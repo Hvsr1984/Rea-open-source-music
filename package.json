@@ -1,0 +1,31 @@
+{
+  "name": "rea-music",
+  "version": "2.4.0",
+  "description": "High-fidelity Apple Music style lossless Indian music streaming player with JioSaavn API integration and synchronized karaoke lyrics.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "music-player",
+    "apple-music",
+    "lossless-audio",
+    "jiosaavn",
+    "lyrics-sync",
+    "web-audio-api",
+    "glassmorphism",
+    "vercel"
+  ],
+  "author": "Hvsr1984",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hvsr1984/rea-music.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hvsr1984/rea-music/issues"
+  },
+  "homepage": "https://github.com/Hvsr1984/rea-music#readme"
+}
