@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REA Music - Free Streaming & Music Exploration</title>
+  <meta name="description" content="REA Music - A modern, high-fidelity music streaming player with smart queue, synchronized lyrics, audio visualizer, and dynamic moods.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/index.css">
+</head>
+<body class="theme-white">
+  <!-- Top Navigation Bar -->
+  <header class="top-nav" id="topNav">
+    <div class="nav-left">
+      <button class="icon-btn" id="menuToggleBtn" aria-label="Toggle navigation drawer" title="Menu">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      </button>
+      <div class="brand" id="brandLogo">
+        <img src="assets/logo.jpg" alt="REA Music Logo" class="brand-logo-img">
+        <span class="brand-name">REA<span class="brand-accent">Music</span></span>
+        <span class="badge-free">FREE</span>
+      </div>
+    </div>
+
+    <div class="nav-center">
+      <div class="search-container" id="searchContainer">
+        <button class="search-icon-btn" aria-label="Search" tabindex="-1">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        </button>
+        <input type="text" id="searchInput" placeholder="Search songs, artists, albums, or moods..." autocomplete="off" spellcheck="false">
+        <button class="search-clear-btn hidden" id="searchClearBtn" aria-label="Clear search">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+        <div class="search-dropdown hidden" id="searchDropdown">
+          <div class="search-results-list" id="searchResultsList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-right">
+      <button class="icon-btn cast-btn" id="castBtn" aria-label="Cast to device" title="Cast audio">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+      </button>
+      <button class="icon-btn settings-btn" id="settingsBtn" aria-label="Settings" title="Settings" onclick="if(window.reamusic&&window.reamusic.openSettingsModal){window.reamusic.openSettingsModal();}else{const m=document.getElementById('settingsModal');if(m){m.classList.remove('hidden');m.style.display='flex';}}">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      </button>
+      <div class="user-avatar" id="userAvatar" title="Active Profile">
+        <span>R</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main App Layout -->
+  <div class="app-layout">
+    <!-- Left Navigation Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav">
+        <a href="#home" class="nav-item active" id="navHome">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span>Home</span>
+        </a>
+        <a href="#explore" class="nav-item" id="navExplore">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 10.9c-.61 0-1.1.49-1.1 1.1s.49 1.1 1.1 1.1c.61 0 1.1-.49 1.1-1.1s-.49-1.1-1.1-1.1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2.19 12.19L6 18l3.81-8.19L18 6l-3.81 8.19z"/></svg>
+          <span>Explore</span>
+        </a>
+        <a href="#library" class="nav-item" id="navLibrary">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12zm-7-2l5-3-5-3v6z"/></svg>
+          <span>Library</span>
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <button class="new-playlist-btn" id="newPlaylistBtn">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span>New playlist</span>
+        </button>
+
+        <div class="playlists-list" id="playlistsList">
+          <div class="playlist-item active-playlist" data-playlist="liked">
+            <div class="playlist-icon heart-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </div>
+            <div class="playlist-info">
+              <span class="playlist-title">Liked Music</span>
+              <span class="playlist-meta">Auto playlist • <span id="likedCount">12</span> tracks</span>
+            </div>
+          </div>
+
+          <div class="playlist-item" data-playlist="superhits">
+            <div class="playlist-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+            </div>
+            <div class="playlist-info">
+              <span class="playlist-title">India Superhits Top 50</span>
+              <span class="playlist-meta">Official Charts • 320kbps</span>
+            </div>
+          </div>
+
+          <div class="playlist-item" data-playlist="romantic">
+            <div class="playlist-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </div>
+            <div class="playlist-info">
+              <span class="playlist-title">Bollywood Love Songs</span>
+              <span class="playlist-meta">Romantic • Soulful Melodies</span>
+            </div>
+          </div>
+
+          <div class="playlist-item" data-playlist="punjabi">
+            <div class="playlist-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+            </div>
+            <div class="playlist-info">
+              <span class="playlist-title">Punjabi Superhits & Bass</span>
+              <span class="playlist-meta">Top Punjabi • Karan & Diljit</span>
+            </div>
+          </div>
+
+          <div class="playlist-item" data-playlist="arijit">
+            <div class="playlist-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            </div>
+            <div class="playlist-info">
+              <span class="playlist-title">Arijit Singh Essentials</span>
+              <span class="playlist-meta">Classics & Sad Songs</span>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="rea-badge-box">
+          <div class="badge-header">
+            <span class="rea-sparkle">✦</span>
+            <strong>REA Indian Music</strong>
+          </div>
+          <p>Lossless 320kbps Indian audio, lyrics & unlimited search.</p>
+        </div>
+      </div>
+    </aside>
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div class="sidebar-backdrop hidden" id="sidebarBackdrop"></div>
+
+    <!-- Center Scrollable Content Area -->
+    <main class="main-content" id="mainContent">
+      <!-- VIEW 1: HOME -->
+      <div class="view-pane active" id="viewHome">
+        <!-- Filter Chips Carousel -->
+        <section class="chips-container" id="chipsContainer">
+          <button class="filter-chip active" data-filter="all">All</button>
+          <button class="filter-chip" data-filter="superhits">India Superhits</button>
+          <button class="filter-chip" data-filter="romantic">Bollywood Romantic</button>
+          <button class="filter-chip" data-filter="punjabi">Punjabi Hits</button>
+          <button class="filter-chip" data-filter="arijit">Arijit Singh</button>
+          <button class="filter-chip" data-filter="retro90s">Retro 90s</button>
+          <button class="filter-chip" data-filter="trending">Trending Today</button>
+        </section>
+
+        <!-- Section: Quick Picks (4-column compact list) -->
+        <section class="shelf" id="quickPicksShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">OFFICIAL INDIAN CHARTS</span>
+              <h2 class="shelf-title">India Superhits Top 50</h2>
+            </div>
+            <button class="btn-play-all" id="playAllQuickPicksBtn">Play all</button>
+          </div>
+
+          <div class="quick-picks-grid" id="quickPicksGrid">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+
+        <!-- Section: Trending & Recommended (Horizontal Carousel) -->
+        <section class="shelf" id="trendingShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">COMMUNITY FAVORITES</span>
+              <h2 class="shelf-title">Trending Hits & Viral India</h2>
+            </div>
+            <div class="carousel-arrows">
+              <button class="arrow-btn" id="trendingPrevBtn" aria-label="Previous">❮</button>
+              <button class="arrow-btn" id="trendingNextBtn" aria-label="Next">❯</button>
+            </div>
+          </div>
+
+          <div class="cards-carousel" id="trendingCarousel">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+
+        <!-- Section: Moods & Genres (Visual Grid) -->
+        <section class="shelf" id="moodsShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">EXPLORE INDIAN GENRES</span>
+              <h2 class="shelf-title">Categories & Artists</h2>
+            </div>
+          </div>
+
+          <div class="mood-cards-grid" id="moodsGrid">
+            <div class="mood-card mood-synthwave" data-genre="superhits">
+              <div class="mood-border"></div>
+              <h3>India Superhits Top 50</h3>
+              <span class="mood-subtitle">Official Billboard India</span>
+            </div>
+            <div class="mood-card mood-lofi" data-genre="romantic">
+              <div class="mood-border"></div>
+              <h3>Bollywood Romance</h3>
+              <span class="mood-subtitle">Arijit, Pritam, Shreya</span>
+            </div>
+            <div class="mood-card mood-electro" data-genre="punjabi">
+              <div class="mood-border"></div>
+              <h3>Punjabi Beats & Bass</h3>
+              <span class="mood-subtitle">Karan Aujla, Diljit, Sidhu</span>
+            </div>
+            <div class="mood-card mood-acoustic" data-genre="arijit">
+              <div class="mood-border"></div>
+              <h3>Arijit Singh Essentials</h3>
+              <span class="mood-subtitle">Soulful Melodies & Classics</span>
+            </div>
+            <div class="mood-card mood-phonk" data-genre="retro90s">
+              <div class="mood-border"></div>
+              <h3>Retro 90s Golden Era</h3>
+              <span class="mood-subtitle">Kishore Kumar, Lata, Udit</span>
+            </div>
+            <div class="mood-card mood-piano" data-genre="trending">
+              <div class="mood-border"></div>
+              <h3>Viral & Trending Now</h3>
+              <span class="mood-subtitle">Most Streamed Today</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Deep Focus & Ambient -->
+        <section class="shelf" id="focusShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">TOP PLAYLIST</span>
+              <h2 class="shelf-title">Punjabi Superhits & Desi Bass</h2>
+            </div>
+          </div>
+
+          <div class="cards-carousel" id="focusCarousel">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+      </div>
+
+      <!-- VIEW 2: EXPLORE -->
+      <div class="view-pane hidden" id="viewExplore">
+        <!-- Top Explore Buttons (YouTube Music style) -->
+        <div class="explore-hero-nav">
+          <button class="explore-nav-btn" data-explore-scroll="exploreReleasesShelf">
+            <span class="explore-btn-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5z"/></svg>
+            </span>
+            <span class="explore-btn-label">New releases</span>
+          </button>
+          <button class="explore-nav-btn" data-explore-scroll="exploreChartsShelf">
+            <span class="explore-btn-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z"/></svg>
+            </span>
+            <span class="explore-btn-label">Charts</span>
+          </button>
+          <button class="explore-nav-btn" data-explore-scroll="exploreMoodsShelf">
+            <span class="explore-btn-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            </span>
+            <span class="explore-btn-label">Moods & genres</span>
+          </button>
+        </div>
+
+        <!-- Section: New Releases (Albums & Singles) -->
+        <section class="shelf" id="exploreReleasesShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">HOT OFF THE PRESS</span>
+              <h2 class="shelf-title">Latest Indian Releases</h2>
+            </div>
+          </div>
+          <div class="cards-carousel" id="exploreReleasesCarousel">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- Section: Top Charts India (Ranked 1 to 20 with numbers and badges) -->
+        <section class="shelf" id="exploreChartsShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">OFFICIAL RANKINGS</span>
+              <h2 class="shelf-title">Top 20 Songs: India</h2>
+            </div>
+            <button class="btn-play-all" id="playAllChartsBtn">Play all</button>
+          </div>
+          <div class="charts-ranked-grid" id="exploreChartsGrid">
+            <!-- Numbered list 1-20 -->
+          </div>
+        </section>
+
+        <!-- Section: All Moods & Genres Directory -->
+        <section class="shelf" id="exploreMoodsShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">BROWSE BY VIBE</span>
+              <h2 class="shelf-title">Moods & Genres</h2>
+            </div>
+          </div>
+          <div class="explore-genre-grid" id="exploreGenreGrid">
+            <div class="genre-tile g-romance" data-search-genre="Bollywood Romance">
+              <h3>Bollywood Romance</h3>
+              <span>Arijit, Pritam, Shreya</span>
+            </div>
+            <div class="genre-tile g-punjabi" data-search-genre="Punjabi Hits">
+              <h3>Punjabi Pop & Dhol</h3>
+              <span>Diljit, Karan Aujla</span>
+            </div>
+            <div class="genre-tile g-party" data-search-genre="Bollywood Party Hits">
+              <h3>Party & Dance</h3>
+              <span>Badshah, Honey Singh</span>
+            </div>
+            <div class="genre-tile g-lofi" data-search-genre="Hindi Lo-Fi">
+              <h3>Chill & Hindi Lo-Fi</h3>
+              <span>Late night acoustic</span>
+            </div>
+            <div class="genre-tile g-retro" data-search-genre="Retro Hindi Classics">
+              <h3>90s & Kishore Kumar</h3>
+              <span>Golden era nostalgia</span>
+            </div>
+            <div class="genre-tile g-sufi" data-search-genre="Sufi Qawwali Hindi">
+              <h3>Sufi & Qawwali</h3>
+              <span>Nusrat, Rahat, Kailash</span>
+            </div>
+            <div class="genre-tile g-workout" data-search-genre="Punjabi Workout Bass">
+              <h3>Gym & Desi Bass</h3>
+              <span>High voltage energy</span>
+            </div>
+            <div class="genre-tile g-south" data-search-genre="South Indian Superhits">
+              <h3>South Indian Cinema</h3>
+              <span>Anirudh, AR Rahman, DSP</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- VIEW 3: LIBRARY -->
+      <div class="view-pane hidden" id="viewLibrary">
+        <div class="library-header">
+          <h1 class="library-main-title">Library</h1>
+          <div class="library-filter-chips">
+            <button class="lib-chip active" data-lib-tab="all">All</button>
+            <button class="lib-chip" data-lib-tab="liked">Liked music</button>
+            <button class="lib-chip" data-lib-tab="playlists">Playlists</button>
+            <button class="lib-chip" data-lib-tab="history">History</button>
+          </div>
+        </div>
+
+        <!-- Liked Music Hero Banner -->
+        <div class="library-hero-card" id="libLikedHero">
+          <div class="lib-hero-cover heart-gradient">
+            <svg viewBox="0 0 24 24" width="48" height="48"><path fill="#fff" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </div>
+          <div class="lib-hero-details">
+            <span class="lib-hero-badge">AUTO PLAYLIST</span>
+            <h2 class="lib-hero-title">Liked Music</h2>
+            <p class="lib-hero-meta"><span id="libLikedTotalCount">12</span> tracks • Auto-updated when you like songs</p>
+            <div class="lib-hero-actions">
+              <button class="btn-play-hero" id="playAllLikedBtn">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                <span>Play</span>
+              </button>
+              <button class="btn-shuffle-hero" id="shuffleLikedBtn">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+                <span>Shuffle</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Library Content: Liked Songs List -->
+        <section class="shelf" id="libLikedSongsShelf">
+          <div class="shelf-header">
+            <h3 class="shelf-title">Liked Songs</h3>
+          </div>
+          <div class="lib-tracks-list" id="libLikedList">
+            <!-- Populated from liked songs -->
+          </div>
+        </section>
+
+        <!-- Library Content: Playlists Grid -->
+        <section class="shelf" id="libPlaylistsShelf">
+          <div class="shelf-header">
+            <h3 class="shelf-title">Playlists</h3>
+            <button class="new-playlist-btn-lib" id="createPlaylistLibBtn">+ New playlist</button>
+          </div>
+          <div class="lib-playlists-grid" id="libPlaylistsGrid">
+            <!-- Custom + Built-in playlists -->
+          </div>
+        </section>
+
+        <!-- Library Content: History / Recently Played -->
+        <section class="shelf" id="libHistoryShelf">
+          <div class="shelf-header">
+            <h3 class="shelf-title">Recently Played</h3>
+            <button class="clear-history-btn" id="clearHistoryBtn">Clear history</button>
+          </div>
+          <div class="lib-tracks-list" id="libHistoryList">
+            <!-- Populated from playback history -->
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Right Side Drawer: Up Next Queue & Lyrics Panel -->
+    <aside class="queue-panel hidden" id="queuePanel">
+      <div class="queue-tabs">
+        <button class="queue-tab active" data-tab="up-next" id="tabUpNext">UP NEXT</button>
+        <button class="queue-tab" data-tab="lyrics" id="tabLyrics">LYRICS</button>
+        <button class="queue-tab" data-tab="related" id="tabRelated">RELATED</button>
+        <button class="icon-btn queue-close-btn" id="closeQueueBtn" aria-label="Close drawer">✕</button>
+      </div>
+
+      <!-- Tab Content: Queue -->
+      <div class="tab-pane active" id="paneUpNext">
+        <div class="queue-header-row">
+          <div class="playing-from">Playing from <strong>REA Curated Mix</strong></div>
+          <div class="queue-actions">
+            <button class="queue-action-btn" id="clearQueueBtn">Clear</button>
+            <button class="queue-action-btn" id="saveQueueBtn">Save as</button>
+          </div>
+        </div>
+        <div class="queue-list" id="queueList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Tab Content: Synced Lyrics -->
+      <div class="tab-pane" id="paneLyrics">
+        <div class="lyrics-container" id="lyricsContainer">
+          <div class="lyrics-header">
+            <span class="lyrics-badge">LIVE SYNC</span>
+            <h3 id="lyricsTrackTitle">Track Title</h3>
+            <p id="lyricsArtistName">Artist Name</p>
+          </div>
+          <div class="lyrics-body" id="lyricsBody">
+            <!-- Lyrics lines populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: Related & Credits -->
+      <div class="tab-pane" id="paneRelated">
+        <div class="related-container" id="relatedContainer">
+          <div class="related-artist-card" id="relatedArtistCard">
+            <!-- Artist details -->
+          </div>
+          <h4>Similar Tracks & Recommendations</h4>
+          <div class="related-tracks-list" id="relatedTracksList"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Persistent Bottom Player Bar (Identical to YouTube Music) -->
+  <footer class="player-bar" id="playerBar">
+    <!-- Progress Scrubber Overlay -->
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-hover" id="progressHover"></div>
+        <div class="progress-bar-buffered" id="progressBuffered"></div>
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-thumb" id="progressThumb"></div>
+      <div class="progress-tooltip" id="progressTooltip">0:00</div>
+    </div>
+
+    <!-- Left: Song Information & Actions -->
+    <div class="player-left">
+      <div class="player-thumbnail-container" id="playerThumbContainer">
+        <img src="assets/midnight_vibes.jpg" alt="Now Playing Art" class="player-thumb-img" id="playerThumbImg">
+        <div class="player-thumb-hover-expand" title="Expand view">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/></svg>
+        </div>
+      </div>
+      <div class="player-meta">
+        <div class="player-title-row">
+          <span class="player-title" id="playerTitle">Cybernetic Dreamscape</span>
+        </div>
+        <div class="player-artist-row">
+          <span class="player-artist" id="playerArtist">Synthetix</span>
+          <span class="dot-separator">•</span>
+          <span class="player-album" id="playerAlbum">Midnight Vibes</span>
+        </div>
+      </div>
+      <div class="player-actions">
+        <button class="icon-btn action-thumb" id="dislikeBtn" title="Dislike">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/></svg>
+        </button>
+        <button class="icon-btn action-thumb" id="likeBtn" title="Like">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.58 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Center: Main Playback Controls -->
+    <div class="player-center">
+      <div class="controls-row">
+        <button class="icon-btn control-btn" id="shuffleBtn" title="Shuffle (S)">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+        </button>
+        <button class="icon-btn control-btn" id="prevBtn" title="Previous (J)">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button class="play-pause-btn" id="playPauseBtn" title="Play/Pause (Space)">
+          <svg class="play-icon" id="playSvg" viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+          <svg class="pause-icon hidden" id="pauseSvg" viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="icon-btn control-btn" id="nextBtn" title="Next (K)">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+        <button class="icon-btn control-btn" id="repeatBtn" title="Repeat (R)">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+        </button>
+      </div>
+
+      <div class="time-row">
+        <span class="time-text" id="timeCurrent">0:00</span>
+        <span class="time-slash">/</span>
+        <span class="time-text" id="timeTotal">3:45</span>
+      </div>
+    </div>
+
+    <!-- Right: Utility Controls (Volume, Queue, Lyrics, Visualizer) -->
+    <div class="player-right">
+      <!-- Live Audio Waveform Canvas -->
+      <canvas class="audio-visualizer-canvas" id="audioVisualizer" width="80" height="24" title="Audio Spectrum"></canvas>
+
+      <!-- Volume Controls -->
+      <div class="volume-container">
+        <button class="icon-btn volume-btn" id="volumeBtn" title="Mute/Unmute (M)">
+          <svg id="volHighSvg" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <svg id="volMuteSvg" class="hidden" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+        </button>
+        <div class="volume-slider-track" id="volumeTrack">
+          <div class="volume-fill" id="volumeFill"></div>
+        </div>
+      </div>
+
+      <!-- Drawer Toggles -->
+      <button class="icon-btn drawer-toggle-btn" id="toggleQueueBtn" title="Toggle Up Next Queue">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+      </button>
+
+      <button class="icon-btn drawer-toggle-btn" id="toggleLyricsBtn" title="Toggle Lyrics">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h10v2H7zm0 4h10v2H7zm0 4h7v2H7z"/></svg>
+      </button>
+
+      <button class="icon-btn fullscreen-btn" id="fullscreenBtn" title="Full screen">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Apple Music Style Mobile Bottom Tab Bar -->
+  <nav class="mobile-tab-bar" id="mobileTabBar" aria-label="Mobile Navigation">
+    <button class="mobile-tab-btn active" data-view="home" id="mobileTabHome" aria-label="Home">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="mobile-tab-btn" data-view="explore" id="mobileTabExplore" aria-label="Explore">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+      <span>Explore</span>
+    </button>
+    <button class="mobile-tab-btn" data-view="library" id="mobileTabLibrary" aria-label="Library">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 10l-2.5-1.5L13 12V6h5v6z"/></svg>
+      <span>Library</span>
+    </button>
+    <button class="mobile-tab-btn" id="mobileTabSearch" aria-label="Search">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 14z"/></svg>
+      <span>Search</span>
+    </button>
+  </nav>
+
+  <!-- Notification Toast -->
+  <div class="toast hidden" id="toast">
+    <span class="toast-message" id="toastMessage">Song added to queue</span>
+  </div>
+
+  <!-- Create Playlist Modal -->
+  <div class="modal-backdrop hidden" id="playlistModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>New playlist</h3>
+        <button class="modal-close-btn" id="closePlaylistModalBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <label for="playlistTitleInput">Title</label>
+        <input type="text" id="playlistTitleInput" placeholder="Enter playlist title (e.g. My Bollywood Chill)" maxlength="60">
+        
+        <label for="playlistDescInput">Description (optional)</label>
+        <textarea id="playlistDescInput" placeholder="Add a description" rows="3"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="cancelPlaylistModalBtn">Cancel</button>
+        <button class="btn-modal-create" id="confirmCreatePlaylistBtn">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apple Settings Modal (Frosted Glass & Appearance Controls) -->
+  <div class="modal-backdrop hidden" id="settingsModal">
+    <div class="modal-box settings-modal-box">
+      <div class="modal-header">
+        <div class="settings-modal-title-group">
+          <h3>Settings</h3>
+          <p class="settings-modal-subtitle">Interface appearance & playback preferences</p>
+        </div>
+        <button class="modal-close-btn" id="closeSettingsModalBtn" aria-label="Close settings" onclick="if(window.reamusic&&window.reamusic.closeSettingsModal){window.reamusic.closeSettingsModal();}else{const m=document.getElementById('settingsModal');if(m){m.classList.add('hidden');m.style.display='none';}}">✕</button>
+      </div>
+      <div class="modal-body settings-modal-body">
+        <!-- Appearance / Theme Selector -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-tag">APPEARANCE</span>
+            <h4>Theme</h4>
+          </div>
+          <div class="theme-selection-grid">
+            <button class="theme-choice-card active" data-theme="white" id="themeChoiceWhite">
+              <div class="theme-preview-card preview-white">
+                <div class="preview-mini-nav"></div>
+                <div class="preview-mini-body">
+                  <div class="preview-mini-pill"></div>
+                  <div class="preview-mini-bar"></div>
+                </div>
+              </div>
+              <div class="theme-choice-info">
+                <div class="theme-choice-name">
+                  <span class="theme-color-dot dot-white"></span>
+                  <span>Glass White</span>
+                </div>
+                <span class="theme-choice-desc">Crisp light frosted glass</span>
+              </div>
+              <div class="theme-check-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              </div>
+            </button>
+
+            <button class="theme-choice-card" data-theme="dark" id="themeChoiceDark">
+              <div class="theme-preview-card preview-dark">
+                <div class="preview-mini-nav"></div>
+                <div class="preview-mini-body">
+                  <div class="preview-mini-pill"></div>
+                  <div class="preview-mini-bar"></div>
+                </div>
+              </div>
+              <div class="theme-choice-info">
+                <div class="theme-choice-name">
+                  <span class="theme-color-dot dot-dark"></span>
+                  <span>Simple Black</span>
+                </div>
+                <span class="theme-choice-desc">Deep OLED obsidian glass</span>
+              </div>
+              <div class="theme-check-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Audio Streaming Settings -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-tag">AUDIO QUALITY</span>
+            <h4>Streaming Engine</h4>
+          </div>
+          <div class="settings-row-item">
+            <div class="settings-row-text">
+              <div class="settings-row-title">Ultra-HD 320kbps Audio</div>
+              <div class="settings-row-desc">Lossless Indian music streaming with Web Audio API</div>
+            </div>
+            <span class="settings-badge-active">ACTIVE</span>
+          </div>
+          <div class="settings-row-item">
+            <div class="settings-row-text">
+              <div class="settings-row-title">Spectrum Visualizer</div>
+              <div class="settings-row-desc">Live real-time frequency analyser in player dock</div>
+            </div>
+            <label class="apple-switch">
+              <input type="checkbox" id="settingVisualizerToggle" checked>
+              <span class="apple-switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Playback & Lyrics Settings -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-tag">PLAYBACK & LYRICS</span>
+            <h4>Features</h4>
+          </div>
+          <div class="settings-row-item">
+            <div class="settings-row-text">
+              <div class="settings-row-title">Synchronized Lyrics</div>
+              <div class="settings-row-desc">Real-time dynamic timecode lyrics engine</div>
+            </div>
+            <span class="settings-badge-active">ENABLED</span>
+          </div>
+          <div class="settings-row-item">
+            <div class="settings-row-text">
+              <div class="settings-row-title">Clear Listening History</div>
+              <div class="settings-row-desc">Remove local play count and recent history</div>
+            </div>
+            <button class="settings-action-btn" id="settingClearHistoryBtn">Clear</button>
+          </div>
+        </div>
+
+        <!-- App Info -->
+        <div class="settings-section settings-about-section">
+          <div class="settings-about-row">
+            <span>REA Music</span>
+            <span>v2.4 Apple Glass</span>
+          </div>
+          <p class="settings-about-note">100% Free & Open Source • Zero Ads • No Subscriptions</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- YouTube Music Style Fullscreen / Theater Maximized Player -->
+  <div class="maximized-player" id="maximizedPlayer" aria-hidden="true">
+    <!-- Ambient Dynamic Glow Backdrop -->
+    <div class="max-ambient-glow" id="maxAmbientGlow"></div>
+    <div class="max-ambient-overlay"></div>
+    <div class="max-grab-handle" id="maxGrabHandle"></div>
+
+    <!-- Top Navigation / Header Bar -->
+    <header class="max-header">
+      <button class="btn-minimize-player" id="minimizePlayerBtn" title="Minimize player (Esc)" aria-label="Minimize player">
+        <svg viewBox="0 0 24 24" width="28" height="28">
+          <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+        </svg>
+      </button>
+
+      <!-- Center Tabs: SONG | LYRICS | UP NEXT -->
+      <nav class="max-tabs-nav" id="maxTabsNav">
+        <button class="max-tab-btn active" data-max-tab="song" id="maxTabSongBtn">SONG</button>
+        <button class="max-tab-btn" data-max-tab="lyrics" id="maxTabLyricsBtn">LYRICS</button>
+        <button class="max-tab-btn" data-max-tab="queue" id="maxTabQueueBtn">UP NEXT</button>
+      </nav>
+
+      <div class="max-header-actions">
+        <button class="icon-btn max-action-btn" id="maxFullscreenToggleBtn" title="Toggle Fullscreen Window">
+          <svg viewBox="0 0 24 24" width="22" height="22">
+            <path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area: Split Stage -->
+    <main class="max-content-stage">
+      <!-- Left Column: Giant Album Art & Metadata -->
+      <section class="max-stage-left" id="maxStageLeft">
+        <div class="max-art-wrapper">
+          <img src="assets/midnight_vibes.jpg" alt="Now Playing Album Art" class="max-album-art" id="maxAlbumArt">
+          <div class="max-art-glow-ring"></div>
+        </div>
+
+        <div class="max-meta-row">
+          <div class="max-meta-info">
+            <h1 class="max-track-title" id="maxTrackTitle">Cybernetic Dreamscape</h1>
+            <div class="max-track-subline">
+              <span class="max-track-artist" id="maxTrackArtist">Synthetix</span>
+              <span class="dot-separator">•</span>
+              <span class="max-track-album" id="maxTrackAlbum">Midnight Vibes</span>
+            </div>
+          </div>
+          <div class="max-meta-actions">
+            <button class="icon-btn max-thumb-btn" id="maxDislikeBtn" title="Dislike">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/></svg>
+            </button>
+            <button class="icon-btn max-thumb-btn" id="maxLikeBtn" title="Like">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.58 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Interactive Panel (Lyrics / Up Next Queue) -->
+      <section class="max-stage-right" id="maxStageRight">
+        <!-- Lyrics Panel View -->
+        <div class="max-panel-pane max-lyrics-pane active" id="maxLyricsPane">
+          <div class="max-pane-header">
+            <h3>Synchronized Lyrics</h3>
+            <span class="max-lyrics-badge">LIVE SYNC</span>
+          </div>
+          <div class="max-lyrics-scroll" id="maxLyricsScroll">
+            <!-- Lyrics lines populated by JS -->
+          </div>
+        </div>
+
+        <!-- Up Next Queue Panel View -->
+        <div class="max-panel-pane max-queue-pane hidden" id="maxQueuePane">
+          <div class="max-pane-header">
+            <h3>Playing Next</h3>
+            <span class="max-queue-count" id="maxQueueCount">5 songs</span>
+          </div>
+          <div class="max-queue-list" id="maxQueueList">
+            <!-- Queue items populated by JS -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Scrubber & Giant Playback Controls -->
+    <footer class="max-footer-controls">
+      <!-- Scrubber Timeline -->
+      <div class="max-scrubber-container">
+        <span class="max-time-label" id="maxTimeCurrent">0:00</span>
+        <div class="max-progress-track" id="maxProgressTrack">
+          <div class="max-progress-fill" id="maxProgressFill"></div>
+          <div class="max-progress-thumb" id="maxProgressThumb"></div>
+        </div>
+        <span class="max-time-label" id="maxTimeTotal">3:45</span>
+      </div>
+
+      <!-- Main Controls Row -->
+      <div class="max-controls-row">
+        <div class="max-controls-sub-left">
+          <button class="icon-btn max-ctrl-btn" id="maxShuffleBtn" title="Shuffle (S)">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+          </button>
+        </div>
+
+        <div class="max-controls-main">
+          <button class="icon-btn max-skip-btn" id="maxPrevBtn" title="Previous (J)">
+            <svg viewBox="0 0 24 24" width="32" height="32"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          
+          <button class="max-play-pause-btn" id="maxPlayPauseBtn" title="Play/Pause (Space)">
+            <svg class="max-play-icon" id="maxPlaySvg" viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+            <svg class="max-pause-icon hidden" id="maxPauseSvg" viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+
+          <button class="icon-btn max-skip-btn" id="maxNextBtn" title="Next (K)">
+            <svg viewBox="0 0 24 24" width="32" height="32"><path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          </button>
+        </div>
+
+        <div class="max-controls-sub-right">
+          <button class="icon-btn max-ctrl-btn" id="maxRepeatBtn" title="Repeat (R)">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+          </button>
+          <div class="max-volume-container">
+            <button class="icon-btn max-volume-btn" id="maxVolumeBtn" title="Mute/Unmute (M)">
+              <svg id="maxVolHighSvg" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+              <svg id="maxVolMuteSvg" class="hidden" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+            </button>
+            <div class="max-volume-track" id="maxVolumeTrack">
+              <div class="max-volume-fill" id="maxVolumeFill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

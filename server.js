@@ -32,7 +32,10 @@ const server = http.createServer(async (req, res) => {
   // Static file server
   let cleanUrl = pathname;
   if (cleanUrl === '/') cleanUrl = '/index.html';
-  const filePath = path.join(__dirname, cleanUrl);
+  let filePath = path.join(__dirname, 'public', cleanUrl);
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(__dirname, cleanUrl);
+  }
 
   fs.readFile(filePath, (err, content) => {
     if (err) {
