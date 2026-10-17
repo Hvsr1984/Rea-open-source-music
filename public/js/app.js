@@ -1,4 +1,10 @@
-/**
+// REA Music Engine v2.4.1
+if (window.__REA_INITIALIZED__) {
+  console.log('[REA] App already initialized');
+} else {
+  window.__REA_INITIALIZED__ = true;
+  const FALLBACK_COVER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E";
+  /**
  * REA MUSIC - Application Engine
  * High-fidelity YouTube Music experience with:
  * - Real 320kbps Lossless Indian Music Streaming (JioSaavn CDN integration)
@@ -1105,7 +1111,7 @@ class REAMusicApp {
         card.className = 'music-card';
         card.innerHTML = `
           <div class="music-card-thumb">
-            <img src="${album.cover}" alt="${album.title}" onerror="this.onerror=null;this.src='assets/midnight_vibes.jpg'">
+            <img src="${album.cover}" alt="${album.title}" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'">
             <button class="music-card-play" aria-label="Play ${album.title}">
               <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
             </button>
@@ -1140,7 +1146,7 @@ class REAMusicApp {
         card.innerHTML = `
           <div class="rank-number ${track.rank <= 3 ? 'top-three' : ''}">${track.rank}</div>
           <div class="rank-badge ${track.rankChange === 'NEW' ? 'badge-new' : ''}">${track.rankChange || '#1'}</div>
-          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" onerror="this.onerror=null;this.src='assets/logo.jpg'" style="width:46px;height:46px;border-radius:4px;object-fit:cover;">
+          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'" style="width:46px;height:46px;border-radius:4px;object-fit:cover;">
           <div class="track-row-info">
             <div class="track-row-title">${track.title}</div>
             <div class="track-row-artist">${track.artist}</div>
@@ -1197,7 +1203,7 @@ class REAMusicApp {
       row.className = 'lib-track-row';
       row.innerHTML = `
         <span class="lib-track-index">${idx + 1}</span>
-        <img src="${track.cover}" alt="${track.title}" class="lib-track-thumb" onerror="this.onerror=null;this.src='assets/logo.jpg'">
+        <img src="${track.cover}" alt="${track.title}" class="lib-track-thumb" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'">
         <div class="lib-track-info">
           <div class="lib-track-title">${track.title}</div>
           <div class="lib-track-artist">${track.artist}</div>
@@ -1938,7 +1944,7 @@ class REAMusicApp {
       const item = document.createElement('div');
       item.className = `max-queue-item ${isCurrent ? 'active' : ''}`;
       item.innerHTML = `
-        <img src="${track.cover}" alt="${track.title}" class="max-queue-thumb" onerror="this.onerror=null;this.src='assets/logo.jpg'">
+        <img src="${track.cover}" alt="${track.title}" class="max-queue-thumb" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'">
         <div class="max-queue-info">
           <div class="max-queue-title">${track.title}</div>
           <div class="max-queue-artist">${track.artist}</div>
@@ -1962,4 +1968,6 @@ if (document.readyState === 'loading') {
   });
 } else {
   window.reamusic = new REAMusicApp();
+}
+
 }
