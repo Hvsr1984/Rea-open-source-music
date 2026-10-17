@@ -191,8 +191,16 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const originalUrl = req.headers['x-forwarded-url'] || req.headers['x-matched-path'] || req.headers['x-invoke-path'] || req.url;
+  const parsedUrl = new URL(originalUrl, `http://${req.headers.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;
+  const pathParam = parsedUrl.searchParams.get('path') || '';
+
+  const isSearch = pathname.endsWith('/search') || pathParam.startsWith('search');
+  const isTrending = pathname.endsWith('/trending') || pathParam.startsWith('trending');
+  const isLyrics = pathname.endsWith('/lyrics') || pathParam.startsWith('lyrics');
+  const isExplore = pathname.endsWith('/explore') || pathParam.startsWith('explore');
+  const isAlbum = pathname.endsWith('/album') || pathParam.startsWith('album');
 
   const sendJson = (statusCode, data) => {
     if (res.status && res.json) {
@@ -204,7 +212,7 @@ export default async function handler(req, res) {
 
   try {
     // 1. Search Indian songs
-    if (pathname.endsWith('/search')) {
+    if (isSearch) {
       const q = parsedUrl.searchParams.get('q');
       if (!q || !q.trim()) {
         return sendJson(200, { results: [] });
@@ -221,7 +229,7 @@ export default async function handler(req, res) {
     }
 
     // 2. Indian Trending & Curated Shelves
-    if (pathname.endsWith('/trending')) {
+    if (isTrending) {
       const category = parsedUrl.searchParams.get('category') || 'all';
 
       if (CACHE.trending[category] && Date.now() - CACHE.trending[category].time < 600000) {
@@ -256,7 +264,7 @@ export default async function handler(req, res) {
     }
 
     // 3. Synced Lyrics
-    if (pathname.endsWith('/lyrics')) {
+    if (isLyrics) {
       const track = parsedUrl.searchParams.get('track') || '';
       const artist = parsedUrl.searchParams.get('artist') || '';
       const lyricsData = await fetchLyrics(track, artist);
@@ -264,7 +272,7 @@ export default async function handler(req, res) {
     }
 
     // 4. Explore (New Releases, Charts, Moods)
-    if (pathname.endsWith('/explore')) {
+    if (isExplore) {
       if (CACHE.trending['explore'] && Date.now() - CACHE.trending['explore'].time < 600000) {
         return sendJson(200, CACHE.trending['explore'].data);
       }
@@ -288,7 +296,7 @@ export default async function handler(req, res) {
     }
 
     // 5. Album songs
-    if (pathname.endsWith('/album')) {
+    if (isAlbum) {
       const id = parsedUrl.searchParams.get('id');
       if (!id) {
         return sendJson(200, { songs: [] });

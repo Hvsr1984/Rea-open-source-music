@@ -10,8 +10,8 @@ const __dirname = path.dirname(__filename);
 const PORT = 4500;
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css',
-  '.js': 'application/javascript',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
@@ -20,35 +20,59 @@ const MIME_TYPES = {
   '.webp': 'image/webp'
 };
 
-const server = http.createServer(async (req, res) => {
-  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+/**
+ * Universal Request Handler for both Vercel Serverless and local Node.js
+ */
+export default async function handler(req, res) {
+  const host = req.headers.host || 'localhost';
+  const trueUrl = req.headers['x-forwarded-url'] || req.headers['x-matched-path'] || req.headers['x-invoke-path'] || req.url;
+  const parsedUrl = new URL(trueUrl, `http://${host}`);
   const pathname = parsedUrl.pathname;
 
-  // Delegate /api/* to the universal Vercel API router
-  if (pathname.startsWith('/api')) {
+  // 1. Delegate /api/* to the JioSaavn API router
+  if (pathname.startsWith('/api') || req.url.startsWith('/api')) {
+    if (req.headers['x-forwarded-url']) {
+      req.url = req.headers['x-forwarded-url'];
+    }
     return apiHandler(req, res);
   }
 
-  // Static file server
+  // 2. Static file serving with SPA fallback
   let cleanUrl = pathname;
-  if (cleanUrl === '/') cleanUrl = '/index.html';
+  if (cleanUrl === '/' || cleanUrl === '' || cleanUrl === '/server.js') {
+    cleanUrl = '/index.html';
+  }
+
   let filePath = path.join(__dirname, 'public', cleanUrl);
   if (!fs.existsSync(filePath)) {
     filePath = path.join(__dirname, cleanUrl);
   }
 
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      return res.end('404 Not Found');
-    }
+  // If path doesn't exist, fall back to index.html (SPA routing)
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    filePath = path.join(__dirname, 'index.html');
+  }
+
+  try {
+    const content = fs.readFileSync(filePath);
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
+    res.setHeader('Content-Type', contentType);
+    if (res.status && res.send) {
+      return res.status(200).send(content);
+    }
+    res.writeHead(200);
     res.end(content);
-  });
-});
+  } catch (err) {
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end('Server Error');
+  }
+}
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`REA_MUSIC_SERVER_READY:http://localhost:${PORT}`);
-});
+// Start local HTTP server if running outside of Vercel
+if (!process.env.VERCEL) {
+  const server = http.createServer(handler);
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`REA_MUSIC_SERVER_READY:http://localhost:${PORT}`);
+  });
+}
