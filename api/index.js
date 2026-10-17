@@ -90,7 +90,7 @@ async function fetchPlaylistSongs(listId) {
 
 async function searchSongs(query) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=25&p=1&q=${encodeURIComponent(query)}`;
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=15&p=1&q=${encodeURIComponent(query)}`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
@@ -107,7 +107,7 @@ async function searchSongs(query) {
 
 async function searchArtists(query) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=8&p=1&q=${encodeURIComponent(query)}`;
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=5&p=1&q=${encodeURIComponent(query)}`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
@@ -307,7 +307,7 @@ export default async function handler(req, res) {
 
       const cacheKey = q.trim().toLowerCase();
       if (CACHE.search[cacheKey] && Date.now() - CACHE.search[cacheKey].time < 300000) {
-        return sendJson(200, CACHE.search[cacheKey].data);
+        return sendJson(200, CACHE.search[cacheKey].data, 300);
       }
 
       const [songs, artists] = await Promise.all([
@@ -317,7 +317,7 @@ export default async function handler(req, res) {
 
       const payload = { results: songs, artists: artists };
       CACHE.search[cacheKey] = { time: Date.now(), data: payload };
-      return sendJson(200, payload);
+      return sendJson(200, payload, 300);
     }
 
     // 2. Indian Trending & Curated Shelves
