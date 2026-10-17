@@ -1,6 +1,6 @@
 {
   "name": "rea-music",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "description": "High-fidelity Apple Music style lossless Indian music streaming player with JioSaavn API integration and synchronized karaoke lyrics.",
   "type": "module",
   "main": "server.js",

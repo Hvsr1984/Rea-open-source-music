@@ -4,7 +4,8 @@ import { decryptSaavnUrl } from './des.js';
 const CACHE = {
   trending: {},
   search: {},
-  lyrics: {}
+  lyrics: {},
+  artist: {}
 };
 
 function decodeEntities(str) {
@@ -253,7 +254,10 @@ export default async function handler(req, res) {
   const isRecommendations = pathname.endsWith('/recommendations') || pathParam.startsWith('recommendations');
   const isArtist = pathname.endsWith('/artist') || pathParam.startsWith('artist');
 
-  const sendJson = (statusCode, data) => {
+  const sendJson = (statusCode, data, maxAge = 120) => {
+    if (statusCode === 200) {
+      res.setHeader('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge * 2}, stale-while-revalidate=86400`);
+    }
     if (res.status && res.json) {
       return res.status(statusCode).json(data);
     }
@@ -449,19 +453,28 @@ export default async function handler(req, res) {
     if (isArtist) {
       const id = parsedUrl.searchParams.get('id');
       const name = parsedUrl.searchParams.get('name');
+      const cacheKey = (id || name || '').trim().toLowerCase();
+      if (cacheKey && CACHE.artist[cacheKey] && Date.now() - CACHE.artist[cacheKey].time < 600000) {
+        return sendJson(200, CACHE.artist[cacheKey].data, 300);
+      }
       if (id) {
         const details = await fetchArtistDetails(id);
-        if (details) return sendJson(200, details);
+        if (details) {
+          CACHE.artist[cacheKey] = { time: Date.now(), data: details };
+          return sendJson(200, details, 300);
+        }
       }
       if (name) {
         const songs = await searchSongs(name);
-        return sendJson(200, {
+        const payload = {
           id: `artist-${Date.now()}`,
           name,
           image: songs[0]?.cover || '',
           subtitle: 'Indian Singer / Artist',
           songs
-        });
+        };
+        CACHE.artist[cacheKey] = { time: Date.now(), data: payload };
+        return sendJson(200, payload, 300);
       }
       return sendJson(400, { error: 'Missing artist id or name' });
     }
