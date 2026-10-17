@@ -38,8 +38,6 @@ jsContent = jsContent.replace(/this\.src='assets\/midnight_vibes\.jpg'/g, `this.
 
 // Write back updated js/app.js and css/index.css
 fs.writeFileSync(jsPath, jsContent, 'utf8');
-fs.writeFileSync(path.join(__dirname, 'app.js'), jsContent, 'utf8');
-fs.writeFileSync(path.join(__dirname, 'index.css'), cssContent, 'utf8');
 
 // Ensure public directories exist
 fs.mkdirSync(path.join(__dirname, 'public', 'css'), { recursive: true });
