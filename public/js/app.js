@@ -79,6 +79,115 @@ const FALLBACK_TRACKS = [
 ];
 
 // =============================================================================
+// Offline Storage (IndexedDB for Persistent Lossless Audio & Offline Vault)
+// =============================================================================
+class OfflineStorage {
+  constructor() {
+    this.dbName = 'reamusic_offline_v1';
+    this.storeName = 'downloaded_tracks';
+    this.db = null;
+    this.isReady = false;
+    this.readyPromise = this.init();
+  }
+
+  init() {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined' || !window.indexedDB) {
+        console.warn('[OfflineStorage] IndexedDB not available');
+        resolve(null);
+        return;
+      }
+      try {
+        const req = window.indexedDB.open(this.dbName, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(this.storeName)) {
+            const store = db.createObjectStore(this.storeName, { keyPath: 'id' });
+            store.createIndex('downloadedAt', 'downloadedAt', { unique: false });
+          }
+        };
+        req.onsuccess = (e) => {
+          this.db = e.target.result;
+          this.isReady = true;
+          resolve(this.db);
+        };
+        req.onerror = (e) => {
+          console.warn('[OfflineStorage] IndexedDB open failed:', e);
+          resolve(null);
+        };
+      } catch (err) {
+        console.warn('[OfflineStorage] IndexedDB initialization error:', err);
+        resolve(null);
+      }
+    });
+  }
+
+  async getAllTracks() {
+    await this.readyPromise;
+    if (!this.db) return [];
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(this.storeName, 'readonly');
+        const store = tx.objectStore(this.storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      } catch (err) {
+        resolve([]);
+      }
+    });
+  }
+
+  async saveTrack(trackData) {
+    await this.readyPromise;
+    if (!this.db) return false;
+    return new Promise((resolve, reject) => {
+      try {
+        const tx = this.db.transaction(this.storeName, 'readwrite');
+        const store = tx.objectStore(this.storeName);
+        const req = store.put(trackData);
+        req.onsuccess = () => resolve(true);
+        req.onerror = (e) => reject(e);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async deleteTrack(id) {
+    await this.readyPromise;
+    if (!this.db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(this.storeName, 'readwrite');
+        const store = tx.objectStore(this.storeName);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => resolve(false);
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  }
+
+  async clearAll() {
+    await this.readyPromise;
+    if (!this.db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(this.storeName, 'readwrite');
+        const store = tx.objectStore(this.storeName);
+        const req = store.clear();
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => resolve(false);
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  }
+}
+
+// =============================================================================
 // 2. Hybrid Audio Engine (HTML5 Media Element + Web Audio Analyser)
 // =============================================================================
 class HybridAudioEngine {
@@ -130,9 +239,10 @@ class HybridAudioEngine {
     }
 
     this.currentTrack = track;
-    if (track.audioUrl) {
-      if (this.audio.src !== track.audioUrl) {
-        this.audio.src = track.audioUrl;
+    const audioSource = track.localBlobUrl || track.audioUrl;
+    if (audioSource) {
+      if (this.audio.src !== audioSource) {
+        this.audio.src = audioSource;
       }
       this.audio.play().catch(e => {
         console.warn('Audio play notice:', e);
@@ -186,8 +296,15 @@ class REAMusicApp {
     this.isShuffle = false;
     this.activeTab = 'up-next';
     this.activeFilter = 'all';
-    this.currentView = 'home'; // 'home', 'explore', 'library'
-    this.currentLibTab = 'all'; // 'all', 'liked', 'playlists', 'history'
+    this.currentView = 'home'; // 'home', 'explore', 'library', 'downloads'
+    this.currentLibTab = 'all'; // 'all', 'liked', 'downloads', 'playlists', 'history'
+
+    // Offline Storage & Downloads Vault
+    this.offlineStorage = new OfflineStorage();
+    this.downloadedTracks = [];
+    this.downloadedTrackIds = new Set();
+    this.activeDownloads = new Map();
+    this.downloadsFilter = '';
 
     // Persistent User Data from LocalStorage
     this.likedTracks = this.loadLocalStorage('rea_liked_tracks', FALLBACK_TRACKS.slice(0, 2));
@@ -206,12 +323,72 @@ class REAMusicApp {
     this.searchDebounceTimer = null;
     this.currentTheme = 'white';
 
+    // Search History & Recommendation State
+    this.searchHistory = this.loadLocalStorage('rea_search_history', [
+      'Arijit Singh',
+      'Tauba Tauba',
+      'Kesariya',
+      'Diljit Dosanjh',
+      'Bollywood Romance'
+    ]);
+    this.recommendations = [];
+    this.trendingSearches = [
+      'Arijit Singh',
+      'Diljit Dosanjh',
+      'Tauba Tauba',
+      'Kesariya',
+      'Bollywood Romance',
+      'Sid Sriram',
+      'Anirudh',
+      'Punjabi Hits',
+      'Shreya Ghoshal',
+      'Karan Aujla',
+      'Lofi Hindi'
+    ];
+
     this.initDOMElements();
     this.initTheme();
+    this.initOfflineStorage();
     this.bindEvents();
     this.startVisualizer();
     this.renderAll();
     this.loadIndianMusicCatalog();
+    this.loadRecommendations();
+  }
+
+  async initOfflineStorage() {
+    try {
+      const records = await this.offlineStorage.getAllTracks();
+      if (records && records.length > 0) {
+        records.sort((a, b) => (b.downloadedAt || 0) - (a.downloadedAt || 0));
+        records.forEach(r => {
+          let localBlobUrl = null;
+          if (r.audioBlob) {
+            try {
+              localBlobUrl = URL.createObjectURL(r.audioBlob);
+            } catch (e) {
+              console.warn('Object URL creation warning:', r.title, e);
+            }
+          }
+          this.downloadedTracks.push({
+            ...r,
+            localBlobUrl
+          });
+          this.downloadedTrackIds.add(r.id);
+        });
+      }
+      this.updateDownloadsStats();
+      this.renderPlayerInfo();
+      this.renderShelves();
+      if (this.currentView === 'downloads') {
+        this.renderDownloads();
+      }
+      if (this.currentView === 'library') {
+        this.renderLibrary();
+      }
+    } catch (err) {
+      console.warn('[OfflineStorage] Error loading offline tracks:', err);
+    }
   }
 
   initTheme() {
@@ -279,17 +456,55 @@ class REAMusicApp {
     this.navHome = document.getElementById('navHome');
     this.navExplore = document.getElementById('navExplore');
     this.navLibrary = document.getElementById('navLibrary');
+    this.navDownloads = document.getElementById('navDownloads');
+    this.sidebarDownloadsBadge = document.getElementById('sidebarDownloadsBadge');
 
     // Views
     this.viewHome = document.getElementById('viewHome');
     this.viewExplore = document.getElementById('viewExplore');
     this.viewLibrary = document.getElementById('viewLibrary');
+    this.viewDownloads = document.getElementById('viewDownloads');
 
-    // Header
+    // Downloads View Elements
+    this.downloadsHeroCard = document.getElementById('downloadsHeroCard');
+    this.downloadsCount = document.getElementById('downloadsCount');
+    this.downloadsTotalSize = document.getElementById('downloadsTotalSize');
+    this.playAllDownloadsBtn = document.getElementById('playAllDownloadsBtn');
+    this.shuffleDownloadsBtn = document.getElementById('shuffleDownloadsBtn');
+    this.downloadAllLikedBtn = document.getElementById('downloadAllLikedBtn');
+    this.clearAllDownloadsBtn = document.getElementById('clearAllDownloadsBtn');
+    this.storageStatsText = document.getElementById('storageStatsText');
+    this.storageMeterFill = document.getElementById('storageMeterFill');
+    this.downloadsSearchInput = document.getElementById('downloadsSearchInput');
+    this.downloadsTracksList = document.getElementById('downloadsTracksList');
+
+    // Library Downloads Shelf Elements
+    this.libDownloadsShelf = document.getElementById('libDownloadsShelf');
+    this.libDownloadsList = document.getElementById('libDownloadsList');
+    this.viewAllDownloadsBtn = document.getElementById('viewAllDownloadsBtn');
+
+    // Header & Search Hub
     this.searchInput = document.getElementById('searchInput');
     this.searchClearBtn = document.getElementById('searchClearBtn');
     this.searchDropdown = document.getElementById('searchDropdown');
+    this.searchHubContent = document.getElementById('searchHubContent');
+    this.searchRecentSection = document.getElementById('searchRecentSection');
+    this.searchHistoryList = document.getElementById('searchHistoryList');
+    this.searchClearHistoryBtn = document.getElementById('searchClearHistoryBtn');
+    this.trendingTagsGrid = document.getElementById('trendingTagsGrid');
+    this.searchRecoList = document.getElementById('searchRecoList');
     this.searchResultsList = document.getElementById('searchResultsList');
+
+    // Home Recommended Shelf Elements
+    this.recommendedShelf = document.getElementById('recommendedShelf');
+    this.recommendedCarousel = document.getElementById('recommendedCarousel');
+    this.recommendedPrevBtn = document.getElementById('recommendedPrevBtn');
+    this.recommendedNextBtn = document.getElementById('recommendedNextBtn');
+
+    // Drawer Related & Recommendations Pane
+    this.relatedContainer = document.getElementById('relatedContainer');
+    this.relatedArtistCard = document.getElementById('relatedArtistCard');
+    this.relatedTracksList = document.getElementById('relatedTracksList');
 
     // Sidebar
     this.sidebar = document.getElementById('sidebar');
@@ -343,6 +558,7 @@ class REAMusicApp {
     this.playerAlbum = document.getElementById('playerAlbum');
     this.likeBtn = document.getElementById('likeBtn');
     this.dislikeBtn = document.getElementById('dislikeBtn');
+    this.playerDownloadBtn = document.getElementById('playerDownloadBtn');
     this.playPauseBtn = document.getElementById('playPauseBtn');
     this.playIcon = document.getElementById('playSvg');
     this.pauseIcon = document.getElementById('pauseSvg');
@@ -383,6 +599,7 @@ class REAMusicApp {
     this.maxTrackAlbum = document.getElementById('maxTrackAlbum');
     this.maxLikeBtn = document.getElementById('maxLikeBtn');
     this.maxDislikeBtn = document.getElementById('maxDislikeBtn');
+    this.maxDownloadBtn = document.getElementById('maxDownloadBtn');
     this.maxLyricsPane = document.getElementById('maxLyricsPane');
     this.maxQueuePane = document.getElementById('maxQueuePane');
     this.maxLyricsScroll = document.getElementById('maxLyricsScroll');
@@ -540,6 +757,82 @@ class REAMusicApp {
         this.switchView('library');
       });
     }
+    if (this.navDownloads) {
+      this.navDownloads.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.switchView('downloads');
+      });
+    }
+
+    // Downloads View & Player Actions
+    if (this.viewAllDownloadsBtn) {
+      this.viewAllDownloadsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.switchView('downloads');
+      });
+    }
+
+    if (this.playAllDownloadsBtn) {
+      this.playAllDownloadsBtn.addEventListener('click', () => {
+        if (this.downloadedTracks.length > 0) {
+          this.queue = [...this.downloadedTracks];
+          this.playTrack(0);
+          this.showToast('Playing all downloaded tracks');
+        } else {
+          this.showToast('No downloaded tracks available');
+        }
+      });
+    }
+
+    if (this.shuffleDownloadsBtn) {
+      this.shuffleDownloadsBtn.addEventListener('click', () => {
+        if (this.downloadedTracks.length > 0) {
+          const shuffled = [...this.downloadedTracks].sort(() => Math.random() - 0.5);
+          this.queue = shuffled;
+          this.playTrack(0);
+          this.showToast('Shuffling downloaded tracks');
+        } else {
+          this.showToast('No downloaded tracks available');
+        }
+      });
+    }
+
+    if (this.downloadAllLikedBtn) {
+      this.downloadAllLikedBtn.addEventListener('click', () => {
+        this.downloadAllLikedSongs();
+      });
+    }
+
+    if (this.clearAllDownloadsBtn) {
+      this.clearAllDownloadsBtn.addEventListener('click', () => {
+        this.clearAllDownloads();
+      });
+    }
+
+    if (this.downloadsSearchInput) {
+      this.downloadsSearchInput.addEventListener('input', (e) => {
+        this.downloadsFilter = e.target.value;
+        this.renderDownloads();
+      });
+    }
+
+    if (this.playerDownloadBtn) {
+      this.playerDownloadBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const track = this.queue[this.currentTrackIndex];
+        if (track) this.handleDownloadButtonClick(track);
+      });
+    }
+
+    if (this.maxDownloadBtn) {
+      this.maxDownloadBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const track = this.queue[this.currentTrackIndex];
+        if (track) this.handleDownloadButtonClick(track);
+      });
+    }
 
     // 1B. Mobile Bottom Tab Bar (Apple Music iOS Style)
     if (this.mobileTabBtns) {
@@ -672,19 +965,32 @@ class REAMusicApp {
       });
     }
 
-    // 7. Search input with live API
+    // 7. Search input with History, Trending & Recommendations
     if (this.searchInput) {
+      this.searchInput.addEventListener('focus', () => {
+        if (this.searchDropdown) this.searchDropdown.classList.remove('hidden');
+        if (!this.searchInput.value.trim()) {
+          if (this.searchHubContent) this.searchHubContent.classList.remove('hidden');
+          if (this.searchResultsList) this.searchResultsList.classList.add('hidden');
+          this.renderSearchHub();
+        }
+      });
+
       this.searchInput.addEventListener('input', (e) => {
         clearTimeout(this.searchDebounceTimer);
         const query = e.target.value;
         if (!query.trim()) {
           if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
-          if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+          if (this.searchHubContent) this.searchHubContent.classList.remove('hidden');
+          if (this.searchResultsList) this.searchResultsList.classList.add('hidden');
+          this.renderSearchHub();
           return;
         }
         if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
         if (this.searchDropdown) this.searchDropdown.classList.remove('hidden');
+        if (this.searchHubContent) this.searchHubContent.classList.add('hidden');
         if (this.searchResultsList) {
+          this.searchResultsList.classList.remove('hidden');
           this.searchResultsList.innerHTML = `<div style="padding:16px;color:#aaa;text-align:center;">Searching Indian hits for "${query}"...</div>`;
         }
 
@@ -692,13 +998,47 @@ class REAMusicApp {
           this.performLiveSearch(query);
         }, 250);
       });
+
+      this.searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const query = this.searchInput.value.trim();
+          if (query) {
+            this.addSearchHistory(query);
+            this.performLiveSearch(query);
+          }
+        }
+      });
     }
 
     if (this.searchClearBtn) {
       this.searchClearBtn.addEventListener('click', () => {
-        if (this.searchInput) this.searchInput.value = '';
+        if (this.searchInput) {
+          this.searchInput.value = '';
+          this.searchInput.focus();
+        }
         this.searchClearBtn.classList.add('hidden');
-        if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+        if (this.searchHubContent) this.searchHubContent.classList.remove('hidden');
+        if (this.searchResultsList) this.searchResultsList.classList.add('hidden');
+        this.renderSearchHub();
+      });
+    }
+
+    if (this.searchClearHistoryBtn) {
+      this.searchClearHistoryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.clearSearchHistory();
+      });
+    }
+
+    if (this.recommendedPrevBtn && this.recommendedCarousel) {
+      this.recommendedPrevBtn.addEventListener('click', () => {
+        this.recommendedCarousel.scrollBy({ left: -420, behavior: 'smooth' });
+      });
+    }
+    if (this.recommendedNextBtn && this.recommendedCarousel) {
+      this.recommendedNextBtn.addEventListener('click', () => {
+        this.recommendedCarousel.scrollBy({ left: 420, behavior: 'smooth' });
       });
     }
 
@@ -1060,6 +1400,7 @@ class REAMusicApp {
     if (this.navHome) this.navHome.classList.toggle('active', viewName === 'home');
     if (this.navExplore) this.navExplore.classList.toggle('active', viewName === 'explore');
     if (this.navLibrary) this.navLibrary.classList.toggle('active', viewName === 'library');
+    if (this.navDownloads) this.navDownloads.classList.toggle('active', viewName === 'downloads');
 
     // Update Apple Music Mobile Tab Bar state
     if (this.mobileTabBtns) {
@@ -1072,6 +1413,7 @@ class REAMusicApp {
     if (this.viewHome) this.viewHome.classList.toggle('hidden', viewName !== 'home');
     if (this.viewExplore) this.viewExplore.classList.toggle('hidden', viewName !== 'explore');
     if (this.viewLibrary) this.viewLibrary.classList.toggle('hidden', viewName !== 'library');
+    if (this.viewDownloads) this.viewDownloads.classList.toggle('hidden', viewName !== 'downloads');
 
     // Scroll main content to top
     const mainContent = document.getElementById('mainContent');
@@ -1081,6 +1423,8 @@ class REAMusicApp {
       this.loadExploreCatalog();
     } else if (viewName === 'library') {
       this.renderLibrary();
+    } else if (viewName === 'downloads') {
+      this.renderDownloads();
     }
   }
 
@@ -1141,19 +1485,30 @@ class REAMusicApp {
     if (this.exploreChartsGrid) {
       this.exploreChartsGrid.innerHTML = '';
       this.exploreCharts.forEach(track => {
+        const isDl = this.isDownloaded(track.id);
         const card = document.createElement('div');
         card.className = 'ranked-track-card';
         card.innerHTML = `
           <div class="rank-number ${track.rank <= 3 ? 'top-three' : ''}">${track.rank}</div>
           <div class="rank-badge ${track.rankChange === 'NEW' ? 'badge-new' : ''}">${track.rankChange || '#1'}</div>
-          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'" style="width:46px;height:46px;border-radius:4px;object-fit:cover;">
+          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Cdefs%3E%3ClinearGradient id=\'g\' x1=\'0%25\' y1=\'0%25\' x2=\'100%25\' y2=\'100%25\'%3E%3Cstop offset=\'0%25\' stop-color=\'%231c1c1e\'/%3E%3Cstop offset=\'100%25\' stop-color=\'%232c2c2e\'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=\'300\' height=\'300\' fill=\'url(%23g)\'/%3E%3Ccircle cx=\'150\' cy=\'150\' r=\'60\' fill=\'%230071e3\' opacity=\'0.85\'/%3E%3Cpath d=\'M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z\' fill=\'%23ffffff\'/%3E%3C/svg%3E'" style="width:46px;height:46px;border-radius:4px;object-fit:cover;">
           <div class="track-row-info">
             <div class="track-row-title">${track.title}</div>
             <div class="track-row-artist">${track.artist}</div>
           </div>
+          <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
+            ${isDl 
+              ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+              : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+          </button>
           <div class="track-row-duration">${this.formatTime(track.duration)}</div>
         `;
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.track-inline-dl-btn')) {
+            e.stopPropagation();
+            this.handleDownloadButtonClick(track);
+            return;
+          }
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
         });
@@ -1167,6 +1522,7 @@ class REAMusicApp {
   // ===========================================================================
   renderLibrary() {
     this.renderLibraryLiked();
+    this.renderLibraryDownloads();
     this.renderLibraryPlaylists();
     this.renderLibraryHistory();
   }
@@ -1177,6 +1533,7 @@ class REAMusicApp {
 
     if (this.libLikedHero) this.libLikedHero.classList.toggle('hidden', tab !== 'all' && tab !== 'liked');
     if (this.libLikedSongsShelf) this.libLikedSongsShelf.classList.toggle('hidden', tab !== 'all' && tab !== 'liked');
+    if (this.libDownloadsShelf) this.libDownloadsShelf.classList.toggle('hidden', tab !== 'all' && tab !== 'downloads');
     if (this.libPlaylistsShelf) this.libPlaylistsShelf.classList.toggle('hidden', tab !== 'all' && tab !== 'playlists');
     if (this.libHistoryShelf) this.libHistoryShelf.classList.toggle('hidden', tab !== 'all' && tab !== 'history');
   }
@@ -1199,17 +1556,23 @@ class REAMusicApp {
     }
 
     this.likedTracks.forEach((track, idx) => {
+      const isDl = this.isDownloaded(track.id);
       const row = document.createElement('div');
       row.className = 'lib-track-row';
       row.innerHTML = `
         <span class="lib-track-index">${idx + 1}</span>
-        <img src="${track.cover}" alt="${track.title}" class="lib-track-thumb" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'">
+        <img src="${track.cover}" alt="${track.title}" class="lib-track-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
         <div class="lib-track-info">
           <div class="lib-track-title">${track.title}</div>
           <div class="lib-track-artist">${track.artist}</div>
         </div>
         <div class="lib-track-album">${track.album || ''}</div>
         <div class="lib-track-actions">
+          <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
+            ${isDl 
+              ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+              : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+          </button>
           <button class="lib-unlike-btn" title="Remove from Liked Music">
             <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           </button>
@@ -1217,6 +1580,11 @@ class REAMusicApp {
         </div>
       `;
       row.addEventListener('click', (e) => {
+        if (e.target.closest('.track-inline-dl-btn')) {
+          e.stopPropagation();
+          this.handleDownloadButtonClick(track);
+          return;
+        }
         if (e.target.closest('.lib-unlike-btn')) {
           this.toggleLikeTrack(track);
           this.renderLibraryLiked();
@@ -1226,6 +1594,53 @@ class REAMusicApp {
         this.playTrack(idx);
       });
       this.libLikedList.appendChild(row);
+    });
+  }
+
+  renderLibraryDownloads() {
+    if (!this.libDownloadsList) return;
+    this.libDownloadsList.innerHTML = '';
+
+    if (this.downloadedTracks.length === 0) {
+      this.libDownloadsList.innerHTML = `
+        <div style="padding: 24px; color: var(--text-secondary); text-align: center;">
+          <p>No offline downloaded songs yet.</p>
+          <button class="btn-action-glass" style="margin-top: 10px;" id="libDownloadLikedPromptBtn">Download Liked Songs</button>
+        </div>
+      `;
+      const btn = document.getElementById('libDownloadLikedPromptBtn');
+      if (btn) btn.addEventListener('click', () => this.downloadAllLikedSongs());
+      return;
+    }
+
+    this.downloadedTracks.slice(0, 6).forEach((track, idx) => {
+      const row = document.createElement('div');
+      row.className = 'lib-track-row';
+      row.innerHTML = `
+        <span class="lib-track-index">${idx + 1}</span>
+        <img src="${track.cover}" alt="${track.title}" class="lib-track-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+        <div class="lib-track-info">
+          <div class="lib-track-title">${track.title}</div>
+          <div class="lib-track-artist">${track.artist}</div>
+        </div>
+        <div class="lib-track-album">${track.sizeFormatted || '320kbps'}</div>
+        <div class="lib-track-actions">
+          <span class="dl-track-quality">OFFLINE</span>
+          <button class="track-inline-dl-btn downloaded" title="Save file to device">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          </button>
+        </div>
+      `;
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.track-inline-dl-btn')) {
+          e.stopPropagation();
+          this.exportTrackToFile(track);
+          return;
+        }
+        this.queue = [...this.downloadedTracks];
+        this.playTrack(idx);
+      });
+      this.libDownloadsList.appendChild(row);
     });
   }
 
@@ -1355,6 +1770,8 @@ class REAMusicApp {
     this.tabPanes.forEach(p => p.classList.toggle('active', p.id === activePaneId));
     if (targetTab === 'lyrics') {
       this.renderLyrics();
+    } else if (targetTab === 'related') {
+      this.renderRelatedPane();
     }
   }
 
@@ -1402,16 +1819,28 @@ class REAMusicApp {
       }
 
       results.forEach(track => {
+        const isDl = this.isDownloaded(track.id);
         const row = document.createElement('div');
         row.className = 'search-item';
         row.innerHTML = `
-          <img src="${track.cover}" alt="${track.title}">
+          <img src="${track.cover}" alt="${track.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
           <div class="search-item-info">
             <div class="search-item-title">${track.title}</div>
             <div class="search-item-meta">${track.artist} • ${track.album}</div>
           </div>
+          <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
+            ${isDl 
+              ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+              : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+          </button>
         `;
-        row.addEventListener('click', () => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.track-inline-dl-btn')) {
+            e.stopPropagation();
+            this.handleDownloadButtonClick(track);
+            return;
+          }
+          this.addSearchHistory(track.title);
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
           if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
@@ -1492,6 +1921,11 @@ class REAMusicApp {
     this.recordHistory(track);
 
     this.fetchTrackLyrics(track);
+    this.renderRelatedPane();
+    if (track.artist) {
+      // Async refresh related recommendations in background
+      this.loadRecommendations(track.artist);
+    }
   }
 
   togglePlayPause() {
@@ -1693,8 +2127,10 @@ class REAMusicApp {
   // ===========================================================================
   renderAll() {
     this.renderShelves();
+    this.renderRecommendedShelf();
     this.renderPlayerInfo();
     this.renderQueue();
+    this.renderSearchHub();
   }
 
   renderPlayerInfo() {
@@ -1709,6 +2145,58 @@ class REAMusicApp {
     const isLiked = this.likedTrackIds.has(track.id);
     if (this.likeBtn) this.likeBtn.classList.toggle('liked', isLiked);
     if (this.maxLikeBtn) this.maxLikeBtn.classList.toggle('active', isLiked);
+
+    // Update Download Button State in Player Bar and Maximized Player
+    const isDl = this.isDownloaded(track.id);
+    const isDownloading = this.activeDownloads.has(track.id);
+
+    if (this.playerDownloadBtn) {
+      const spinner = this.playerDownloadBtn.querySelector('.dl-spinner');
+      const normalIcon = this.playerDownloadBtn.querySelector('.dl-icon-normal');
+      const doneIcon = this.playerDownloadBtn.querySelector('.dl-icon-done');
+      if (isDownloading) {
+        if (spinner) spinner.classList.remove('hidden');
+        if (normalIcon) normalIcon.classList.add('hidden');
+        if (doneIcon) doneIcon.classList.add('hidden');
+        this.playerDownloadBtn.title = 'Downloading (320kbps)...';
+      } else if (isDl) {
+        if (spinner) spinner.classList.add('hidden');
+        if (normalIcon) normalIcon.classList.add('hidden');
+        if (doneIcon) doneIcon.classList.remove('hidden');
+        this.playerDownloadBtn.classList.add('downloaded');
+        this.playerDownloadBtn.title = 'Downloaded (320kbps Lossless) • Click to save file to device';
+      } else {
+        if (spinner) spinner.classList.add('hidden');
+        if (normalIcon) normalIcon.classList.remove('hidden');
+        if (doneIcon) doneIcon.classList.add('hidden');
+        this.playerDownloadBtn.classList.remove('downloaded');
+        this.playerDownloadBtn.title = 'Download song (320kbps Lossless)';
+      }
+    }
+
+    if (this.maxDownloadBtn) {
+      const spinner = this.maxDownloadBtn.querySelector('.dl-spinner');
+      const normalIcon = this.maxDownloadBtn.querySelector('.dl-icon-normal');
+      const doneIcon = this.maxDownloadBtn.querySelector('.dl-icon-done');
+      if (isDownloading) {
+        if (spinner) spinner.classList.remove('hidden');
+        if (normalIcon) normalIcon.classList.add('hidden');
+        if (doneIcon) doneIcon.classList.add('hidden');
+        this.maxDownloadBtn.title = 'Downloading (320kbps)...';
+      } else if (isDl) {
+        if (spinner) spinner.classList.add('hidden');
+        if (normalIcon) normalIcon.classList.add('hidden');
+        if (doneIcon) doneIcon.classList.remove('hidden');
+        this.maxDownloadBtn.classList.add('downloaded');
+        this.maxDownloadBtn.title = 'Downloaded (320kbps Lossless) • Click to save file to device';
+      } else {
+        if (spinner) spinner.classList.add('hidden');
+        if (normalIcon) normalIcon.classList.remove('hidden');
+        if (doneIcon) doneIcon.classList.add('hidden');
+        this.maxDownloadBtn.classList.remove('downloaded');
+        this.maxDownloadBtn.title = 'Download song (320kbps Lossless)';
+      }
+    }
 
     // Update Maximized Theater Player Information
     if (this.maxAlbumArt) this.maxAlbumArt.src = track.cover;
@@ -1729,6 +2217,7 @@ class REAMusicApp {
     if (this.quickPicksGrid) {
       this.quickPicksGrid.innerHTML = '';
       this.quickPicks.forEach((track) => {
+        const isDl = this.isDownloaded(track.id);
         const card = document.createElement('div');
         card.className = `track-row-card ${currentId === track.id ? 'active-track' : ''}`;
         card.innerHTML = `
@@ -1745,9 +2234,19 @@ class REAMusicApp {
             <div class="track-row-title">${track.title}</div>
             <div class="track-row-artist">${track.artist}</div>
           </div>
+          <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
+            ${isDl 
+              ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+              : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+          </button>
           <div class="track-row-duration">${this.formatTime(track.duration)}</div>
         `;
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.track-inline-dl-btn')) {
+            e.stopPropagation();
+            this.handleDownloadButtonClick(track);
+            return;
+          }
           const queueIdx = this.queue.findIndex(t => t.id === track.id);
           if (queueIdx !== -1) {
             this.playTrack(queueIdx);
@@ -1815,18 +2314,31 @@ class REAMusicApp {
     if (!this.queueList) return;
     this.queueList.innerHTML = '';
     this.queue.forEach((track, idx) => {
+      const isDl = this.isDownloaded(track.id);
       const isCurrent = idx === this.currentTrackIndex;
       const item = document.createElement('div');
       item.className = `queue-item ${isCurrent ? 'active-queue-item' : ''}`;
       item.innerHTML = `
-        <img src="${track.cover}" alt="${track.title}" class="queue-item-thumb">
+        <img src="${track.cover}" alt="${track.title}" class="queue-item-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
         <div class="queue-item-info">
           <div class="queue-item-title">${track.title}</div>
           <div class="queue-item-artist">${track.artist}</div>
         </div>
+        <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
+          ${isDl 
+            ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+            : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+        </button>
         <div class="queue-item-duration">${this.formatTime(track.duration)}</div>
       `;
-      item.addEventListener('click', () => this.playTrack(idx));
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.track-inline-dl-btn')) {
+          e.stopPropagation();
+          this.handleDownloadButtonClick(track);
+          return;
+        }
+        this.playTrack(idx);
+      });
       this.queueList.appendChild(item);
     });
     this.renderMaxQueue();
@@ -1941,20 +2453,655 @@ class REAMusicApp {
 
     this.queue.forEach((track, idx) => {
       const isCurrent = idx === this.currentTrackIndex;
+      const isDl = this.isDownloaded(track.id);
       const item = document.createElement('div');
       item.className = `max-queue-item ${isCurrent ? 'active' : ''}`;
       item.innerHTML = `
-        <img src="${track.cover}" alt="${track.title}" class="max-queue-thumb" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'">
+        <img src="${track.cover}" alt="${track.title}" class="max-queue-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
         <div class="max-queue-info">
           <div class="max-queue-title">${track.title}</div>
           <div class="max-queue-artist">${track.artist}</div>
         </div>
+        <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
+          ${isDl 
+            ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+            : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+        </button>
         <div class="max-queue-dur">${this.formatTime(track.duration)}</div>
       `;
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.track-inline-dl-btn')) {
+          e.stopPropagation();
+          this.handleDownloadButtonClick(track);
+          return;
+        }
         this.playTrack(idx);
       });
       this.maxQueueList.appendChild(item);
+    });
+  }
+
+  // ===========================================================================
+  // Offline Downloads & Storage Engine (Lossless 320kbps Vault)
+  // ===========================================================================
+  isDownloaded(trackId) {
+    return this.downloadedTrackIds.has(trackId);
+  }
+
+  getDownloadedTrack(trackId) {
+    return this.downloadedTracks.find(t => t.id === trackId);
+  }
+
+  handleDownloadButtonClick(track) {
+    if (!track) return;
+    if (this.isDownloaded(track.id)) {
+      this.exportTrackToFile(track);
+      return;
+    }
+    if (this.activeDownloads.has(track.id)) {
+      this.showToast(`"${track.title}" is currently downloading...`);
+      return;
+    }
+    this.downloadTrack(track, true);
+  }
+
+  async downloadTrack(track, showSuccessToast = true) {
+    if (!track || !track.id) return;
+    if (this.isDownloaded(track.id)) {
+      if (showSuccessToast) this.showToast(`"${track.title}" is already saved offline`);
+      return;
+    }
+    if (this.activeDownloads.has(track.id)) return;
+
+    this.activeDownloads.set(track.id, { progress: 0 });
+    this.showToast(`Downloading "${track.title}" in Lossless 320kbps...`);
+    this.renderPlayerInfo();
+    this.renderShelves();
+    this.renderQueue();
+
+    try {
+      let response = null;
+      if (track.audioUrl) {
+        try {
+          response = await fetch(track.audioUrl);
+          if (!response.ok) response = null;
+        } catch (fetchErr) {
+          response = null;
+        }
+      }
+
+      if (!response) {
+        const proxyUrl = `/api/download?url=${encodeURIComponent(track.audioUrl || '')}&title=${encodeURIComponent(track.title || 'song')}`;
+        response = await fetch(proxyUrl);
+      }
+
+      if (!response.ok) {
+        throw new Error(`Download HTTP error ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const sizeBytes = audioBlob.size;
+      const sizeFormatted = (sizeBytes / (1024 * 1024)).toFixed(1) + ' MB';
+      const localBlobUrl = URL.createObjectURL(audioBlob);
+
+      const downloadedTrack = {
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        album: track.album || '',
+        cover: track.cover || FALLBACK_COVER,
+        duration: track.duration || 0,
+        language: track.language || 'hindi',
+        lyrics: track.lyrics || [],
+        audioUrl: track.audioUrl,
+        audioBlob,
+        localBlobUrl,
+        sizeBytes,
+        sizeFormatted,
+        downloadedAt: Date.now()
+      };
+
+      // Persist into IndexedDB
+      await this.offlineStorage.saveTrack({
+        id: downloadedTrack.id,
+        title: downloadedTrack.title,
+        artist: downloadedTrack.artist,
+        album: downloadedTrack.album,
+        cover: downloadedTrack.cover,
+        duration: downloadedTrack.duration,
+        language: downloadedTrack.language,
+        lyrics: downloadedTrack.lyrics,
+        audioUrl: downloadedTrack.audioUrl,
+        audioBlob: downloadedTrack.audioBlob,
+        sizeBytes: downloadedTrack.sizeBytes,
+        sizeFormatted: downloadedTrack.sizeFormatted,
+        downloadedAt: downloadedTrack.downloadedAt
+      });
+
+      // Update in-memory collections
+      this.downloadedTracks.unshift(downloadedTrack);
+      this.downloadedTrackIds.add(track.id);
+
+      // Link blob URL into currently active or queued track instance
+      if (this.queue[this.currentTrackIndex]?.id === track.id) {
+        this.queue[this.currentTrackIndex].localBlobUrl = localBlobUrl;
+      }
+      this.queue.forEach(t => {
+        if (t.id === track.id) t.localBlobUrl = localBlobUrl;
+      });
+
+      this.activeDownloads.delete(track.id);
+      this.updateDownloadsStats();
+      this.renderPlayerInfo();
+      this.renderShelves();
+      this.renderQueue();
+
+      if (this.currentView === 'downloads') {
+        this.renderDownloads();
+      }
+      if (this.currentView === 'library') {
+        this.renderLibraryDownloads();
+      }
+
+      if (showSuccessToast) {
+        this.showToast(`Saved "${track.title}" offline (${sizeFormatted})`);
+      }
+    } catch (err) {
+      console.error('[Download] Failed to download song:', err);
+      this.activeDownloads.delete(track.id);
+      this.renderPlayerInfo();
+      this.renderShelves();
+      this.renderQueue();
+      this.showToast(`Failed to download "${track.title}". Check connection.`);
+    }
+  }
+
+  exportTrackToFile(track) {
+    if (!track) return;
+    this.showToast(`Exporting "${track.title}" audio file...`);
+    const cleanTitle = (track.title || 'song').replace(/[/\\?%*:|"<>]/g, '');
+    const cleanArtist = (track.artist || 'artist').replace(/[/\\?%*:|"<>]/g, '');
+    const fileName = `${cleanTitle} - ${cleanArtist}.m4a`;
+
+    if (track.localBlobUrl) {
+      const a = document.createElement('a');
+      a.href = track.localBlobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      this.showToast(`Exported "${track.title}" to device`);
+    } else {
+      const dlUrl = `/api/download?url=${encodeURIComponent(track.audioUrl || '')}&title=${encodeURIComponent(cleanTitle)}`;
+      const a = document.createElement('a');
+      a.href = dlUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  }
+
+  async deleteDownloadedTrack(trackId) {
+    const track = this.downloadedTracks.find(t => t.id === trackId);
+    if (!track) return;
+
+    if (track.localBlobUrl) {
+      try {
+        URL.revokeObjectURL(track.localBlobUrl);
+      } catch (e) { }
+    }
+
+    await this.offlineStorage.deleteTrack(trackId);
+    this.downloadedTrackIds.delete(trackId);
+    this.downloadedTracks = this.downloadedTracks.filter(t => t.id !== trackId);
+
+    this.queue.forEach(t => {
+      if (t.id === trackId) delete t.localBlobUrl;
+    });
+
+    this.updateDownloadsStats();
+    this.renderPlayerInfo();
+    this.renderShelves();
+    this.renderQueue();
+    this.renderDownloads();
+    this.renderLibraryDownloads();
+
+    this.showToast(`Removed "${track.title}" from offline downloads`);
+  }
+
+  async downloadAllLikedSongs() {
+    const toDownload = this.likedTracks.filter(t => !this.isDownloaded(t.id));
+    if (toDownload.length === 0) {
+      this.showToast('All liked songs are already downloaded offline!');
+      return;
+    }
+
+    this.showToast(`Downloading ${toDownload.length} liked songs in background...`);
+    for (const track of toDownload) {
+      await this.downloadTrack(track, false);
+    }
+    this.showToast(`All ${toDownload.length} liked songs downloaded offline!`);
+  }
+
+  async clearAllDownloads() {
+    if (this.downloadedTracks.length === 0) {
+      this.showToast('No downloaded tracks to clear');
+      return;
+    }
+
+    const confirmed = window.confirm(`Are you sure you want to delete all ${this.downloadedTracks.length} offline downloaded songs?`);
+    if (!confirmed) return;
+
+    this.downloadedTracks.forEach(t => {
+      if (t.localBlobUrl) {
+        try {
+          URL.revokeObjectURL(t.localBlobUrl);
+        } catch (e) { }
+      }
+    });
+
+    await this.offlineStorage.clearAll();
+    this.downloadedTracks = [];
+    this.downloadedTrackIds.clear();
+
+    this.queue.forEach(t => delete t.localBlobUrl);
+
+    this.updateDownloadsStats();
+    this.renderPlayerInfo();
+    this.renderShelves();
+    this.renderQueue();
+    this.renderDownloads();
+    this.renderLibraryDownloads();
+
+    this.showToast('All offline downloads removed');
+  }
+
+  updateDownloadsStats() {
+    const count = this.downloadedTracks.length;
+    let totalBytes = 0;
+    this.downloadedTracks.forEach(t => {
+      totalBytes += (t.sizeBytes || 0);
+    });
+    const totalMB = (totalBytes / (1024 * 1024)).toFixed(1);
+
+    if (this.downloadsCount) this.downloadsCount.textContent = count;
+    if (this.downloadsTotalSize) this.downloadsTotalSize.textContent = `${totalMB} MB`;
+
+    if (this.sidebarDownloadsBadge) {
+      if (count > 0) {
+        this.sidebarDownloadsBadge.textContent = count;
+        this.sidebarDownloadsBadge.classList.remove('hidden');
+      } else {
+        this.sidebarDownloadsBadge.classList.add('hidden');
+      }
+    }
+
+    if (this.storageStatsText) {
+      this.storageStatsText.textContent = `${totalMB} MB of 2.0 GB used (${count} song${count === 1 ? '' : 's'} offline)`;
+    }
+
+    if (this.storageMeterFill) {
+      const pct = Math.min(100, (parseFloat(totalMB) / 2048) * 100);
+      this.storageMeterFill.style.width = `${Math.max(2, pct)}%`;
+    }
+  }
+
+
+  // ===========================================================================
+  // Search History & Live Recommendations Engine
+  // ===========================================================================
+  addSearchHistory(query) {
+    if (!query || typeof query !== 'string') return;
+    const clean = query.trim();
+    if (!clean) return;
+    this.searchHistory = this.searchHistory.filter(q => q.toLowerCase() !== clean.toLowerCase());
+    this.searchHistory.unshift(clean);
+    if (this.searchHistory.length > 10) {
+      this.searchHistory = this.searchHistory.slice(0, 10);
+    }
+    this.saveLocalStorage('rea_search_history', this.searchHistory);
+    this.renderSearchHub();
+  }
+
+  removeSearchHistory(query) {
+    if (!query) return;
+    this.searchHistory = this.searchHistory.filter(q => q.toLowerCase() !== query.toLowerCase());
+    this.saveLocalStorage('rea_search_history', this.searchHistory);
+    this.renderSearchHub();
+  }
+
+  clearSearchHistory() {
+    this.searchHistory = [];
+    this.saveLocalStorage('rea_search_history', []);
+    this.renderSearchHub();
+    this.showToast('Recent searches cleared');
+  }
+
+  async loadRecommendations(targetArtist) {
+    try {
+      const currentTrack = this.queue[this.currentTrackIndex];
+      const artistParam = targetArtist || (currentTrack ? currentTrack.artist : 'Arijit Singh');
+      const trackId = currentTrack ? currentTrack.id : '';
+      const res = await fetch(`/api/recommendations?artist=${encodeURIComponent(artistParam)}&trackId=${encodeURIComponent(trackId)}`);
+      if (!res.ok) throw new Error('Recommendations offline');
+      const data = await res.json();
+      if (data.recommendations && data.recommendations.length > 0) {
+        this.recommendations = data.recommendations;
+      } else if (this.quickPicks.length > 0) {
+        this.recommendations = [...this.quickPicks];
+      }
+      if (data.trendingSearches && data.trendingSearches.length > 0) {
+        this.trendingSearches = data.trendingSearches;
+      }
+      this.renderRecommendedShelf();
+      this.renderSearchHub();
+      this.renderRelatedPane();
+    } catch (e) {
+      console.warn('Recommendation load notice:', e);
+      if (this.quickPicks.length > 0 && this.recommendations.length === 0) {
+        this.recommendations = [...this.quickPicks];
+      }
+      this.renderRecommendedShelf();
+      this.renderSearchHub();
+      this.renderRelatedPane();
+    }
+  }
+
+  renderSearchHub() {
+    // 1. Render Recent Searches
+    if (this.searchHistoryList) {
+      this.searchHistoryList.innerHTML = '';
+      if (this.searchHistory.length === 0) {
+        this.searchHistoryList.innerHTML = `
+          <div class="search-history-empty">No recent searches yet</div>
+        `;
+      } else {
+        this.searchHistory.slice(0, 6).forEach(query => {
+          const item = document.createElement('div');
+          item.className = 'search-history-item';
+          item.innerHTML = `
+            <div class="search-history-left">
+              <span class="search-history-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+              </span>
+              <span class="search-history-text">${query}</span>
+            </div>
+            <button class="search-history-remove-btn" title="Remove from history" aria-label="Remove">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+          `;
+          item.addEventListener('click', (e) => {
+            if (e.target.closest('.search-history-remove-btn')) {
+              e.stopPropagation();
+              this.removeSearchHistory(query);
+              return;
+            }
+            if (this.searchInput) {
+              this.searchInput.value = query;
+              this.addSearchHistory(query);
+              if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
+              if (this.searchHubContent) this.searchHubContent.classList.add('hidden');
+              if (this.searchResultsList) {
+                this.searchResultsList.classList.remove('hidden');
+                this.searchResultsList.innerHTML = `<div style="padding:16px;color:#aaa;text-align:center;">Searching for "${query}"...</div>`;
+              }
+              this.performLiveSearch(query);
+            }
+          });
+          this.searchHistoryList.appendChild(item);
+        });
+      }
+    }
+
+    // 2. Render Trending Searches (Tags / Pills)
+    if (this.trendingTagsGrid) {
+      this.trendingTagsGrid.innerHTML = '';
+      const tags = (this.trendingSearches && this.trendingSearches.length > 0)
+        ? this.trendingSearches
+        : ['Arijit Singh', 'Diljit Dosanjh', 'Tauba Tauba', 'Kesariya', 'Sid Sriram', 'Anirudh', 'Punjabi Hits'];
+
+      tags.slice(0, 8).forEach(tag => {
+        const pill = document.createElement('button');
+        pill.className = 'trending-tag-pill';
+        pill.innerHTML = `
+          <span class="trending-tag-icon">🔥</span>
+          <span>${tag}</span>
+        `;
+        pill.addEventListener('click', () => {
+          if (this.searchInput) {
+            this.searchInput.value = tag;
+            this.addSearchHistory(tag);
+            if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
+            if (this.searchHubContent) this.searchHubContent.classList.add('hidden');
+            if (this.searchResultsList) {
+              this.searchResultsList.classList.remove('hidden');
+              this.searchResultsList.innerHTML = `<div style="padding:16px;color:#aaa;text-align:center;">Searching for "${tag}"...</div>`;
+            }
+            this.performLiveSearch(tag);
+          }
+        });
+        this.trendingTagsGrid.appendChild(pill);
+      });
+    }
+
+    // 3. Render Recommended Songs in Search Dropdown
+    if (this.searchRecoList) {
+      this.searchRecoList.innerHTML = '';
+      const recoTracks = this.recommendations.length > 0 ? this.recommendations.slice(0, 5) : this.quickPicks.slice(0, 5);
+      recoTracks.forEach(track => {
+        const isDl = this.isDownloaded(track.id);
+        const item = document.createElement('div');
+        item.className = 'search-reco-item';
+        item.innerHTML = `
+          <img src="${track.cover}" alt="${track.title}" class="search-reco-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <div class="search-reco-info">
+            <div class="search-reco-title">${track.title}</div>
+            <div class="search-reco-meta">
+              <span>${track.artist}</span>
+              <span class="search-reco-badge">Recommended</span>
+            </div>
+          </div>
+          <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps)' : 'Download for offline'}">
+            ${isDl 
+              ? '<svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+              : '<svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+          </button>
+        `;
+        item.addEventListener('click', (e) => {
+          if (e.target.closest('.track-inline-dl-btn')) {
+            e.stopPropagation();
+            this.handleDownloadButtonClick(track);
+            return;
+          }
+          this.addSearchHistory(track.title);
+          this.queue.splice(this.currentTrackIndex + 1, 0, track);
+          this.playTrack(this.currentTrackIndex + 1);
+          if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+          if (this.searchInput) this.searchInput.value = '';
+          if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
+        });
+        this.searchRecoList.appendChild(item);
+      });
+    }
+  }
+
+  renderRecommendedShelf() {
+    if (!this.recommendedCarousel) return;
+    this.recommendedCarousel.innerHTML = '';
+    const recoTracks = this.recommendations.length > 0 ? this.recommendations.slice(0, 12) : this.quickPicks.slice(0, 12);
+    recoTracks.forEach(track => {
+      const card = document.createElement('div');
+      card.className = 'music-card';
+      card.innerHTML = `
+        <div class="music-card-thumb">
+          <img src="${track.cover}" alt="${track.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <button class="music-card-play" aria-label="Play ${track.title}">
+            <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+        <div class="music-card-title">${track.title}</div>
+        <div class="music-card-sub">${track.artist}</div>
+        <div style="margin-top: 4px;">
+          <span class="shelf-tag-badge">✦ Recommended</span>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        this.queue.splice(this.currentTrackIndex + 1, 0, track);
+        this.playTrack(this.currentTrackIndex + 1);
+      });
+      this.recommendedCarousel.appendChild(card);
+    });
+  }
+
+  renderRelatedPane() {
+    const currentTrack = this.queue[this.currentTrackIndex] || FALLBACK_TRACKS[0];
+    if (this.relatedArtistCard) {
+      this.relatedArtistCard.innerHTML = `
+        <img src="${currentTrack.cover}" alt="${currentTrack.artist}" class="related-artist-avatar" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+        <div class="related-artist-info">
+          <div class="related-artist-title">${currentTrack.artist}</div>
+          <div class="related-artist-subtitle">Recommendations based on "${currentTrack.title}"</div>
+        </div>
+      `;
+    }
+
+    if (this.relatedTracksList) {
+      this.relatedTracksList.innerHTML = '';
+      const pool = (this.recommendations.length > 0 ? this.recommendations : this.quickPicks)
+        .filter(t => t.id !== currentTrack.id)
+        .slice(0, 8);
+
+      pool.forEach(track => {
+        const isDl = this.isDownloaded(track.id);
+        const row = document.createElement('div');
+        row.className = 'related-track-row';
+        row.innerHTML = `
+          <img src="${track.cover}" alt="${track.title}" class="related-track-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <div class="related-track-info">
+            <div class="related-track-title">${track.title}</div>
+            <div class="related-track-artist">${track.artist}</div>
+          </div>
+          <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps)' : 'Download for offline'}">
+            ${isDl 
+              ? '<svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
+              : '<svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
+          </button>
+        `;
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.track-inline-dl-btn')) {
+            e.stopPropagation();
+            this.handleDownloadButtonClick(track);
+            return;
+          }
+          this.queue.splice(this.currentTrackIndex + 1, 0, track);
+          this.playTrack(this.currentTrackIndex + 1);
+        });
+        this.relatedTracksList.appendChild(row);
+      });
+    }
+  }
+
+  renderDownloads() {
+    if (!this.downloadsTracksList) return;
+    this.downloadsTracksList.innerHTML = '';
+
+    let tracks = [...this.downloadedTracks];
+    if (this.downloadsFilter && this.downloadsFilter.trim()) {
+      const q = this.downloadsFilter.toLowerCase().trim();
+      tracks = tracks.filter(t =>
+        (t.title && t.title.toLowerCase().includes(q)) ||
+        (t.artist && t.artist.toLowerCase().includes(q)) ||
+        (t.album && t.album.toLowerCase().includes(q))
+      );
+    }
+
+    if (tracks.length === 0) {
+      const isFiltered = Boolean(this.downloadsFilter && this.downloadsFilter.trim());
+      this.downloadsTracksList.innerHTML = `
+        <div class="downloads-empty-state">
+          <div class="downloads-empty-icon">
+            <svg viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+          </div>
+          <h3 class="downloads-empty-title">${isFiltered ? 'No matching downloads found' : 'No offline songs downloaded yet'}</h3>
+          <p class="downloads-empty-desc">${isFiltered ? 'Try searching for a different song or artist title.' : 'Download any song across REA Music in lossless 320kbps for offline playback anytime, anywhere.'}</p>
+          <div class="downloads-empty-actions">
+            ${isFiltered 
+              ? `<button class="btn-action-glass" id="resetDlSearchBtn">Clear Search</button>`
+              : `<button class="btn-action-primary" id="emptyDlLikedBtn">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                  Download Liked Songs
+                </button>
+                <button class="btn-action-glass" id="emptyDlExploreBtn">Explore Top Hits</button>`
+            }
+          </div>
+        </div>
+      `;
+
+      const resetBtn = document.getElementById('resetDlSearchBtn');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          this.downloadsFilter = '';
+          if (this.downloadsSearchInput) this.downloadsSearchInput.value = '';
+          this.renderDownloads();
+        });
+      }
+
+      const emptyLikedBtn = document.getElementById('emptyDlLikedBtn');
+      if (emptyLikedBtn) {
+        emptyLikedBtn.addEventListener('click', () => this.downloadAllLikedSongs());
+      }
+
+      const emptyExploreBtn = document.getElementById('emptyDlExploreBtn');
+      if (emptyExploreBtn) {
+        emptyExploreBtn.addEventListener('click', () => this.switchView('explore'));
+      }
+      return;
+    }
+
+    tracks.forEach((track, idx) => {
+      const isCurrent = this.queue[this.currentTrackIndex]?.id === track.id && this.isPlaying;
+      const row = document.createElement('div');
+      row.className = `dl-track-row ${isCurrent ? 'active-dl-row' : ''}`;
+      row.innerHTML = `
+        <span class="dl-track-index">${idx + 1}</span>
+        <img src="${track.cover}" alt="${track.title}" class="dl-track-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+        <div class="dl-track-info">
+          <div class="dl-track-title">${track.title}</div>
+          <div class="dl-track-artist">${track.artist}</div>
+        </div>
+        <div class="dl-track-album">${track.album || 'Lossless Single'}</div>
+        <div class="dl-track-size">
+          <span class="dl-track-badge">${track.sizeFormatted || '320kbps'}</span>
+        </div>
+        <div class="dl-track-actions">
+          <button class="dl-btn-action dl-export-btn" title="Save .m4a file to device">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          </button>
+          <button class="dl-btn-action dl-delete-btn" title="Delete from offline storage">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      `;
+
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.dl-export-btn')) {
+          e.stopPropagation();
+          this.exportTrackToFile(track);
+          return;
+        }
+        if (e.target.closest('.dl-delete-btn')) {
+          e.stopPropagation();
+          this.deleteDownloadedTrack(track.id);
+          return;
+        }
+
+        this.queue = [...this.downloadedTracks];
+        const targetIdx = this.queue.findIndex(t => t.id === track.id);
+        this.playTrack(targetIdx !== -1 ? targetIdx : 0);
+      });
+
+      this.downloadsTracksList.appendChild(row);
     });
   }
 }

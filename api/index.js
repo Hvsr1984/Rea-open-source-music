@@ -201,6 +201,8 @@ export default async function handler(req, res) {
   const isLyrics = pathname.endsWith('/lyrics') || pathParam.startsWith('lyrics');
   const isExplore = pathname.endsWith('/explore') || pathParam.startsWith('explore');
   const isAlbum = pathname.endsWith('/album') || pathParam.startsWith('album');
+  const isDownload = pathname.endsWith('/download') || pathParam.startsWith('download');
+  const isRecommendations = pathname.endsWith('/recommendations') || pathParam.startsWith('recommendations');
 
   const sendJson = (statusCode, data) => {
     if (res.status && res.json) {
@@ -211,6 +213,38 @@ export default async function handler(req, res) {
   };
 
   try {
+    // 0. Audio Download Proxy (attachment or streaming)
+    if (isDownload) {
+      const audioUrl = parsedUrl.searchParams.get('url');
+      const filename = parsedUrl.searchParams.get('filename') || 'track.m4a';
+      if (!audioUrl) {
+        return sendJson(400, { error: 'Missing audio url parameter' });
+      }
+
+      try {
+        const audioRes = await fetch(audioUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        if (!audioRes.ok) {
+          return sendJson(audioRes.status, { error: 'Failed to retrieve audio stream from CDN' });
+        }
+        const cType = audioRes.headers.get('content-type') || 'audio/mp4';
+        const cLength = audioRes.headers.get('content-length');
+        res.setHeader('Content-Type', cType);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        if (cLength) res.setHeader('Content-Length', cLength);
+
+        const arrayBuffer = await audioRes.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        if (res.status && res.send) {
+          return res.status(200).send(buffer);
+        }
+        res.writeHead(200);
+        return res.end(buffer);
+      } catch (err) {
+        return sendJson(500, { error: 'Download stream error', message: err.message });
+      }
+    }
     // 1. Search Indian songs
     if (isSearch) {
       const q = parsedUrl.searchParams.get('q');
@@ -305,12 +339,64 @@ export default async function handler(req, res) {
       return sendJson(200, { songs });
     }
 
+    // 6. Indian Recommendations & Trending Search Suggestions
+    if (isRecommendations) {
+      const artist = parsedUrl.searchParams.get('artist') || '';
+      const trackId = parsedUrl.searchParams.get('trackId') || '';
+      const trendingSearches = [
+        'Arijit Singh',
+        'Diljit Dosanjh',
+        'Tauba Tauba',
+        'Kesariya',
+        'Bollywood Romance',
+        'Sid Sriram',
+        'Anirudh Ravichander',
+        'Punjabi Hits',
+        'Shreya Ghoshal',
+        'Karan Aujla',
+        'Lofi Hindi'
+      ];
+
+      const cacheKey = ('reco__' + (artist || 'all')).toLowerCase();
+      if (CACHE.trending[cacheKey] && Date.now() - CACHE.trending[cacheKey].time < 300000) {
+        return sendJson(200, CACHE.trending[cacheKey].data);
+      }
+
+      let recommendedTracks = [];
+      if (artist && artist.trim()) {
+        const primaryArtist = artist.split(',')[0].replace(/\([^)]*\)/g, '').trim();
+        const searchResults = await searchSongs(primaryArtist);
+        recommendedTracks = searchResults
+          .filter(t => t.id !== trackId)
+          .slice(0, 14);
+      }
+
+      if (recommendedTracks.length < 8) {
+        const [superhits, trending] = await Promise.all([
+          fetchPlaylistSongs(CHARTS.superhits),
+          fetchPlaylistSongs(CHARTS.trending)
+        ]);
+        const pool = [...superhits, ...trending];
+        const additional = pool.filter(t => t.id !== trackId && !recommendedTracks.some(r => r.id === t.id));
+        recommendedTracks = [...recommendedTracks, ...additional].slice(0, 18);
+      }
+
+      const payload = {
+        recommendations: recommendedTracks,
+        trendingSearches,
+        artist: artist || 'Top Indian Hits'
+      };
+
+      CACHE.trending[cacheKey] = { time: Date.now(), data: payload };
+      return sendJson(200, payload);
+    }
+
     // Fallback status
     return sendJson(200, {
       name: 'REA Music API',
       status: 'online',
-      version: '2.4.0',
-      routes: ['/api/search', '/api/trending', '/api/lyrics', '/api/explore', '/api/album']
+      version: '2.4.1',
+      routes: ['/api/search', '/api/trending', '/api/lyrics', '/api/explore', '/api/album', '/api/download', '/api/recommendations']
     });
   } catch (err) {
     console.error('API Error:', err);
