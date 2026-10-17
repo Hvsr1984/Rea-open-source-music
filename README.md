@@ -58,7 +58,7 @@ rea-music/
 
 1. Clone or download the repository:
    ```bash
-   git clone https://github.com/Hvsr1984/rea-music.git
+   git clone https://github.com/Hvsr1984/Rea-open-source-music.git
    cd rea-music
    ```
 
@@ -86,11 +86,11 @@ rea-music/
    git add .
    git commit -m "feat: initial commit of REA Music"
    git branch -M main
-   git remote add origin https://github.com/Hvsr1984/rea-music.git
+   git remote add origin https://github.com/Hvsr1984/Rea-open-source-music.git
    git push -u origin main
    ```
 2. Go to [vercel.com/new](https://vercel.com/new).
-3. Import the `rea-music` repository from GitHub.
+3. Import the `Rea-open-source-music` repository from GitHub.
 4. Leave all build settings as default (Framework Preset: **Other**; Output Directory: `./`).
 5. Click **Deploy**. Vercel will build and deploy the frontend and serverless API in seconds!
 
