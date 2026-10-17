@@ -104,6 +104,54 @@ async function searchSongs(query) {
   }
 }
 
+async function searchArtists(query) {
+  try {
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=8&p=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await res.text();
+    const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+    const data = JSON.parse(clean);
+    const results = data.results || [];
+    return results.map(a => ({
+      id: a.id,
+      name: decodeEntities(a.name),
+      image: (a.image || '')
+        .replace('50x50.jpg', '500x500.jpg')
+        .replace('150x150.jpg', '500x500.jpg')
+        .replace('50x50.png', '500x500.png')
+        .replace('150x150.png', '500x500.png'),
+      role: decodeEntities(a.role || 'Singer'),
+      type: 'artist'
+    }));
+  } catch (e) {
+    console.error(`Artist search error for ${query}:`, e.message);
+    return [];
+  }
+}
+
+async function fetchArtistDetails(artistId) {
+  try {
+    const url = `https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&artistId=${artistId}&n_song=20&n_album=10`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await res.text();
+    const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+    const data = JSON.parse(clean);
+    const rawSongs = data.topSongs?.songs || data.top_songs || [];
+    const songs = rawSongs.map(formatSong).filter(s => s.audioUrl);
+    return {
+      id: data.artistId || artistId,
+      name: decodeEntities(data.name),
+      image: (data.image || '').replace('150x150.jpg', '500x500.jpg').replace('50x50.jpg', '500x500.jpg'),
+      subtitle: decodeEntities(data.subtitle || 'Indian Singer'),
+      followerCount: data.follower_count || '1M+',
+      songs
+    };
+  } catch (e) {
+    console.error(`Artist details error for ${artistId}:`, e.message);
+    return null;
+  }
+}
+
 async function fetchLyrics(track, artist) {
   const cacheKey = `${track}__${artist}`.toLowerCase();
   if (CACHE.lyrics[cacheKey]) return CACHE.lyrics[cacheKey];
@@ -203,6 +251,7 @@ export default async function handler(req, res) {
   const isAlbum = pathname.endsWith('/album') || pathParam.startsWith('album');
   const isDownload = pathname.endsWith('/download') || pathParam.startsWith('download');
   const isRecommendations = pathname.endsWith('/recommendations') || pathParam.startsWith('recommendations');
+  const isArtist = pathname.endsWith('/artist') || pathParam.startsWith('artist');
 
   const sendJson = (statusCode, data) => {
     if (res.status && res.json) {
@@ -245,21 +294,26 @@ export default async function handler(req, res) {
         return sendJson(500, { error: 'Download stream error', message: err.message });
       }
     }
-    // 1. Search Indian songs
+    // 1. Search Indian songs and singers/artists
     if (isSearch) {
       const q = parsedUrl.searchParams.get('q');
       if (!q || !q.trim()) {
-        return sendJson(200, { results: [] });
+        return sendJson(200, { results: [], artists: [] });
       }
 
       const cacheKey = q.trim().toLowerCase();
       if (CACHE.search[cacheKey] && Date.now() - CACHE.search[cacheKey].time < 300000) {
-        return sendJson(200, { results: CACHE.search[cacheKey].data });
+        return sendJson(200, CACHE.search[cacheKey].data);
       }
 
-      const results = await searchSongs(q);
-      CACHE.search[cacheKey] = { time: Date.now(), data: results };
-      return sendJson(200, { results });
+      const [songs, artists] = await Promise.all([
+        searchSongs(q),
+        searchArtists(q)
+      ]);
+
+      const payload = { results: songs, artists: artists };
+      CACHE.search[cacheKey] = { time: Date.now(), data: payload };
+      return sendJson(200, payload);
     }
 
     // 2. Indian Trending & Curated Shelves
@@ -391,12 +445,33 @@ export default async function handler(req, res) {
       return sendJson(200, payload);
     }
 
+    // 7. Artist / Singer Page Details & Top Songs
+    if (isArtist) {
+      const id = parsedUrl.searchParams.get('id');
+      const name = parsedUrl.searchParams.get('name');
+      if (id) {
+        const details = await fetchArtistDetails(id);
+        if (details) return sendJson(200, details);
+      }
+      if (name) {
+        const songs = await searchSongs(name);
+        return sendJson(200, {
+          id: `artist-${Date.now()}`,
+          name,
+          image: songs[0]?.cover || '',
+          subtitle: 'Indian Singer / Artist',
+          songs
+        });
+      }
+      return sendJson(400, { error: 'Missing artist id or name' });
+    }
+
     // Fallback status
     return sendJson(200, {
       name: 'REA Music API',
       status: 'online',
-      version: '2.4.1',
-      routes: ['/api/search', '/api/trending', '/api/lyrics', '/api/explore', '/api/album', '/api/download', '/api/recommendations']
+      version: '2.5.0',
+      routes: ['/api/search', '/api/trending', '/api/lyrics', '/api/explore', '/api/album', '/api/download', '/api/recommendations', '/api/artist']
     });
   } catch (err) {
     console.error('API Error:', err);
