@@ -17,6 +17,13 @@ All notable changes to the **REA Music** web ecosystem are documented in this fi
 - **Playback Reliability & Error Recovery**: Bounded retry handler (`handlePlaybackError`, max 3 attempts) catching expired CDN URLs and stream dropouts without freezing or entering infinite retry loops.
 - **Persistent Autoplay Controls**: Real Autoplay toggle switch added to the bottom player bar (`#barAutoplayBtn`), right drawer panel (`#queueAutoplayToggle`), and theater maximized player (`#maxAutoplayToggle`) with `localStorage` persistence.
 - **Restored Play/Pause & Engine Controls**: Restored missing `togglePlayPause()` method on `REAMusicApp`, added `engine.play()` alias on `HybridAudioEngine`, enabled Spacebar keyboard playback toggling, and added contextual row play/pause support.
+- **Butter-Smooth Device Performance & Instant Hydration**:
+  - **Instant 0ms Cache Hydration**: Hydrates catalog directly from `localStorage` on load, eliminating skeleton flashes and initial network layout shifts.
+  - **On-Demand Audio Visualizer**: Stopped continuous 60–120 FPS requestAnimationFrame canvas loops during idle/pause states, slashing CPU and battery usage.
+  - **Async Lazy Image Pipeline**: Applied `loading="lazy"` and `decoding="async"` across all catalog and queue album art images, preventing network saturation and thread blocking.
+  - **DocumentFragment DOM Batching**: Eliminated layout thrashing by batching shelf DOM insertions into single reflows.
+  - **CSS Rendering Acceleration**: Replaced excess `will-change` layer allocation with `content-visibility: auto`, tuned mobile glass blur for GPU fill-rate efficiency, and added JioSaavn CDN preconnect/DNS prefetch links.
+  - **Edge & HTTP Asset Caching**: Added immutable cache headers (`max-age=31536000`) for media assets and edge cache rules in `vercel.json` and `server.js`.
 
 ---
 

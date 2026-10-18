@@ -58,6 +58,16 @@ export default async function handler(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
+
+    // High performance device caching headers
+    if (ext === '.html' || cleanUrl === '/index.html') {
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    } else if (['.jpg', '.jpeg', '.png', '.svg', '.webp', '.ico'].includes(ext)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (['.css', '.js', '.json'].includes(ext)) {
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    }
+
     if (res.status && res.send) {
       return res.status(200).send(content);
     }

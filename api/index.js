@@ -81,8 +81,11 @@ async function fetchPlaylistSongs(listId) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&_format=json&listid=${listId}`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!res.ok) return [];
     const text = await res.text();
+    if (!text || !text.trim()) return [];
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+    if (!clean) return [];
     const data = JSON.parse(clean);
     const rawSongs = data.songs || data.list || [];
     return rawSongs

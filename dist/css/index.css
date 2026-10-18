@@ -36,12 +36,29 @@ button, .music-card, .song-list-item, .mini-player-dock, .mobile-tab-btn {
   transform: translateZ(0);
 }
 
-.music-card,
-.song-list-item,
 .mini-player-dock,
 .bottom-tab-bar,
 .top-nav {
-  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Device rendering optimization: skip off-screen rendering calculations */
+.track-row-card,
+.music-card,
+.ranked-track-card,
+.queue-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 68px;
+}
+
+/* Image rendering acceleration */
+.track-thumb-img,
+.music-card-thumb img,
+.queue-item-thumb,
+.artist-avatar-img,
+.singer-avatar-img {
+  image-rendering: -webkit-optimize-contrast;
   transform: translateZ(0);
 }
 
@@ -2319,6 +2336,8 @@ a {
     --nav-height: 54px;
     --player-height: 56px;
     --mobile-tab-height: 56px;
+    --glass-blur: blur(12px) saturate(140%);
+    --glass-blur-sm: blur(8px) saturate(130%);
   }
 
   /* 1. Header Navigation Bar on Mobile */

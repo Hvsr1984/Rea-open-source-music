@@ -58,6 +58,7 @@ let bundledHtml = htmlContent;
 bundledHtml = bundledHtml.replace(/<style id="rea-embedded-styles">[\s\S]*?<\/style>/g, '');
 bundledHtml = bundledHtml.replace(/<script id="rea-embedded-script">[\s\S]*?<\/script>/g, '');
 bundledHtml = bundledHtml.replace(/<script src="js\/app\.js"><\/script>/g, '');
+bundledHtml = bundledHtml.replace(/<link rel="stylesheet" href="css\/index\.css">\s*/g, '');
 
 // Brand logo inline fallback (clean existing fallback first to ensure idempotency)
 bundledHtml = bundledHtml.replace(/<div class="brand-logo-fallback"[^>]*>[\s\S]*?<\/div>\s*/g, '');

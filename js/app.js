@@ -1209,12 +1209,18 @@ class REAMusicApp {
       this.isPlaying = true;
       this.updatePlayPauseUI();
       this.renderShelves();
+      if (typeof this.startVisualizerLoop === 'function') {
+        this.startVisualizerLoop();
+      }
     });
 
     this.engine.audio.addEventListener('pause', () => {
       this.isPlaying = false;
       this.updatePlayPauseUI();
       this.renderShelves();
+      if (typeof this.stopVisualizerLoop === 'function') {
+        this.stopVisualizerLoop();
+      }
     });
 
     // 4. Progress bar seeking
@@ -2907,6 +2913,7 @@ class REAMusicApp {
     // 2. Ranked Top Charts Grid (1 to 20)
     if (this.exploreChartsGrid) {
       this.exploreChartsGrid.innerHTML = '';
+      const fragment = document.createDocumentFragment();
       this.exploreCharts.forEach(track => {
         const isDl = this.isDownloaded(track.id);
         const card = document.createElement('div');
@@ -2914,7 +2921,7 @@ class REAMusicApp {
         card.innerHTML = `
           <div class="rank-number ${track.rank <= 3 ? 'top-three' : ''}">${track.rank}</div>
           <div class="rank-badge ${track.rankChange === 'NEW' ? 'badge-new' : ''}">${track.rankChange || '#1'}</div>
-          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Cdefs%3E%3ClinearGradient id=\'g\' x1=\'0%25\' y1=\'0%25\' x2=\'100%25\' y2=\'100%25\'%3E%3Cstop offset=\'0%25\' stop-color=\'%231c1c1e\'/%3E%3Cstop offset=\'100%25\' stop-color=\'%232c2c2e\'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=\'300\' height=\'300\' fill=\'url(%23g)\'/%3E%3Ccircle cx=\'150\' cy=\'150\' r=\'60\' fill=\'%230071e3\' opacity=\'0.85\'/%3E%3Cpath d=\'M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z\' fill=\'%23ffffff\'/%3E%3C/svg%3E'" style="width:46px;height:46px;border-radius:4px;object-fit:cover;">
+          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" style="width:46px;height:46px;border-radius:4px;object-fit:cover;">
           <div class="track-row-info">
             <div class="track-row-title">${track.title}</div>
             <div class="track-row-artist">${track.artist}</div>
@@ -2935,8 +2942,9 @@ class REAMusicApp {
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
         });
-        this.exploreChartsGrid.appendChild(card);
+        fragment.appendChild(card);
       });
+      this.exploreChartsGrid.appendChild(fragment);
     }
   }
 
@@ -3202,6 +3210,21 @@ class REAMusicApp {
   // Live API Integration: JioSaavn & LRCLIB
   // ===========================================================================
   async loadIndianMusicCatalog() {
+    // Instant cache hydration from localStorage for 0ms initial load
+    try {
+      const cached = localStorage.getItem('rea_cached_catalog_v2');
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data && Array.isArray(data.quickPicks) && data.quickPicks.length > 0) {
+          this.quickPicks = data.quickPicks;
+          this.trendingHits = data.trendingHits || [];
+          this.punjabiHits = data.punjabiHits || [];
+          this.romanticHits = data.romanticHits || [];
+          this.renderShelves();
+        }
+      }
+    } catch (_) {}
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -3227,6 +3250,14 @@ class REAMusicApp {
       if (data && Array.isArray(data.romanticHits) && data.romanticHits.length > 0) {
         this.romanticHits = data.romanticHits;
       }
+      try {
+        localStorage.setItem('rea_cached_catalog_v2', JSON.stringify({
+          quickPicks: this.quickPicks,
+          trendingHits: this.trendingHits,
+          punjabiHits: this.punjabiHits,
+          romanticHits: this.romanticHits
+        }));
+      } catch (_) {}
     } catch (e) {
       console.warn('Using fallback catalog:', e);
       if (!this.quickPicks || this.quickPicks.length === 0) {
@@ -3234,7 +3265,7 @@ class REAMusicApp {
         this.queue = [...FALLBACK_TRACKS];
       }
     } finally {
-      this.renderAll();
+      this.renderShelves();
     }
   }
 
@@ -3790,11 +3821,17 @@ class REAMusicApp {
         this.engine.resume();
         this.isPlaying = true;
         this.updatePlayPauseUI();
+        if (typeof this.startVisualizerLoop === 'function') {
+          this.startVisualizerLoop();
+        }
       }
     } else {
       this.engine.pause();
       this.isPlaying = false;
       this.updatePlayPauseUI();
+      if (typeof this.stopVisualizerLoop === 'function') {
+        this.stopVisualizerLoop();
+      }
     }
     this.syncMediaControls();
     this.renderShelves();
@@ -4251,20 +4288,26 @@ class REAMusicApp {
     const canvas = this.audioVisualizer;
     const ctx = canvas.getContext('2d');
     const dataArray = new Uint8Array(32);
+    let rafId = null;
+
+    const drawIdle = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = this.currentTheme === 'dark'
+        ? 'rgba(255, 255, 255, 0.2)'
+        : 'rgba(0, 0, 0, 0.15)';
+      for (let i = 0; i < 8; i++) {
+        ctx.fillRect(i * 10 + 2, 20, 6, 2);
+      }
+    };
 
     const render = () => {
-      requestAnimationFrame(render);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       if (!this.isPlaying || !this.engine.analyser) {
-        ctx.fillStyle = this.currentTheme === 'dark'
-          ? 'rgba(255, 255, 255, 0.2)'
-          : 'rgba(0, 0, 0, 0.15)';
-        for (let i = 0; i < 8; i++) {
-          ctx.fillRect(i * 10 + 2, 20, 6, 2);
-        }
+        drawIdle();
+        rafId = null;
         return;
       }
+      rafId = requestAnimationFrame(render);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       this.engine.analyser.getByteFrequencyData(dataArray);
       const barWidth = 7;
@@ -4283,7 +4326,23 @@ class REAMusicApp {
         x += barWidth + 3;
       }
     };
-    render();
+
+    // Draw idle state once on load
+    drawIdle();
+
+    this.startVisualizerLoop = () => {
+      if (!rafId && this.isPlaying && this.engine.analyser) {
+        rafId = requestAnimationFrame(render);
+      }
+    };
+
+    this.stopVisualizerLoop = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      drawIdle();
+    };
   }
 
   // ===========================================================================
@@ -4385,13 +4444,14 @@ class REAMusicApp {
     // 1. Quick Picks Grid (India Superhits Top 50)
     if (this.quickPicksGrid) {
       this.quickPicksGrid.innerHTML = '';
+      const fragment = document.createDocumentFragment();
       this.quickPicks.forEach((track) => {
         const isDl = this.isDownloaded(track.id);
         const card = document.createElement('div');
         card.className = `track-row-card ${currentId === track.id ? 'active-track' : ''}`;
         card.innerHTML = `
           <div class="track-thumb-wrapper">
-            <img src="${track.cover}" alt="${track.title}" class="track-thumb-img">
+            <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
             <div class="track-play-overlay">
               ${currentId === track.id && this.isPlaying
             ? `<div class="equalizer-icon"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>`
@@ -4431,20 +4491,22 @@ class REAMusicApp {
             this.playTrack(this.queue.length - 1);
           }
         });
-        this.quickPicksGrid.appendChild(card);
+        fragment.appendChild(card);
       });
+      this.quickPicksGrid.appendChild(fragment);
     }
 
     // 2. Trending Carousel
     if (this.trendingCarousel) {
       const trendingSource = this.trendingHits.length > 0 ? this.trendingHits : this.quickPicks;
       this.trendingCarousel.innerHTML = '';
+      const fragment = document.createDocumentFragment();
       trendingSource.forEach(track => {
         const card = document.createElement('div');
         card.className = 'music-card';
         card.innerHTML = `
           <div class="music-card-thumb">
-            <img src="${track.cover}" alt="${track.title}">
+            <img src="${track.cover}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
             <button class="music-card-play" aria-label="Play ${track.title}">
               <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
             </button>
@@ -4461,20 +4523,22 @@ class REAMusicApp {
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
         });
-        this.trendingCarousel.appendChild(card);
+        fragment.appendChild(card);
       });
+      this.trendingCarousel.appendChild(fragment);
     }
 
     // 3. Punjabi & Desi Bass Shelf
     if (this.focusCarousel) {
       const focusSource = this.punjabiHits.length > 0 ? this.punjabiHits : this.quickPicks;
       this.focusCarousel.innerHTML = '';
+      const fragment = document.createDocumentFragment();
       focusSource.forEach(track => {
         const card = document.createElement('div');
         card.className = 'music-card';
         card.innerHTML = `
           <div class="music-card-thumb">
-            <img src="${track.cover}" alt="${track.title}">
+            <img src="${track.cover}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
             <button class="music-card-play" aria-label="Play ${track.title}">
               <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
             </button>
@@ -4491,8 +4555,9 @@ class REAMusicApp {
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
         });
-        this.focusCarousel.appendChild(card);
+        fragment.appendChild(card);
       });
+      this.focusCarousel.appendChild(fragment);
     }
   }
 
@@ -5217,12 +5282,13 @@ class REAMusicApp {
     if (!this.recommendedCarousel) return;
     this.recommendedCarousel.innerHTML = '';
     const recoTracks = this.recommendations.length > 0 ? this.recommendations.slice(0, 12) : this.quickPicks.slice(0, 12);
+    const fragment = document.createDocumentFragment();
     recoTracks.forEach(track => {
       const card = document.createElement('div');
       card.className = 'music-card';
       card.innerHTML = `
         <div class="music-card-thumb">
-          <img src="${track.cover}" alt="${track.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <img src="${track.cover}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
           <button class="music-card-play" aria-label="Play ${track.title}">
             <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
           </button>
@@ -5237,8 +5303,9 @@ class REAMusicApp {
         this.queue.splice(this.currentTrackIndex + 1, 0, track);
         this.playTrack(this.currentTrackIndex + 1);
       });
-      this.recommendedCarousel.appendChild(card);
+      fragment.appendChild(card);
     });
+    this.recommendedCarousel.appendChild(fragment);
   }
 
   renderRelatedPane() {
