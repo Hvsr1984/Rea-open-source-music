@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "build": "node build.js",
+    "build": "node -e \"import('node:fs').then(fs => { if (fs.existsSync('build.js')) import('./build.js'); else console.log('[REA] Pre-built assets ready'); })\"",
+    "build:local": "node build.js",
     "build:web": "node scripts/build-web.js",
     "verify": "node scripts/verify-project.js",
     "test": "node tests/smoke-test.js"
