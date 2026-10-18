@@ -17,6 +17,19 @@ if (window.__REA_INITIALIZED__) {
  * - Live Indian music search for millions of songs, movies & artists
  */
 
+// Smart API Resolution:
+// 1. Android Capacitor / Standalone APK -> https://reamusic.vercel.app
+// 2. Local Node server (localhost:4500) -> '' (local /api)
+// 3. Vercel deployment (reamusic.vercel.app) -> '' (same-origin /api)
+const IS_CAPACITOR_APP = typeof window !== 'undefined' && Boolean(
+  window.Capacitor ||
+  location.protocol === 'file:' ||
+  location.protocol === 'capacitor:' ||
+  (location.hostname === 'localhost' && (!location.port || location.port === '80' || location.port === '443'))
+);
+
+const API_BASE_URL = IS_CAPACITOR_APP ? 'https://reamusic.vercel.app' : '';
+
 // =============================================================================
 // 1. Initial Fallback Indian Tracks
 // =============================================================================
@@ -193,16 +206,13 @@ class OfflineStorage {
 class HybridAudioEngine {
   constructor() {
     this.audio = new Audio();
-    this.audio.crossOrigin = 'anonymous';
     this.audio.preload = 'auto';
-
-    this.ctx = null;
-    this.analyser = null;
-    this.gainNode = null;
-    this.sourceNode = null;
     this.volume = 0.75;
+    this.audio.volume = this.volume;
     this.isPlaying = false;
     this.currentTrack = null;
+    this.ctx = null;
+    this.analyser = null;
   }
 
   init() {
@@ -212,13 +222,6 @@ class HybridAudioEngine {
       this.ctx = new AudioContext();
       this.analyser = this.ctx.createAnalyser();
       this.analyser.fftSize = 64;
-      this.gainNode = this.ctx.createGain();
-      this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime);
-
-      this.sourceNode = this.ctx.createMediaElementSource(this.audio);
-      this.sourceNode.connect(this.gainNode);
-      this.gainNode.connect(this.analyser);
-      this.analyser.connect(this.ctx.destination);
     } catch (e) {
       console.warn('Web Audio init notice:', e);
     }
@@ -227,15 +230,12 @@ class HybridAudioEngine {
   setVolume(val) {
     this.volume = Math.max(0, Math.min(1, val));
     this.audio.volume = this.volume;
-    if (this.gainNode && this.ctx) {
-      this.gainNode.gain.setValueAtTime(this.volume, this.ctx.currentTime);
-    }
   }
 
   playTrack(track) {
     this.init();
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
 
     this.currentTrack = track;
@@ -244,9 +244,15 @@ class HybridAudioEngine {
       if (this.audio.src !== audioSource) {
         this.audio.src = audioSource;
       }
-      this.audio.play().catch(e => {
-        console.warn('Audio play notice:', e);
-      });
+      this.audio.volume = this.volume;
+      const promise = this.audio.play();
+      if (promise !== undefined) {
+        promise.then(() => {
+          this.isPlaying = true;
+        }).catch(e => {
+          console.warn('Audio play notice:', e);
+        });
+      }
       this.isPlaying = true;
     }
   }
@@ -258,10 +264,14 @@ class HybridAudioEngine {
 
   resume() {
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
     if (this.audio.src) {
-      this.audio.play().catch(e => console.warn('Resume notice:', e));
+      this.audio.volume = this.volume;
+      const promise = this.audio.play();
+      if (promise !== undefined) {
+        promise.catch(e => console.warn('Resume notice:', e));
+      }
       this.isPlaying = true;
     }
   }
@@ -362,17 +372,34 @@ class REAMusicApp {
     this.searchCategory = 'all'; // 'all' | 'music' | 'singers'
     this.currentSearchArtists = [];
     this.currentSearchSongs = [];
+    this.currentSearchAlbums = [];
     this.clientSearchCache = new Map();
+    this.clientArtistCache = new Map();
+    this.clientSongCache = new Map();
+    this.clientAlbumCache = new Map();
+    this.lastSearchQuery = '';
+    this.currentUnifiedFilter = 'all';
+    this.currentArtistSongs = [];
+    this.currentArtistAlbums = [];
+    this.currentArtistId = null;
+    this.currentArtistName = null;
+    this.currentSongDetail = null;
+    this.currentSongId = null;
+    this.currentAlbumSongs = [];
+    this.currentAlbumId = null;
+    this.currentRelatedSongs = [];
     this.searchAbortController = null;
 
     this.initDOMElements();
     this.initTheme();
     this.initOfflineStorage();
+    this.initCapacitorListeners();
     this.bindEvents();
     this.startVisualizer();
     this.renderAll();
     this.loadIndianMusicCatalog();
     this.loadRecommendations();
+    this.initRouter();
   }
 
   async initOfflineStorage() {
@@ -414,6 +441,101 @@ class REAMusicApp {
     const savedTheme = localStorage.getItem('rea_theme');
     const validTheme = savedTheme === 'dark' ? 'dark' : 'white';
     this.setTheme(validTheme, false);
+  }
+
+  initCapacitorListeners() {
+    if (typeof window === 'undefined' || !window.Capacitor) return;
+
+    if (window.Capacitor.Plugins && window.Capacitor.Plugins.MusicService) {
+      try {
+        window.Capacitor.Plugins.MusicService.addListener('onMediaAction', (data) => {
+          if (!data || !data.action) return;
+          const act = data.action;
+          if (act.includes('ACTION_PLAY')) {
+            if (!this.isPlaying) {
+              this.engine.resume();
+              this.isPlaying = true;
+              this.updatePlayPauseUI();
+            }
+          } else if (act.includes('ACTION_PAUSE')) {
+            if (this.isPlaying) {
+              this.engine.pause();
+              this.isPlaying = false;
+              this.updatePlayPauseUI();
+            }
+          } else if (act.includes('ACTION_NEXT')) {
+            this.nextTrack();
+          } else if (act.includes('ACTION_PREVIOUS')) {
+            this.prevTrack();
+          }
+        });
+      } catch (e) {
+        console.warn('Capacitor MusicService listener notice:', e);
+      }
+    }
+
+    if (window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+      try {
+        window.Capacitor.Plugins.App.addListener('backButton', () => {
+          if (document.body.classList.contains('theater-active')) {
+            this.closeTheaterMode();
+          } else if (this.currentView !== 'home') {
+            this.switchView('home');
+          } else {
+            window.Capacitor.Plugins.App.minimizeApp();
+          }
+        });
+      } catch (e) {
+        console.warn('Capacitor App backButton notice:', e);
+      }
+    }
+  }
+
+  syncMediaControls() {
+    const track = this.queue[this.currentTrackIndex] || FALLBACK_TRACKS[0];
+    if (!track) return;
+
+    if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: track.title,
+          artist: track.artist,
+          album: track.album || 'REA Music',
+          artwork: [
+            { src: track.cover || 'assets/logo.jpg', sizes: '500x500', type: 'image/jpeg' }
+          ]
+        });
+        navigator.mediaSession.playbackState = this.isPlaying ? 'playing' : 'paused';
+
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (!this.isPlaying) this.togglePlayPause();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (this.isPlaying) this.togglePlayPause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => this.prevTrack());
+        navigator.mediaSession.setActionHandler('nexttrack', () => this.nextTrack());
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details.seekTime) this.engine.seek(details.seekTime);
+        });
+      } catch (e) {
+        console.warn('MediaSession sync notice:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.MusicService) {
+      try {
+        window.Capacitor.Plugins.MusicService.updateState({
+          title: track.title,
+          artist: track.artist,
+          album: track.album || 'REA Music',
+          coverUrl: track.cover || '',
+          isPlaying: this.isPlaying
+        });
+      } catch (e) {
+        console.warn('Capacitor MusicService updateState notice:', e);
+      }
+    }
   }
 
   setTheme(themeName, showToastFeedback = true) {
@@ -483,6 +605,94 @@ class REAMusicApp {
     this.viewExplore = document.getElementById('viewExplore');
     this.viewLibrary = document.getElementById('viewLibrary');
     this.viewDownloads = document.getElementById('viewDownloads');
+    this.viewSearch = document.getElementById('viewSearch');
+    this.viewArtist = document.getElementById('viewArtist');
+    this.viewSong = document.getElementById('viewSong');
+    this.viewAlbum = document.getElementById('viewAlbum');
+
+    // Unified Search View Elements
+    this.searchBackBtn = document.getElementById('searchBackBtn');
+    this.searchBreadcrumbQuery = document.getElementById('searchBreadcrumbQuery');
+    this.searchPageTitle = document.getElementById('searchPageTitle');
+    this.searchCategoryPills = document.getElementById('searchCategoryPills');
+    this.searchSkeleton = document.getElementById('searchSkeleton');
+    this.searchErrorState = document.getElementById('searchErrorState');
+    this.searchErrorMessage = document.getElementById('searchErrorMessage');
+    this.searchRetryBtn = document.getElementById('searchRetryBtn');
+    this.searchEmptyState = document.getElementById('searchEmptyState');
+    this.searchEmptyMessage = document.getElementById('searchEmptyMessage');
+    this.searchResultsContent = document.getElementById('searchResultsContent');
+    this.searchTopResultSection = document.getElementById('searchTopResultSection');
+    this.searchTopResultCard = document.getElementById('searchTopResultCard');
+    this.searchSongsSection = document.getElementById('searchSongsSection');
+    this.searchSongsTitle = document.getElementById('searchSongsTitle');
+    this.searchSongsGrid = document.getElementById('searchSongsGrid');
+    this.searchArtistsSection = document.getElementById('searchArtistsSection');
+    this.searchArtistsTitle = document.getElementById('searchArtistsTitle');
+    this.searchArtistsGrid = document.getElementById('searchArtistsGrid');
+    this.searchAlbumsSection = document.getElementById('searchAlbumsSection');
+    this.searchAlbumsTitle = document.getElementById('searchAlbumsTitle');
+    this.searchAlbumsGrid = document.getElementById('searchAlbumsGrid');
+
+    // Dedicated Artist View Elements
+    this.artistBackBtn = document.getElementById('artistBackBtn');
+    this.artistSkeleton = document.getElementById('artistSkeleton');
+    this.artistErrorState = document.getElementById('artistErrorState');
+    this.artistErrorMessage = document.getElementById('artistErrorMessage');
+    this.artistRetryBtn = document.getElementById('artistRetryBtn');
+    this.artistContent = document.getElementById('artistContent');
+    this.artistHeroAvatar = document.getElementById('artistHeroAvatar');
+    this.artistHeroName = document.getElementById('artistHeroName');
+    this.artistHeroMeta = document.getElementById('artistHeroMeta');
+    this.artistHeroBio = document.getElementById('artistHeroBio');
+    this.artistPlayAllBtn = document.getElementById('artistPlayAllBtn');
+    this.artistShuffleBtn = document.getElementById('artistShuffleBtn');
+    this.artistPopularSection = document.getElementById('artistPopularSection');
+    this.artistTopSongsList = document.getElementById('artistTopSongsList');
+    this.artistAlbumsSection = document.getElementById('artistAlbumsSection');
+    this.artistAlbumsGrid = document.getElementById('artistAlbumsGrid');
+    this.artistSimilarSection = document.getElementById('artistSimilarSection');
+    this.artistSimilarGrid = document.getElementById('artistSimilarGrid');
+
+    // Dedicated Song View Elements
+    this.songBackBtn = document.getElementById('songBackBtn');
+    this.songSkeleton = document.getElementById('songSkeleton');
+    this.songErrorState = document.getElementById('songErrorState');
+    this.songErrorMessage = document.getElementById('songErrorMessage');
+    this.songRetryBtn = document.getElementById('songRetryBtn');
+    this.songContent = document.getElementById('songContent');
+    this.songHeroCover = document.getElementById('songHeroCover');
+    this.songHeroTitle = document.getElementById('songHeroTitle');
+    this.songHeroArtistRow = document.getElementById('songHeroArtistRow');
+    this.songHeroArtistLink = document.getElementById('songHeroArtistLink');
+    this.songHeroAlbumRow = document.getElementById('songHeroAlbumRow');
+    this.songHeroAlbumLink = document.getElementById('songHeroAlbumLink');
+    this.songHeroYear = document.getElementById('songHeroYear');
+    this.songHeroDuration = document.getElementById('songHeroDuration');
+    this.songPlayHeroBtn = document.getElementById('songPlayHeroBtn');
+    this.songQueueNextBtn = document.getElementById('songQueueNextBtn');
+    this.songHeroDownloadBtn = document.getElementById('songHeroDownloadBtn');
+    this.songRelatedSection = document.getElementById('songRelatedSection');
+    this.songRelatedTracksList = document.getElementById('songRelatedTracksList');
+
+    // Dedicated Album View Elements
+    this.albumBackBtn = document.getElementById('albumBackBtn');
+    this.albumSkeleton = document.getElementById('albumSkeleton');
+    this.albumErrorState = document.getElementById('albumErrorState');
+    this.albumErrorMessage = document.getElementById('albumErrorMessage');
+    this.albumRetryBtn = document.getElementById('albumRetryBtn');
+    this.albumContent = document.getElementById('albumContent');
+    this.albumHeroCover = document.getElementById('albumHeroCover');
+    this.albumHeroTitle = document.getElementById('albumHeroTitle');
+    this.albumHeroArtistRow = document.getElementById('albumHeroArtistRow');
+    this.albumHeroArtistLink = document.getElementById('albumHeroArtistLink');
+    this.albumHeroStats = document.getElementById('albumHeroStats');
+    this.albumHeroYear = document.getElementById('albumHeroYear');
+    this.albumHeroTrackCount = document.getElementById('albumHeroTrackCount');
+    this.albumPlayAllBtn = document.getElementById('albumPlayAllBtn');
+    this.albumShuffleBtn = document.getElementById('albumShuffleBtn');
+    this.albumTracksSection = document.getElementById('albumTracksSection');
+    this.albumTracksList = document.getElementById('albumTracksList');
 
     // Downloads View Elements
     this.downloadsHeroCard = document.getElementById('downloadsHeroCard');
@@ -1046,7 +1256,7 @@ class REAMusicApp {
           const query = this.searchInput.value.trim();
           if (query) {
             this.addSearchHistory(query);
-            this.performLiveSearch(query, true);
+            this.openSearchView(query);
           }
         }
       });
@@ -1441,12 +1651,236 @@ class REAMusicApp {
         if (this.volumeBtn) this.volumeBtn.click();
       });
     }
+
+    // G. Detail Views Back Buttons
+    if (this.searchBackBtn) {
+      this.searchBackBtn.addEventListener('click', () => {
+        if (window.history.length > 1) window.history.back();
+        else this.switchView('home');
+      });
+    }
+    if (this.artistBackBtn) {
+      this.artistBackBtn.addEventListener('click', () => {
+        if (window.history.length > 1) window.history.back();
+        else if (this.lastSearchQuery) this.openSearchView(this.lastSearchQuery);
+        else this.switchView('home');
+      });
+    }
+    if (this.songBackBtn) {
+      this.songBackBtn.addEventListener('click', () => {
+        if (window.history.length > 1) window.history.back();
+        else if (this.lastSearchQuery) this.openSearchView(this.lastSearchQuery);
+        else this.switchView('home');
+      });
+    }
+    if (this.albumBackBtn) {
+      this.albumBackBtn.addEventListener('click', () => {
+        if (window.history.length > 1) window.history.back();
+        else if (this.lastSearchQuery) this.openSearchView(this.lastSearchQuery);
+        else this.switchView('home');
+      });
+    }
+
+    // H. Retry buttons
+    if (this.searchRetryBtn) {
+      this.searchRetryBtn.addEventListener('click', () => {
+        if (this.lastSearchQuery) this.openSearchView(this.lastSearchQuery, false);
+      });
+    }
+    if (this.artistRetryBtn) {
+      this.artistRetryBtn.addEventListener('click', () => {
+        if (this.currentArtistId) this.openArtistView(this.currentArtistId, this.currentArtistName || '', false);
+      });
+    }
+    if (this.songRetryBtn) {
+      this.songRetryBtn.addEventListener('click', () => {
+        if (this.currentSongId) this.openSongView(this.currentSongId, false);
+      });
+    }
+    if (this.albumRetryBtn) {
+      this.albumRetryBtn.addEventListener('click', () => {
+        if (this.currentAlbumId) this.openAlbumView(this.currentAlbumId, false);
+      });
+    }
+
+    // I. Search Category Filter Pills
+    if (this.searchCategoryPills) {
+      this.searchCategoryPills.querySelectorAll('.search-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+          const filter = pill.dataset.filter || 'all';
+          this.searchCategoryPills.querySelectorAll('.search-pill').forEach(p => p.classList.toggle('active', p === pill));
+          this.applyUnifiedSearchFilter(filter);
+        });
+      });
+    }
+
+    // J. Detail Action Buttons
+    if (this.artistPlayAllBtn) {
+      this.artistPlayAllBtn.addEventListener('click', () => {
+        this.playTrackList(this.currentArtistSongs, false);
+      });
+    }
+    if (this.artistShuffleBtn) {
+      this.artistShuffleBtn.addEventListener('click', () => {
+        this.playTrackList(this.currentArtistSongs, true);
+      });
+    }
+
+    if (this.songPlayHeroBtn) {
+      this.songPlayHeroBtn.addEventListener('click', () => {
+        if (!this.currentSongDetail) return;
+        const currentTrack = this.queue[this.currentTrackIndex];
+        if (currentTrack && currentTrack.id === this.currentSongDetail.id) {
+          this.togglePlayPause();
+        } else {
+          this.playTrackItem(this.currentSongDetail);
+        }
+      });
+    }
+    if (this.songQueueNextBtn) {
+      this.songQueueNextBtn.addEventListener('click', () => {
+        if (!this.currentSongDetail) return;
+        const insertIdx = (this.currentTrackIndex >= 0) ? this.currentTrackIndex + 1 : 0;
+        this.queue.splice(insertIdx, 0, this.currentSongDetail);
+        this.renderQueue();
+        this.showToast(`"${this.currentSongDetail.title}" added to play next`);
+      });
+    }
+    if (this.songHeroDownloadBtn) {
+      this.songHeroDownloadBtn.addEventListener('click', () => {
+        if (this.currentSongDetail) this.handleDownloadButtonClick(this.currentSongDetail);
+      });
+    }
+
+    if (this.albumPlayAllBtn) {
+      this.albumPlayAllBtn.addEventListener('click', () => {
+        this.playTrackList(this.currentAlbumSongs, false);
+      });
+    }
+    if (this.albumShuffleBtn) {
+      this.albumShuffleBtn.addEventListener('click', () => {
+        this.playTrackList(this.currentAlbumSongs, true);
+      });
+    }
+
+    // K. Universal Click Delegation
+    document.addEventListener('click', (e) => {
+      // 1. Artist link click
+      const artistLink = e.target.closest('.artist-link');
+      if (artistLink) {
+        e.preventDefault();
+        e.stopPropagation();
+        const artistId = artistLink.dataset.artistId;
+        const artistName = artistLink.dataset.artistName || artistLink.textContent.trim();
+        this.openArtistView(artistId || artistName, artistName);
+        return;
+      }
+
+      // 2. Album link click
+      const albumLink = e.target.closest('.album-link');
+      if (albumLink) {
+        e.preventDefault();
+        e.stopPropagation();
+        const albumId = albumLink.dataset.albumId;
+        if (albumId) {
+          this.openAlbumView(albumId);
+          return;
+        }
+      }
+
+      // 3. Song link click
+      const songLink = e.target.closest('.song-link');
+      if (songLink) {
+        e.preventDefault();
+        e.stopPropagation();
+        const songId = songLink.dataset.songId;
+        if (songId) {
+          this.openSongView(songId);
+          return;
+        }
+      }
+
+      // 4. Click play button inside track row card, ranked row, or top result
+      const playBtn = e.target.closest('.track-row-play-btn, .btn-top-play');
+      if (playBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = playBtn.closest('[data-song-id], [data-artist-id], [data-album-id]');
+        if (card) {
+          if (card.dataset.songId) {
+            const track = this.findTrackById(card.dataset.songId);
+            if (track) this.playTrackItem(track);
+          } else if (card.dataset.artistId || card.dataset.artistName) {
+            this.loadSingerHits({ id: card.dataset.artistId, name: card.dataset.artistName });
+          } else if (card.dataset.albumId) {
+            this.openAlbumView(card.dataset.albumId);
+          }
+        }
+        return;
+      }
+
+      // 5. Click view button on top result card
+      const viewBtn = e.target.closest('.btn-top-view');
+      if (viewBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = viewBtn.closest('.top-result-card');
+        if (card) {
+          if (card.dataset.artistId || card.dataset.artistName) {
+            this.openArtistView(card.dataset.artistId || card.dataset.artistName, card.dataset.artistName || '');
+          } else if (card.dataset.songId) {
+            this.openSongView(card.dataset.songId);
+          } else if (card.dataset.albumId) {
+            this.openAlbumView(card.dataset.albumId);
+          }
+        }
+        return;
+      }
+
+      // 6. Click top result card body (outside buttons/links)
+      const topCard = e.target.closest('.top-result-card');
+      if (topCard && !e.target.closest('button, .artist-link, .album-link, .song-link')) {
+        if (topCard.dataset.artistId || topCard.dataset.artistName) {
+          this.openArtistView(topCard.dataset.artistId || topCard.dataset.artistName, topCard.dataset.artistName || '');
+        } else if (topCard.dataset.songId) {
+          this.openSongView(topCard.dataset.songId);
+        } else if (topCard.dataset.albumId) {
+          this.openAlbumView(topCard.dataset.albumId);
+        }
+        return;
+      }
+
+      // 7. Click artist card
+      const artistCard = e.target.closest('.artist-card');
+      if (artistCard && !e.target.closest('button')) {
+        const artistId = artistCard.dataset.artistId;
+        const artistName = artistCard.dataset.artistName || artistCard.querySelector('.artist-card-name')?.textContent || '';
+        this.openArtistView(artistId || artistName, artistName);
+        return;
+      }
+
+      // 8. Click music-card with data-album-id
+      const albumCard = e.target.closest('.music-card[data-album-id]');
+      if (albumCard) {
+        const albumId = albumCard.dataset.albumId;
+        if (albumId) this.openAlbumView(albumId);
+        return;
+      }
+
+      // 9. Click ranked-track-row (outside buttons and links)
+      const rankedRow = e.target.closest('.ranked-track-row');
+      if (rankedRow && !e.target.closest('button, .artist-link, .album-link, .song-link, .track-inline-dl-btn')) {
+        const songId = rankedRow.dataset.songId;
+        if (songId) this.openSongView(songId);
+        return;
+      }
+    });
   }
 
   // ===========================================================================
-  // SPA View Router (Home, Explore, Library)
+  // SPA View Router & Dynamic Detail Pages
   // ===========================================================================
-  switchView(viewName) {
+  switchView(viewName, pushState = true) {
     this.currentView = viewName;
     if (this.closeMobileMenu) this.closeMobileMenu();
 
@@ -1468,10 +1902,21 @@ class REAMusicApp {
     if (this.viewExplore) this.viewExplore.classList.toggle('hidden', viewName !== 'explore');
     if (this.viewLibrary) this.viewLibrary.classList.toggle('hidden', viewName !== 'library');
     if (this.viewDownloads) this.viewDownloads.classList.toggle('hidden', viewName !== 'downloads');
+    if (this.viewSearch) this.viewSearch.classList.toggle('hidden', viewName !== 'search');
+    if (this.viewArtist) this.viewArtist.classList.toggle('hidden', viewName !== 'artist');
+    if (this.viewSong) this.viewSong.classList.toggle('hidden', viewName !== 'song');
+    if (this.viewAlbum) this.viewAlbum.classList.toggle('hidden', viewName !== 'album');
 
     // Scroll main content to top
     const mainContent = document.getElementById('mainContent');
     if (mainContent) mainContent.scrollTop = 0;
+
+    if (pushState && typeof history !== 'undefined' && history.pushState) {
+      if (viewName === 'home') this.updateUrl('/');
+      else if (viewName === 'explore') this.updateUrl('/explore');
+      else if (viewName === 'library') this.updateUrl('/library');
+      else if (viewName === 'downloads') this.updateUrl('/downloads');
+    }
 
     if (viewName === 'explore') {
       this.loadExploreCatalog();
@@ -1482,12 +1927,688 @@ class REAMusicApp {
     }
   }
 
+  updateUrl(path) {
+    if (typeof history !== 'undefined' && history.pushState) {
+      const cur = window.location.pathname + window.location.search;
+      if (cur !== path) {
+        history.pushState({ path }, '', path);
+      }
+    }
+  }
+
+  initRouter() {
+    window.addEventListener('popstate', () => {
+      this.handleRoute(window.location.pathname, window.location.search, false);
+    });
+
+    // Run router for initial page path
+    this.handleRoute(window.location.pathname, window.location.search, false);
+  }
+
+  handleRoute(pathname, search, pushState = false) {
+    const params = new URLSearchParams(search);
+    const cleanPath = pathname.replace(/\/$/, '') || '/';
+
+    if (cleanPath === '/' || cleanPath === '/home' || cleanPath === '/index.html') {
+      this.switchView('home', pushState);
+    } else if (cleanPath === '/explore') {
+      this.switchView('explore', pushState);
+    } else if (cleanPath === '/library') {
+      this.switchView('library', pushState);
+    } else if (cleanPath === '/downloads') {
+      this.switchView('downloads', pushState);
+    } else if (cleanPath === '/search') {
+      const q = params.get('q') || '';
+      if (q) {
+        this.openSearchView(q, pushState);
+      } else {
+        this.switchView('home', pushState);
+      }
+    } else if (cleanPath.startsWith('/artist/')) {
+      const artistId = decodeURIComponent(cleanPath.substring('/artist/'.length));
+      const artistName = params.get('name') || '';
+      if (artistId) {
+        this.openArtistView(artistId, artistName, pushState);
+      }
+    } else if (cleanPath.startsWith('/song/')) {
+      const songId = decodeURIComponent(cleanPath.substring('/song/'.length));
+      if (songId) {
+        this.openSongView(songId, pushState);
+      }
+    } else if (cleanPath.startsWith('/album/')) {
+      const albumId = decodeURIComponent(cleanPath.substring('/album/'.length));
+      if (albumId) {
+        this.openAlbumView(albumId, pushState);
+      }
+    } else {
+      this.switchView('home', pushState);
+    }
+  }
+
+  renderClickableArtists(song) {
+    if (!song) return 'Unknown Artist';
+    const artistStr = typeof song === 'string' ? song : (song.artist || '');
+    if (!artistStr) return 'Unknown Artist';
+    const artistNames = artistStr.split(',').map(s => s.trim()).filter(Boolean);
+    const map = (song && typeof song === 'object' && song.artistMap) ? song.artistMap : {};
+    return artistNames.map((name, idx) => {
+      const id = map[name.toLowerCase()] || map[name] || (idx === 0 && song.primaryArtistId ? song.primaryArtistId : '') || '';
+      return `<span class="artist-link" data-artist-id="${id}" data-artist-name="${name}">${name}</span>`;
+    }).join(', ');
+  }
+
+  // ===========================================================================
+  // 1. Unified Search View
+  // ===========================================================================
+  async openSearchView(query, pushState = true) {
+    const cleanQuery = (query || '').trim();
+    if (!cleanQuery) return;
+    this.lastSearchQuery = cleanQuery;
+
+    if (this.searchInput) this.searchInput.value = cleanQuery;
+    if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
+    if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+
+    this.switchView('search', false);
+    if (pushState) {
+      this.updateUrl(`/search?q=${encodeURIComponent(cleanQuery)}`);
+    }
+
+    if (this.searchBreadcrumbQuery) this.searchBreadcrumbQuery.textContent = cleanQuery;
+    if (this.searchPageTitle) this.searchPageTitle.textContent = `Results for "${cleanQuery}"`;
+
+    // Reset filter pills to All
+    if (this.searchCategoryPills) {
+      this.searchCategoryPills.querySelectorAll('.search-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.filter === 'all');
+      });
+    }
+    this.currentUnifiedFilter = 'all';
+
+    // Show loading skeleton, hide other states
+    if (this.searchSkeleton) this.searchSkeleton.classList.remove('hidden');
+    if (this.searchEmptyState) this.searchEmptyState.classList.add('hidden');
+    if (this.searchErrorState) this.searchErrorState.classList.add('hidden');
+    if (this.searchResultsContent) this.searchResultsContent.classList.add('hidden');
+
+    const cacheKey = cleanQuery.toLowerCase();
+    let data = null;
+
+    if (this.clientSearchCache && this.clientSearchCache.has(cacheKey)) {
+      data = this.clientSearchCache.get(cacheKey);
+    } else {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(cleanQuery)}`);
+        if (!res.ok) throw new Error('Search request failed');
+        data = await res.json();
+        if (this.clientSearchCache) {
+          this.clientSearchCache.set(cacheKey, data);
+        }
+      } catch (err) {
+        console.error('Search error:', err);
+        if (this.searchSkeleton) this.searchSkeleton.classList.add('hidden');
+        if (this.searchErrorState) {
+          this.searchErrorState.classList.remove('hidden');
+          if (this.searchErrorMessage) {
+            this.searchErrorMessage.textContent = `Could not load results for "${cleanQuery}". Please check your network connection and retry.`;
+          }
+        }
+        return;
+      }
+    }
+
+    if (this.searchSkeleton) this.searchSkeleton.classList.add('hidden');
+
+    const songs = data.results || [];
+    const artists = data.artists || [];
+    const albums = data.albums || [];
+    const topResult = data.topResult || null;
+
+    this.currentSearchSongs = songs;
+    this.currentSearchArtists = artists;
+    this.currentSearchAlbums = albums;
+
+    if (songs.length === 0 && artists.length === 0 && albums.length === 0) {
+      if (this.searchEmptyState) {
+        this.searchEmptyState.classList.remove('hidden');
+        if (this.searchEmptyMessage) {
+          this.searchEmptyMessage.textContent = `We couldn't find any songs, artists, or albums matching "${cleanQuery}". Try checking your spelling or searching for another artist or song.`;
+        }
+      }
+      return;
+    }
+
+    if (this.searchResultsContent) this.searchResultsContent.classList.remove('hidden');
+
+    // 1. Render Top Result
+    if (topResult && this.searchTopResultSection && this.searchTopResultCard) {
+      this.searchTopResultSection.classList.remove('hidden');
+      if (topResult.type === 'artist') {
+        this.searchTopResultCard.innerHTML = `
+          <div class="top-result-card" data-artist-id="${topResult.id || ''}" data-artist-name="${topResult.name || ''}">
+            <div class="top-result-thumb-wrap artist">
+              <img src="${topResult.image || FALLBACK_COVER}" class="top-result-thumb" alt="${topResult.name}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            </div>
+            <div class="top-result-info">
+              <span class="top-result-badge">Top Artist</span>
+              <div class="top-result-title">${topResult.name}</div>
+              <div class="top-result-meta">${topResult.role || 'Artist / Singer'} • Tap to explore artist discography & top hits</div>
+              <div class="top-result-actions">
+                <button class="btn-top-play" title="Play Top Hits">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  <span>Play Top Hits</span>
+                </button>
+                <button class="btn-top-view" title="View Artist Page">
+                  <span>View Artist Page →</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (topResult.type === 'album') {
+        this.searchTopResultCard.innerHTML = `
+          <div class="top-result-card" data-album-id="${topResult.id}">
+            <div class="top-result-thumb-wrap">
+              <img src="${topResult.image || FALLBACK_COVER}" class="top-result-thumb" alt="${topResult.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            </div>
+            <div class="top-result-info">
+              <span class="top-result-badge">Top Album</span>
+              <div class="top-result-title">${topResult.title}</div>
+              <div class="top-result-meta">By ${topResult.artist} ${topResult.year ? '• ' + topResult.year : ''}</div>
+              <div class="top-result-actions">
+                <button class="btn-top-play" title="Play Album">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  <span>Play Album</span>
+                </button>
+                <button class="btn-top-view" title="View Album Page">
+                  <span>View Album Page →</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        // Song
+        this.searchTopResultCard.innerHTML = `
+          <div class="top-result-card" data-song-id="${topResult.id}">
+            <div class="top-result-thumb-wrap">
+              <img src="${topResult.cover || FALLBACK_COVER}" class="top-result-thumb" alt="${topResult.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            </div>
+            <div class="top-result-info">
+              <span class="top-result-badge">Top Song</span>
+              <div class="top-result-title">${topResult.title}</div>
+              <div class="top-result-meta">By ${this.renderClickableArtists(topResult)} • ${topResult.album || 'Single'}</div>
+              <div class="top-result-actions">
+                <button class="btn-top-play" title="Play Song">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  <span>Play Song</span>
+                </button>
+                <button class="btn-top-view" title="Song Details">
+                  <span>Song Details →</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    } else if (this.searchTopResultSection) {
+      this.searchTopResultSection.classList.add('hidden');
+    }
+
+    // 2. Render Matching Songs
+    if (this.searchSongsSection && this.searchSongsGrid) {
+      if (songs.length > 0) {
+        this.searchSongsSection.classList.remove('hidden');
+        if (this.searchSongsTitle) this.searchSongsTitle.textContent = `Songs • ${songs.length}`;
+        this.searchSongsGrid.innerHTML = songs.map(song => `
+          <div class="track-row-card" data-song-id="${song.id}">
+            <img src="${song.cover || FALLBACK_COVER}" alt="${song.title}" class="track-row-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <div class="track-row-info">
+              <div class="track-row-title song-link" data-song-id="${song.id}">${song.title}</div>
+              <div class="track-row-meta">
+                ${this.renderClickableArtists(song)} • ${song.album ? `<span class="album-link" data-album-id="${song.albumId || ''}">${song.album}</span>` : 'Single'}
+              </div>
+            </div>
+            ${song.duration ? `<div class="track-row-duration">${this.formatTime(song.duration)}</div>` : ''}
+            <button class="track-row-play-btn" title="Play song">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+          </div>
+        `).join('');
+      } else {
+        this.searchSongsSection.classList.add('hidden');
+      }
+    }
+
+    // 3. Render Matching Artists & Singers
+    if (this.searchArtistsSection && this.searchArtistsGrid) {
+      if (artists.length > 0) {
+        this.searchArtistsSection.classList.remove('hidden');
+        if (this.searchArtistsTitle) this.searchArtistsTitle.textContent = `Artists & Singers • ${artists.length}`;
+        this.searchArtistsGrid.innerHTML = artists.map(artist => `
+          <div class="artist-card" data-artist-id="${artist.id || ''}" data-artist-name="${artist.name || ''}">
+            <div class="artist-avatar-wrap">
+              <img src="${artist.image || FALLBACK_COVER}" alt="${artist.name}" class="artist-avatar-img" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            </div>
+            <div class="artist-card-name">${artist.name}</div>
+            <div class="artist-card-role">${artist.role || 'Artist / Singer'}</div>
+          </div>
+        `).join('');
+      } else {
+        this.searchArtistsSection.classList.add('hidden');
+      }
+    }
+
+    // 4. Render Matching Albums
+    if (this.searchAlbumsSection && this.searchAlbumsGrid) {
+      if (albums.length > 0) {
+        this.searchAlbumsSection.classList.remove('hidden');
+        if (this.searchAlbumsTitle) this.searchAlbumsTitle.textContent = `Albums • ${albums.length}`;
+        this.searchAlbumsGrid.innerHTML = albums.map(album => `
+          <div class="music-card" data-album-id="${album.id}">
+            <div class="music-card-cover-wrap">
+              <img src="${album.image || FALLBACK_COVER}" alt="${album.title}" class="music-card-img" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+              <div class="music-card-play-overlay">
+                <button class="card-play-btn" title="Open Album">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="music-card-title album-link" data-album-id="${album.id}">${album.title}</div>
+            <div class="music-card-subtitle">${album.artist || 'Album'} ${album.year ? '• ' + album.year : ''}</div>
+          </div>
+        `).join('');
+      } else {
+        this.searchAlbumsSection.classList.add('hidden');
+      }
+    }
+  }
+
+  applyUnifiedSearchFilter(filter) {
+    this.currentUnifiedFilter = filter;
+    if (filter === 'all') {
+      if (this.searchTopResultSection) {
+        this.searchTopResultSection.classList.toggle('hidden', !this.searchTopResultCard.innerHTML);
+      }
+      if (this.searchSongsSection) {
+        this.searchSongsSection.classList.toggle('hidden', (this.currentSearchSongs || []).length === 0);
+      }
+      if (this.searchArtistsSection) {
+        this.searchArtistsSection.classList.toggle('hidden', (this.currentSearchArtists || []).length === 0);
+      }
+      if (this.searchAlbumsSection) {
+        this.searchAlbumsSection.classList.toggle('hidden', (this.currentSearchAlbums || []).length === 0);
+      }
+    } else if (filter === 'songs') {
+      if (this.searchTopResultSection) this.searchTopResultSection.classList.add('hidden');
+      if (this.searchSongsSection) this.searchSongsSection.classList.remove('hidden');
+      if (this.searchArtistsSection) this.searchArtistsSection.classList.add('hidden');
+      if (this.searchAlbumsSection) this.searchAlbumsSection.classList.add('hidden');
+    } else if (filter === 'artists') {
+      if (this.searchTopResultSection) this.searchTopResultSection.classList.add('hidden');
+      if (this.searchSongsSection) this.searchSongsSection.classList.add('hidden');
+      if (this.searchArtistsSection) this.searchArtistsSection.classList.remove('hidden');
+      if (this.searchAlbumsSection) this.searchAlbumsSection.classList.add('hidden');
+    } else if (filter === 'albums') {
+      if (this.searchTopResultSection) this.searchTopResultSection.classList.add('hidden');
+      if (this.searchSongsSection) this.searchSongsSection.classList.add('hidden');
+      if (this.searchArtistsSection) this.searchArtistsSection.classList.add('hidden');
+      if (this.searchAlbumsSection) this.searchAlbumsSection.classList.remove('hidden');
+    }
+  }
+
+  // ===========================================================================
+  // 2. Dedicated Artist Page
+  // ===========================================================================
+  async openArtistView(artistIdOrName, artistName = '', pushState = true) {
+    if (!artistIdOrName) return;
+    this.currentArtistId = artistIdOrName;
+    this.currentArtistName = artistName || artistIdOrName;
+
+    this.switchView('artist', false);
+    if (pushState) {
+      this.updateUrl(`/artist/${encodeURIComponent(artistIdOrName)}${artistName ? '?name=' + encodeURIComponent(artistName) : ''}`);
+    }
+
+    // Show loading skeleton, hide content and error
+    if (this.artistSkeleton) this.artistSkeleton.classList.remove('hidden');
+    if (this.artistErrorState) this.artistErrorState.classList.add('hidden');
+    if (this.artistContent) this.artistContent.classList.add('hidden');
+
+    const cacheKey = String(artistIdOrName).toLowerCase();
+    let data = null;
+
+    if (this.clientArtistCache && this.clientArtistCache.has(cacheKey)) {
+      data = this.clientArtistCache.get(cacheKey);
+    } else {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/artist?id=${encodeURIComponent(artistIdOrName)}&name=${encodeURIComponent(this.currentArtistName)}`);
+        if (!res.ok) throw new Error('Artist fetch failed');
+        data = await res.json();
+        if (this.clientArtistCache) {
+          this.clientArtistCache.set(cacheKey, data);
+        }
+      } catch (err) {
+        console.error('Artist fetch error:', err);
+        if (this.artistSkeleton) this.artistSkeleton.classList.add('hidden');
+        if (this.artistErrorState) {
+          this.artistErrorState.classList.remove('hidden');
+          if (this.artistErrorMessage) {
+            this.artistErrorMessage.textContent = `Could not load artist profile for "${this.currentArtistName}". Please check your connection and retry.`;
+          }
+        }
+        return;
+      }
+    }
+
+    if (this.artistSkeleton) this.artistSkeleton.classList.add('hidden');
+    if (this.artistContent) this.artistContent.classList.remove('hidden');
+
+    this.currentArtistSongs = data.topSongs || [];
+    this.currentArtistAlbums = data.topAlbums || [];
+
+    // Header info
+    if (this.artistHeroAvatar) this.artistHeroAvatar.src = data.image || FALLBACK_COVER;
+    if (this.artistHeroName) this.artistHeroName.textContent = data.name || this.currentArtistName;
+    if (this.artistHeroMeta) {
+      const listeners = data.follower_count ? Number(data.follower_count).toLocaleString() + ' Followers • ' : '';
+      const fanCount = data.fan_count ? Number(data.fan_count).toLocaleString() + ' Monthly Listeners • ' : '';
+      this.artistHeroMeta.textContent = `${listeners}${fanCount}${data.dominantType || 'Singer & Artist'}`;
+    }
+    if (this.artistHeroBio) {
+      if (data.bio) {
+        const cleanBio = data.bio.replace(/<[^>]+>/g, '').trim();
+        this.artistHeroBio.textContent = cleanBio.length > 300 ? cleanBio.slice(0, 300) + '...' : cleanBio;
+        this.artistHeroBio.style.display = 'block';
+      } else {
+        this.artistHeroBio.style.display = 'none';
+      }
+    }
+
+    // Popular Songs list
+    if (this.artistPopularSection && this.artistTopSongsList) {
+      if (this.currentArtistSongs.length > 0) {
+        this.artistPopularSection.classList.remove('hidden');
+        this.artistTopSongsList.innerHTML = this.currentArtistSongs.map((song, idx) => `
+          <div class="ranked-track-row" data-song-id="${song.id}">
+            <div class="track-rank-num">${idx + 1}</div>
+            <img src="${song.cover || FALLBACK_COVER}" alt="${song.title}" class="track-row-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <div class="track-row-info">
+              <div class="track-row-title song-link" data-song-id="${song.id}">${song.title}</div>
+              <div class="track-row-meta">
+                ${this.renderClickableArtists(song)} • ${song.album ? `<span class="album-link" data-album-id="${song.albumId || ''}">${song.album}</span>` : 'Single'}
+              </div>
+            </div>
+            ${song.duration ? `<div class="track-row-duration">${this.formatTime(song.duration)}</div>` : ''}
+            <button class="track-row-play-btn" title="Play">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+          </div>
+        `).join('');
+      } else {
+        this.artistPopularSection.classList.add('hidden');
+      }
+    }
+
+    // Albums & Singles
+    if (this.artistAlbumsSection && this.artistAlbumsGrid) {
+      if (this.currentArtistAlbums.length > 0) {
+        this.artistAlbumsSection.classList.remove('hidden');
+        this.artistAlbumsGrid.innerHTML = this.currentArtistAlbums.map(album => `
+          <div class="music-card" data-album-id="${album.id}">
+            <div class="music-card-cover-wrap">
+              <img src="${album.image || FALLBACK_COVER}" alt="${album.title}" class="music-card-img" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+              <div class="music-card-play-overlay">
+                <button class="card-play-btn" title="Open Album">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="music-card-title album-link" data-album-id="${album.id}">${album.title}</div>
+            <div class="music-card-subtitle">${album.year ? album.year + ' • ' : ''}Album</div>
+          </div>
+        `).join('');
+      } else {
+        this.artistAlbumsSection.classList.add('hidden');
+      }
+    }
+
+    // Similar Artists
+    if (this.artistSimilarSection && this.artistSimilarGrid) {
+      const similar = data.similarArtists || [];
+      if (similar.length > 0) {
+        this.artistSimilarSection.classList.remove('hidden');
+        this.artistSimilarGrid.innerHTML = similar.map(art => `
+          <div class="artist-card" data-artist-id="${art.id || ''}" data-artist-name="${art.name || ''}">
+            <div class="artist-avatar-wrap">
+              <img src="${art.image || FALLBACK_COVER}" alt="${art.name}" class="artist-avatar-img" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            </div>
+            <div class="artist-card-name">${art.name}</div>
+            <div class="artist-card-role">Artist</div>
+          </div>
+        `).join('');
+      } else {
+        this.artistSimilarSection.classList.add('hidden');
+      }
+    }
+  }
+
+  // ===========================================================================
+  // 3. Dedicated Song Detail Page
+  // ===========================================================================
+  async openSongView(songId, pushState = true) {
+    if (!songId) return;
+    this.currentSongId = songId;
+
+    this.switchView('song', false);
+    if (pushState) {
+      this.updateUrl(`/song/${encodeURIComponent(songId)}`);
+    }
+
+    if (this.songSkeleton) this.songSkeleton.classList.remove('hidden');
+    if (this.songErrorState) this.songErrorState.classList.add('hidden');
+    if (this.songContent) this.songContent.classList.add('hidden');
+
+    const cacheKey = String(songId).toLowerCase();
+    let data = null;
+
+    if (this.clientSongCache && this.clientSongCache.has(cacheKey)) {
+      data = this.clientSongCache.get(cacheKey);
+    } else {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/song?id=${encodeURIComponent(songId)}`);
+        if (!res.ok) throw new Error('Song fetch failed');
+        data = await res.json();
+        if (this.clientSongCache) {
+          this.clientSongCache.set(cacheKey, data);
+        }
+      } catch (err) {
+        console.error('Song fetch error:', err);
+        if (this.songSkeleton) this.songSkeleton.classList.add('hidden');
+        if (this.songErrorState) {
+          this.songErrorState.classList.remove('hidden');
+          if (this.songErrorMessage) {
+            this.songErrorMessage.textContent = 'Could not load song details. Please check your connection and retry.';
+          }
+        }
+        return;
+      }
+    }
+
+    if (this.songSkeleton) this.songSkeleton.classList.add('hidden');
+    if (this.songContent) this.songContent.classList.remove('hidden');
+
+    const track = data.track;
+    this.currentSongDetail = track;
+    this.currentRelatedSongs = data.related || [];
+
+    if (this.songHeroCover) this.songHeroCover.src = track.cover || FALLBACK_COVER;
+    if (this.songHeroTitle) this.songHeroTitle.textContent = track.title;
+    if (this.songHeroArtistLink) this.songHeroArtistLink.innerHTML = this.renderClickableArtists(track);
+    if (this.songHeroAlbumLink) {
+      this.songHeroAlbumLink.innerHTML = `<span class="album-link" data-album-id="${track.albumId || ''}">${track.album || 'Single'}</span>`;
+    }
+    if (this.songHeroYear) this.songHeroYear.textContent = track.year || (track.release_date ? track.release_date.slice(0, 4) : '2024');
+    if (this.songHeroDuration) this.songHeroDuration.textContent = `Duration: ${this.formatTime(track.duration || 0)}`;
+
+    this.updatePlayPauseUI();
+
+    // Related Songs
+    if (this.songRelatedSection && this.songRelatedTracksList) {
+      if (this.currentRelatedSongs.length > 0) {
+        this.songRelatedSection.classList.remove('hidden');
+        this.songRelatedTracksList.innerHTML = this.currentRelatedSongs.map((song, idx) => `
+          <div class="ranked-track-row" data-song-id="${song.id}">
+            <div class="track-rank-num">${idx + 1}</div>
+            <img src="${song.cover || FALLBACK_COVER}" alt="${song.title}" class="track-row-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <div class="track-row-info">
+              <div class="track-row-title song-link" data-song-id="${song.id}">${song.title}</div>
+              <div class="track-row-meta">
+                ${this.renderClickableArtists(song)} • ${song.album ? `<span class="album-link" data-album-id="${song.albumId || ''}">${song.album}</span>` : 'Single'}
+              </div>
+            </div>
+            ${song.duration ? `<div class="track-row-duration">${this.formatTime(song.duration)}</div>` : ''}
+            <button class="track-row-play-btn" title="Play">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+          </div>
+        `).join('');
+      } else {
+        this.songRelatedSection.classList.add('hidden');
+      }
+    }
+  }
+
+  // ===========================================================================
+  // 4. Dedicated Album Page
+  // ===========================================================================
+  async openAlbumView(albumId, pushState = true) {
+    if (!albumId) return;
+    this.currentAlbumId = albumId;
+
+    this.switchView('album', false);
+    if (pushState) {
+      this.updateUrl(`/album/${encodeURIComponent(albumId)}`);
+    }
+
+    if (this.albumSkeleton) this.albumSkeleton.classList.remove('hidden');
+    if (this.albumErrorState) this.albumErrorState.classList.add('hidden');
+    if (this.albumContent) this.albumContent.classList.add('hidden');
+
+    const cacheKey = String(albumId).toLowerCase();
+    let data = null;
+
+    if (this.clientAlbumCache && this.clientAlbumCache.has(cacheKey)) {
+      data = this.clientAlbumCache.get(cacheKey);
+    } else {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/album?id=${encodeURIComponent(albumId)}`);
+        if (!res.ok) throw new Error('Album fetch failed');
+        data = await res.json();
+        if (this.clientAlbumCache) {
+          this.clientAlbumCache.set(cacheKey, data);
+        }
+      } catch (err) {
+        console.error('Album fetch error:', err);
+        if (this.albumSkeleton) this.albumSkeleton.classList.add('hidden');
+        if (this.albumErrorState) {
+          this.albumErrorState.classList.remove('hidden');
+          if (this.albumErrorMessage) {
+            this.albumErrorMessage.textContent = 'Could not load album details. Please check your connection and retry.';
+          }
+        }
+        return;
+      }
+    }
+
+    if (this.albumSkeleton) this.albumSkeleton.classList.add('hidden');
+    if (this.albumContent) this.albumContent.classList.remove('hidden');
+
+    this.currentAlbumSongs = data.songs || [];
+
+    if (this.albumHeroCover) this.albumHeroCover.src = data.cover || FALLBACK_COVER;
+    if (this.albumHeroTitle) this.albumHeroTitle.textContent = data.title;
+    if (this.albumHeroArtistLink) {
+      this.albumHeroArtistLink.innerHTML = `<span class="artist-link" data-artist-id="${data.primaryArtistId || ''}" data-artist-name="${data.artist}">${data.artist}</span>`;
+    }
+    if (this.albumHeroYear) this.albumHeroYear.textContent = data.year || '2024';
+    if (this.albumHeroTrackCount) this.albumHeroTrackCount.textContent = `${this.currentAlbumSongs.length} tracks`;
+
+    if (this.albumTracksSection && this.albumTracksList) {
+      if (this.currentAlbumSongs.length > 0) {
+        this.albumTracksSection.classList.remove('hidden');
+        this.albumTracksList.innerHTML = this.currentAlbumSongs.map((song, idx) => `
+          <div class="ranked-track-row" data-song-id="${song.id}">
+            <div class="track-rank-num">${idx + 1}</div>
+            <img src="${song.cover || data.cover || FALLBACK_COVER}" alt="${song.title}" class="track-row-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <div class="track-row-info">
+              <div class="track-row-title song-link" data-song-id="${song.id}">${song.title}</div>
+              <div class="track-row-meta">${this.renderClickableArtists(song)}</div>
+            </div>
+            ${song.duration ? `<div class="track-row-duration">${this.formatTime(song.duration)}</div>` : ''}
+            <button class="track-row-play-btn" title="Play">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+          </div>
+        `).join('');
+      } else {
+        this.albumTracksSection.classList.add('hidden');
+      }
+    }
+  }
+
+  // ===========================================================================
+  // Playback Helpers for Detail Views
+  // ===========================================================================
+  playTrackItem(track) {
+    if (!track) return;
+    const existingIdx = this.queue.findIndex(t => String(t.id) === String(track.id));
+    if (existingIdx !== -1) {
+      this.playTrack(existingIdx);
+    } else {
+      const insertIdx = (this.currentTrackIndex >= 0) ? this.currentTrackIndex + 1 : 0;
+      this.queue.splice(insertIdx, 0, track);
+      this.playTrack(insertIdx);
+    }
+  }
+
+  playTrackList(tracks, shuffle = false) {
+    if (!tracks || tracks.length === 0) return;
+    let list = [...tracks];
+    if (shuffle) {
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+    }
+    this.queue = list;
+    this.currentTrackIndex = 0;
+    this.playTrack(0);
+    this.showToast(shuffle ? 'Playing shuffled tracks' : 'Playing all tracks');
+  }
+
+  findTrackById(id) {
+    if (!id) return null;
+    const all = [
+      ...(this.currentSearchSongs || []),
+      ...(this.currentArtistSongs || []),
+      ...(this.currentAlbumSongs || []),
+      ...(this.currentRelatedSongs || []),
+      ...(this.queue || []),
+      ...(this.downloadedTracks || []),
+      ...(this.quickPicks || []),
+      ...(this.trendingHits || []),
+      ...(this.exploreReleases || [])
+    ];
+    return all.find(t => t && String(t.id) === String(id)) || null;
+  }
+
   // ===========================================================================
   // Explore View Logic
   // ===========================================================================
   async loadExploreCatalog() {
     try {
-      const res = await fetch('/api/explore');
+      const res = await fetch(`${API_BASE_URL}/api/explore`);
       if (!res.ok) throw new Error('Explore API offline');
       const data = await res.json();
 
@@ -1520,7 +2641,7 @@ class REAMusicApp {
         card.addEventListener('click', async () => {
           this.showToast(`Loading album "${album.title}"...`);
           try {
-            const res = await fetch(`/api/album?id=${album.id}`);
+            const res = await fetch(`${API_BASE_URL}/api/album?id=${album.id}`);
             const data = await res.json();
             if (data.songs && data.songs.length > 0) {
               this.queue = data.songs;
@@ -1834,27 +2955,37 @@ class REAMusicApp {
   // ===========================================================================
   async loadIndianMusicCatalog() {
     try {
-      const res = await fetch('/api/trending?category=all');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch(`${API_BASE_URL}/api/trending?category=all`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
       if (!res.ok) throw new Error('API offline');
       const data = await res.json();
 
-      if (data.quickPicks && data.quickPicks.length > 0) {
+      if (data && Array.isArray(data.quickPicks) && data.quickPicks.length > 0) {
         this.quickPicks = data.quickPicks;
         this.queue = [...this.quickPicks];
       }
-      if (data.trendingHits) this.trendingHits = data.trendingHits;
-      if (data.punjabiHits) this.punjabiHits = data.punjabiHits;
-      if (data.romanticHits) this.romanticHits = data.romanticHits;
-
-      this.renderShelves();
-      this.renderPlayerInfo();
-      this.renderQueue();
-
-      if (this.queue[0]) {
-        this.fetchTrackLyrics(this.queue[0]);
+      if (data && Array.isArray(data.trendingHits) && data.trendingHits.length > 0) {
+        this.trendingHits = data.trendingHits;
+      }
+      if (data && Array.isArray(data.punjabiHits) && data.punjabiHits.length > 0) {
+        this.punjabiHits = data.punjabiHits;
+      }
+      if (data && Array.isArray(data.romanticHits) && data.romanticHits.length > 0) {
+        this.romanticHits = data.romanticHits;
       }
     } catch (e) {
       console.warn('Using fallback catalog:', e);
+      if (!this.quickPicks || this.quickPicks.length === 0) {
+        this.quickPicks = [...FALLBACK_TRACKS];
+        this.queue = [...FALLBACK_TRACKS];
+      }
+    } finally {
       this.renderAll();
     }
   }
@@ -1907,15 +3038,15 @@ class REAMusicApp {
       if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
 
       let url = artist.id
-        ? `/api/artist?id=${encodeURIComponent(artist.id)}&name=${encodeURIComponent(artist.name)}`
-        : `/api/search?q=${encodeURIComponent(artist.name)}`;
+        ? `${API_BASE_URL}/api/artist?id=${encodeURIComponent(artist.id)}&name=${encodeURIComponent(artist.name)}`
+        : `${API_BASE_URL}/api/search?q=${encodeURIComponent(artist.name)}`;
 
       const res = await fetch(url);
       const data = await res.json();
       let songs = data.songs || data.results || [];
 
       if (!songs || songs.length === 0) {
-        const searchRes = await fetch(`/api/search?q=${encodeURIComponent(artist.name)}`);
+        const searchRes = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(artist.name)}`);
         const searchData = await searchRes.json();
         songs = searchData.results || [];
       }
@@ -2003,9 +3134,13 @@ class REAMusicApp {
             <span>Play Hits</span>
           </button>
         `;
-        this.featuredSingerCard.onclick = () => {
+        this.featuredSingerCard.onclick = (e) => {
           this.addSearchHistory(topArtist.name);
-          this.loadSingerHits(topArtist);
+          if (e.target.closest('.featured-singer-btn')) {
+            this.loadSingerHits(topArtist);
+          } else {
+            this.openArtistView(topArtist.id || topArtist.name, topArtist.name);
+          }
         };
       } else {
         this.featuredSingerCard.dataset.hasArtist = '';
@@ -2038,9 +3173,13 @@ class REAMusicApp {
               <span>Top Songs</span>
             </button>
           `;
-          row.addEventListener('click', () => {
+          row.addEventListener('click', (e) => {
             this.addSearchHistory(artist.name);
-            this.loadSingerHits(artist);
+            if (e.target.closest('.artist-play-btn')) {
+              this.loadSingerHits(artist);
+            } else {
+              this.openArtistView(artist.id || artist.name, artist.name);
+            }
           });
           this.searchArtistsList.appendChild(row);
         });
@@ -2062,8 +3201,8 @@ class REAMusicApp {
           row.innerHTML = `
             <img src="${track.cover}" alt="${track.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
             <div class="search-item-info">
-              <div class="search-item-title">${track.title}</div>
-              <div class="search-item-meta">${track.artist} • ${track.album}</div>
+              <div class="search-item-title" style="cursor:pointer;">${track.title}</div>
+              <div class="search-item-meta">${this.renderClickableArtists(track)} • ${track.album || 'Single'}</div>
             </div>
             <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
               ${isDl 
@@ -2072,9 +3211,13 @@ class REAMusicApp {
             </button>
           `;
           row.addEventListener('click', (e) => {
-            if (e.target.closest('.track-inline-dl-btn')) {
+            if (e.target.closest('.track-inline-dl-btn') || e.target.closest('.artist-link')) {
+              return;
+            }
+            if (e.target.closest('.search-item-title')) {
               e.stopPropagation();
-              this.handleDownloadButtonClick(track);
+              if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+              this.openSongView(track.id);
               return;
             }
             this.addSearchHistory(track.title);
@@ -2086,6 +3229,18 @@ class REAMusicApp {
           });
           this.searchResultsList.appendChild(row);
         });
+
+        if (query && !isPreview) {
+          const viewAllRow = document.createElement('div');
+          viewAllRow.className = 'search-dropdown-view-all';
+          viewAllRow.style.cssText = 'padding:12px;text-align:center;color:var(--accent-blue);font-weight:600;font-size:13px;cursor:pointer;border-top:1px solid var(--border-subtle);';
+          viewAllRow.innerHTML = `View all search results for "<b>${query}</b>" →`;
+          viewAllRow.addEventListener('click', () => {
+            this.addSearchHistory(query);
+            this.openSearchView(query);
+          });
+          this.searchResultsList.appendChild(viewAllRow);
+        }
       }
     }
 
@@ -2114,7 +3269,7 @@ class REAMusicApp {
     this.searchAbortController = new AbortController();
 
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(cleanQuery)}`, {
+      const res = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(cleanQuery)}`, {
         signal: this.searchAbortController.signal
       });
       if (!res.ok) throw new Error('Search request failed');
@@ -2147,7 +3302,7 @@ class REAMusicApp {
   async fetchTrackLyrics(track) {
     if (!track || track.lyricsLoaded) return;
     try {
-      const res = await fetch(`/api/lyrics?track=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`);
+      const res = await fetch(`${API_BASE_URL}/api/lyrics?track=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`);
       const data = await res.json();
       track.lyrics = data.lines || [];
       track.lyricsLoaded = true;
@@ -2167,7 +3322,7 @@ class REAMusicApp {
     }
 
     try {
-      const res = await fetch(`/api/trending?category=${filter}`);
+      const res = await fetch(`${API_BASE_URL}/api/trending?category=${filter}`);
       const data = await res.json();
       const songs = data.songs || [];
       if (songs.length > 0) {
@@ -2230,6 +3385,7 @@ class REAMusicApp {
       this.isPlaying = false;
       this.updatePlayPauseUI();
     }
+    this.syncMediaControls();
     this.renderShelves();
   }
 
@@ -2273,6 +3429,14 @@ class REAMusicApp {
       if (this.pauseIcon) this.pauseIcon.classList.add('hidden');
       if (this.maxPlaySvg) this.maxPlaySvg.classList.remove('hidden');
       if (this.maxPauseSvg) this.maxPauseSvg.classList.add('hidden');
+    }
+
+    if (this.songPlayHeroBtn) {
+      const isCurrent = this.currentSongDetail && this.queue[this.currentTrackIndex]?.id === this.currentSongDetail.id;
+      const textSpan = this.songPlayHeroBtn.querySelector('span');
+      if (textSpan) {
+        textSpan.textContent = (isCurrent && this.isPlaying) ? 'Pause Song' : 'Play Song';
+      }
     }
   }
 
@@ -2425,10 +3589,12 @@ class REAMusicApp {
     const track = this.queue[this.currentTrackIndex] || FALLBACK_TRACKS[0];
     if (this.playerThumb) this.playerThumb.src = track.cover;
     if (this.playerTrackTitle) this.playerTrackTitle.textContent = track.title;
-    if (this.playerArtist) this.playerArtist.textContent = track.artist;
-    if (this.playerAlbum) this.playerAlbum.textContent = track.album;
+    if (this.playerArtist) this.playerArtist.innerHTML = this.renderClickableArtists(track);
+    if (this.playerAlbum) this.playerAlbum.innerHTML = track.album ? `<span class="album-link" data-album-id="${track.albumId || ''}">${track.album}</span>` : '';
     if (this.lyricsTrackTitle) this.lyricsTrackTitle.textContent = track.title;
-    if (this.lyricsArtistName) this.lyricsArtistName.textContent = track.artist;
+    if (this.lyricsArtistName) this.lyricsArtistName.innerHTML = this.renderClickableArtists(track);
+
+    this.syncMediaControls();
 
     const isLiked = this.likedTrackIds.has(track.id);
     if (this.likeBtn) this.likeBtn.classList.toggle('liked', isLiked);
@@ -2490,8 +3656,8 @@ class REAMusicApp {
     if (this.maxAlbumArt) this.maxAlbumArt.src = track.cover;
     if (this.maxAmbientGlow) this.maxAmbientGlow.style.backgroundImage = `url("${track.cover}")`;
     if (this.maxTrackTitle) this.maxTrackTitle.textContent = track.title;
-    if (this.maxTrackArtist) this.maxTrackArtist.textContent = track.artist;
-    if (this.maxTrackAlbum) this.maxTrackAlbum.textContent = track.album || '';
+    if (this.maxTrackArtist) this.maxTrackArtist.innerHTML = this.renderClickableArtists(track);
+    if (this.maxTrackAlbum) this.maxTrackAlbum.innerHTML = track.album ? `<span class="album-link" data-album-id="${track.albumId || ''}">${track.album}</span>` : '';
 
     this.renderMaxLyrics();
     this.renderMaxQueue();
@@ -2519,8 +3685,8 @@ class REAMusicApp {
             </div>
           </div>
           <div class="track-row-info">
-            <div class="track-row-title">${track.title}</div>
-            <div class="track-row-artist">${track.artist}</div>
+            <div class="track-row-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
+            <div class="track-row-artist">${this.renderClickableArtists(track)}</div>
           </div>
           <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
             ${isDl 
@@ -2530,9 +3696,12 @@ class REAMusicApp {
           <div class="track-row-duration">${this.formatTime(track.duration)}</div>
         `;
         card.addEventListener('click', (e) => {
-          if (e.target.closest('.track-inline-dl-btn')) {
-            e.stopPropagation();
-            this.handleDownloadButtonClick(track);
+          if (e.target.closest('.track-inline-dl-btn') || e.target.closest('.artist-link')) {
+            if (e.target.closest('.track-inline-dl-btn')) this.handleDownloadButtonClick(track);
+            return;
+          }
+          if (e.target.closest('.track-row-title')) {
+            this.openSongView(track.id);
             return;
           }
           const queueIdx = this.queue.findIndex(t => t.id === track.id);
@@ -2561,10 +3730,15 @@ class REAMusicApp {
               <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
             </button>
           </div>
-          <div class="music-card-title">${track.title}</div>
-          <div class="music-card-sub">${track.artist}</div>
+          <div class="music-card-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
+          <div class="music-card-sub">${this.renderClickableArtists(track)}</div>
         `;
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.artist-link')) return;
+          if (e.target.closest('.music-card-title')) {
+            this.openSongView(track.id);
+            return;
+          }
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
         });
@@ -2586,10 +3760,15 @@ class REAMusicApp {
               <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
             </button>
           </div>
-          <div class="music-card-title">${track.title}</div>
-          <div class="music-card-sub">${track.artist}</div>
+          <div class="music-card-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
+          <div class="music-card-sub">${this.renderClickableArtists(track)}</div>
         `;
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.artist-link')) return;
+          if (e.target.closest('.music-card-title')) {
+            this.openSongView(track.id);
+            return;
+          }
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
         });
@@ -2819,7 +3998,7 @@ class REAMusicApp {
       }
 
       if (!response) {
-        const proxyUrl = `/api/download?url=${encodeURIComponent(track.audioUrl || '')}&title=${encodeURIComponent(track.title || 'song')}`;
+        const proxyUrl = `${API_BASE_URL}/api/download?url=${encodeURIComponent(track.audioUrl || '')}&title=${encodeURIComponent(track.title || 'song')}`;
         response = await fetch(proxyUrl);
       }
 
@@ -2920,7 +4099,7 @@ class REAMusicApp {
       document.body.removeChild(a);
       this.showToast(`Exported "${track.title}" to device`);
     } else {
-      const dlUrl = `/api/download?url=${encodeURIComponent(track.audioUrl || '')}&title=${encodeURIComponent(cleanTitle)}`;
+      const dlUrl = `${API_BASE_URL}/api/download?url=${encodeURIComponent(track.audioUrl || '')}&title=${encodeURIComponent(cleanTitle)}`;
       const a = document.createElement('a');
       a.href = dlUrl;
       a.download = fileName;
@@ -3071,7 +4250,7 @@ class REAMusicApp {
       const currentTrack = this.queue[this.currentTrackIndex];
       const artistParam = targetArtist || (currentTrack ? currentTrack.artist : 'Arijit Singh');
       const trackId = currentTrack ? currentTrack.id : '';
-      const res = await fetch(`/api/recommendations?artist=${encodeURIComponent(artistParam)}&trackId=${encodeURIComponent(trackId)}`);
+      const res = await fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(artistParam)}&trackId=${encodeURIComponent(trackId)}`);
       if (!res.ok) throw new Error('Recommendations offline');
       const data = await res.json();
       if (data.recommendations && data.recommendations.length > 0) {
@@ -3156,18 +4335,7 @@ class REAMusicApp {
           <span class="singer-avatar-role">${singer.role || 'Singer'}</span>
         `;
         card.addEventListener('click', () => {
-          if (this.searchInput) {
-            this.searchInput.value = singer.name;
-            this.addSearchHistory(singer.name);
-            if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
-            if (this.searchHubContent) this.searchHubContent.classList.add('hidden');
-            if (this.searchTabsNav) this.searchTabsNav.classList.remove('hidden');
-            if (this.searchResultsList) {
-              this.searchResultsList.classList.remove('hidden');
-              this.searchResultsList.innerHTML = `<div style="padding:16px;color:#aaa;text-align:center;">Loading ${singer.name}'s top hits...</div>`;
-            }
-            this.loadSingerHits(singer);
-          }
+          this.openArtistView(singer.id || singer.name, singer.name);
         });
         this.searchSingersGrid.appendChild(card);
       });
@@ -3188,18 +4356,7 @@ class REAMusicApp {
           <span>${tag}</span>
         `;
         pill.addEventListener('click', () => {
-          if (this.searchInput) {
-            this.searchInput.value = tag;
-            this.addSearchHistory(tag);
-            if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
-            if (this.searchHubContent) this.searchHubContent.classList.add('hidden');
-            if (this.searchTabsNav) this.searchTabsNav.classList.remove('hidden');
-            if (this.searchResultsList) {
-              this.searchResultsList.classList.remove('hidden');
-              this.searchResultsList.innerHTML = `<div style="padding:16px;color:#aaa;text-align:center;">Searching for "${tag}"...</div>`;
-            }
-            this.performLiveSearch(tag);
-          }
+          this.openSearchView(tag);
         });
         this.trendingTagsGrid.appendChild(pill);
       });

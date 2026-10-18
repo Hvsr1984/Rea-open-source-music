@@ -3,123 +3,131 @@
 > **High-Fidelity Apple Music Style Web Streaming Application**  
 > Stream lossless 320kbps Indian music, synchronized karaoke lyrics, real-time Web Audio API frequency spectrum analyzer, and dual liquid glass themes (**Glass White** & **Simple Black**).
 
-[![Vercel Deployment](https://img.shields.io/badge/Deployed%20with-Vercel-black?logo=vercel)](https://vercel.com)
+[![Vercel Deployment](https://img.shields.io/badge/Deployed%20with-Vercel-black?logo=vercel)](https://reamusic.vercel.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Audio: 320kbps](https://img.shields.io/badge/Audio-320kbps%20Ultra--HD-red)](#features)
+
+Live Website: **[https://reamusic.vercel.app/](https://reamusic.vercel.app/)**
 
 ---
 
 ## ✨ Features
 
-- 🎧 **Lossless 320kbps Indian Music Streaming**: Direct integration with JioSaavn CDN with pure JS DES URL decryption.
-- 🍏 **Apple Liquid Glass Aesthetics**: Precision frosted glassmorphism, dynamic ambient background lighting, and curated themes (**Glass White** & **Simple Black**).
+- 🎧 **Lossless 320kbps Indian Music Streaming**: Direct high-speed CDN audio streaming powered by JioSaavn CDN with pure JS DES URL decryption.
+- 🍏 **Apple Liquid Glass Aesthetics**: Precision frosted glassmorphism, dynamic ambient lighting, and curated themes (**Glass White** & **Simple Black**).
 - 🎤 **Synchronized Karaoke Lyrics**: Real-time line-by-line synchronized lyrics powered by the LRCLIB API with instant click-to-seek playback.
 - 📊 **Real-time Web Audio API Spectrum Analyser**: Live dynamic frequency visualizer rendered in the player dock and theater mode.
-- 📱 **Mobile First & Responsive**: Native iOS-inspired bottom tab navigation, swipeable music shelves, and floating theater player.
-- ⚙️ **Settings & Preferences Modal**: Custom frosted glass settings dialog to toggle appearance, visualizer display, and manage listening history.
+- 💾 **Offline Vault (IndexedDB)**: Full 320kbps offline song storage with persistent playback even without internet connection.
+- ⚡ **Sub-100ms Debounced Search**: Live search across songs, albums, and artist cards with dedicated category filters.
+- ☁️ **Vercel Edge-Optimized**: Deployed on low-latency Mumbai edge (`bom1`) with intelligent caching headers.
 - ⚡ **Zero-Dependency Core**: Pure Vanilla HTML5, modern CSS3 variables, and vanilla JavaScript without heavy frontend frameworks.
 
 ---
 
-## 📁 Systematic Folder Architecture
+## 📁 Project Architecture
 
 ```
-rea-music/
-├── api/                       # Vercel Serverless Functions
-│   ├── des.js                 # Pure JavaScript DES decipher for JioSaavn encrypted CDN URLs
-│   └── index.js               # Universal API router (/api/trending, /api/search, /api/lyrics, etc.)
-├── assets/                    # High-resolution album covers, brand logo & static media
-│   ├── acoustic_sun.jpg
-│   ├── cyber_phonk.jpg
-│   ├── electro_horizon.jpg
-│   ├── lofi_piano.jpg
-│   ├── lofi_rain.jpg
-│   ├── logo.jpg
-│   └── midnight_vibes.jpg
-├── css/                       # Modular Design System & Stylesheets
-│   └── index.css              # Apple Music liquid glass design system & responsive styling
-├── js/                        # Core Frontend Logic & Audio Engine
-│   └── app.js                 # SPA navigation, hybrid audio engine, queue manager, & lyrics sync
-├── index.html                 # Main Single Page Application interface
-├── server.js                  # Lightweight local Node.js development server
-├── vercel.json                # Vercel zero-config routing & edge caching headers
-├── package.json               # Node.js manifest with dev & start scripts
-└── .gitignore                 # Excluded build artifacts & environment variables
+REA-MUSIC/
+│
+├── README.md                          # Primary project documentation & quickstart
+├── .gitignore                         # Excluded build artifacts, environments & caches
+├── .env.example                       # Root template for environment configuration
+├── package.json                       # Project manifest with build and QA scripts
+├── package-lock.json                  # Locked dependency graph
+│
+├── api/                               # Edge / Serverless Functions
+│   ├── des.js                         # Pure JavaScript DES decipher for JioSaavn CDN audio URLs
+│   └── index.js                       # Universal API router (/api/trending, /api/search, /api/lyrics, etc.)
+│
+├── assets/                            # Categorized Media & Static Assets
+│   ├── branding/                      # Showcase banners, promo covers & app icon art
+│   ├── icons/                         # Brand icons & logos
+│   ├── images/                        # Album covers & curated playlist artwork
+│   ├── screenshots/                   # Application screenshots & demos
+│   ├── logo.jpg                       # Root-level runtime web asset
+│   └── midnight_vibes.jpg             # Root-level runtime web asset
+│
+├── docs/                              # Project Documentation Suite
+│   ├── PROJECT_STRUCTURE.md           # Detailed folder layout & file classification
+│   ├── BUILD_GUIDE.md                 # Complete web compilation, bundling & development guide
+│   ├── DEPLOYMENT.md                  # Vercel zero-config routing & edge deployment
+│   └── CHANGELOG.md                   # Comprehensive project release & evolution history
+│
+├── scripts/                           # Safe Automation & Maintenance Scripts
+│   ├── build-web.js                   # Web bundle execution wrapper
+│   └── verify-project.js              # Comprehensive project integrity & health verifier
+│
+├── tests/                             # Quality Assurance & Testing Suite
+│   ├── smoke-test.js                  # Automated HTTP server & API endpoint smoke test
+│   └── README.md                      # Test suite documentation & instructions
+│
+├── config/                            # Safe, Non-Secret Configuration Templates
+│   ├── .env.example                   # Placeholder environment configuration template
+│   └── README.md                      # Guide to environment variables & configuration tokens
+│
+├── archive/                           # Obsolete Files, Redundancies & Historical Records
+│   └── README.md                      # Audit of legacy packages, duplicates & external assets
+│
+├── css/                               # Design System & Styling
+│   └── index.css                      # Apple liquid glass frosted glassmorphism & responsive CSS tokens
+│
+├── js/                                # Core Web Application Logic
+│   └── app.js                         # SPA router, audio engine, queue manager, LRCLIB lyrics sync
+│
+├── public/                            # Static runtime assets served by server.js
+├── dist/                              # Compiled distribution assets (bundled by build.js)
+├── index.html                         # SPA Main HTML Template
+├── server.js                          # Lightweight local Node.js development server & Vercel handler
+├── build.js                           # Inliner & bundler script generating dist/ and public/
+└── vercel.json                        # Vercel edge rewrite rules & caching headers
 ```
 
 ---
 
 ## 🚀 Quick Start (Local Development)
 
-### Prerequisites
-- Node.js (v18 or higher recommended)
+### 1. Start the Web App
+```bash
+# Start local Node.js server (port 4500):
+npm start
+# or
+npm run dev
+```
+Open your browser at `http://localhost:4500`.
 
-### Installation & Running
+### 2. Run the Verification Suite & Smoke Tests
+```bash
+# Verify project integrity (verifies zero Android/APK artifacts):
+npm run verify
 
-1. Clone or download the repository:
-   ```bash
-   git clone https://github.com/Hvsr1984/Rea-open-source-music.git
-   cd rea-music
-   ```
+# Run automated HTTP & API smoke tests:
+npm test
+```
 
-2. Start the local server:
-   ```bash
-   npm start
-   # or
-   npm run dev
-   ```
-
-3. Open your browser and navigate to:
-   ```
-   http://localhost:4500
-   ```
-
----
-
-## ☁️ Deploying to Vercel
-
-### Method 1: Deploy with Vercel Web Dashboard (Recommended)
-
-1. Push your repository to GitHub:
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: initial commit of REA Music"
-   git branch -M main
-   git remote add origin https://github.com/Hvsr1984/Rea-open-source-music.git
-   git push -u origin main
-   ```
-2. Go to [vercel.com/new](https://vercel.com/new).
-3. Import the `Rea-open-source-music` repository from GitHub.
-4. Leave all build settings as default (Framework Preset: **Other**; Output Directory: `./`).
-5. Click **Deploy**. Vercel will build and deploy the frontend and serverless API in seconds!
-
-### Method 2: Deploy with Vercel CLI
-
-1. Run the Vercel CLI from the `rea-music` directory:
-   ```bash
-   npx vercel
-   ```
-2. Follow the interactive prompts to link your project.
-3. For production deployment, run:
-   ```bash
-   npx vercel --prod
-   ```
+### 3. Build Production Web Bundle
+```bash
+# Compile web distribution bundles (dist/ and public/):
+npm run build
+```
 
 ---
 
-## 🛠️ API Endpoints (Vercel Serverless)
+## ☁️ Deployment
 
-| Endpoint | Method | Description | Parameters |
-|---|---|---|---|
-| `/api/trending` | `GET` | Curated Indian charts, trending hits, and quick picks | `category`: `all`, `punjabi`, `romantic`, `superhits` |
-| `/api/search` | `GET` | Search millions of Indian songs and artists | `q`: search query string |
-| `/api/lyrics` | `GET` | Timecode synchronized lyrics | `track`: song title, `artist`: artist name |
-| `/api/explore` | `GET` | New releases and Top 20 ranked leaderboard | none |
-| `/api/album` | `GET` | Full track listing for a specific album | `id`: album ID |
+REA Music is continuously deployed to Vercel at [https://reamusic.vercel.app/](https://reamusic.vercel.app/).  
+For complete deployment architecture and instructions, see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 
-## 📄 License
+## 📄 Documentation Hub
+
+- [Project Structure & Architectural Manifesto](docs/PROJECT_STRUCTURE.md)
+- [Complete Build & Development Guide](docs/BUILD_GUIDE.md)
+- [Production Deployment Guide](docs/DEPLOYMENT.md)
+- [Official Release History & Changelog](docs/CHANGELOG.md)
+
+---
+
+## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).

@@ -5,7 +5,9 @@ const CACHE = {
   trending: {},
   search: {},
   lyrics: {},
-  artist: {}
+  artist: {},
+  album: {},
+  song: {}
 };
 
 function decodeEntities(str) {
@@ -40,19 +42,23 @@ function parseLRC(lrcText) {
 }
 
 function formatSong(s) {
+  if (!s) return null;
   const audioUrl = decryptSaavnUrl(s.encrypted_media_url);
-  const image = (s.image || '')
+  const image = (s.image || s.imageUrl || '')
     .replace('150x150.jpg', '500x500.jpg')
     .replace('150x150.png', '500x500.png')
     .replace('50x50.jpg', '500x500.jpg');
 
   return {
-    id: s.id || `track-${Math.random().toString(36).substring(2, 9)}`,
-    title: decodeEntities(s.song || s.title || 'Unknown Title'),
-    artist: decodeEntities(s.singers || s.primary_artists || s.music || 'Various Artists'),
+    id: s.id || s.song_id || `track-${Math.random().toString(36).substring(2, 9)}`,
+    title: decodeEntities(s.song || s.title || s.name || 'Unknown Title'),
+    artist: decodeEntities(s.singers || s.primary_artists || s.primaryArtists || s.music || 'Various Artists'),
     album: decodeEntities(s.album || s.more_info?.album || 'Single'),
+    albumId: s.albumid || s.album_id || s.more_info?.album_id || '',
+    artistMap: s.artistMap || s.artistIDMap || null,
+    primaryArtistId: (s.primary_artists_id || s.primaryArtistsIds || '').split(',')[0].trim(),
     cover: image || 'assets/logo.jpg',
-    duration: parseInt(s.duration, 10) || 210,
+    duration: parseInt(s.duration || s.more_info?.duration, 10) || 210,
     audioUrl: audioUrl || null,
     year: s.year || s.more_info?.year || '2024',
     language: s.language || 'hindi',
@@ -81,7 +87,7 @@ async function fetchPlaylistSongs(listId) {
     const rawSongs = data.songs || data.list || [];
     return rawSongs
       .map(formatSong)
-      .filter(s => s.audioUrl);
+      .filter(s => s && s.audioUrl);
   } catch (e) {
     console.error(`Error fetching playlist ${listId}:`, e.message);
     return [];
@@ -90,7 +96,7 @@ async function fetchPlaylistSongs(listId) {
 
 async function searchSongs(query) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=15&p=1&q=${encodeURIComponent(query)}`;
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=20&p=1&q=${encodeURIComponent(query)}`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
@@ -98,7 +104,7 @@ async function searchSongs(query) {
     const results = data.results || [];
     return results
       .map(formatSong)
-      .filter(s => s.audioUrl);
+      .filter(s => s && s.audioUrl);
   } catch (e) {
     console.error(`Search error for ${query}:`, e.message);
     return [];
@@ -107,14 +113,14 @@ async function searchSongs(query) {
 
 async function searchArtists(query) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=5&p=1&q=${encodeURIComponent(query)}`;
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=8&p=1&q=${encodeURIComponent(query)}`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
     const data = JSON.parse(clean);
     const results = data.results || [];
     return results.map(a => ({
-      id: a.id,
+      id: a.id || a.artistId,
       name: decodeEntities(a.name),
       image: (a.image || '')
         .replace('50x50.jpg', '500x500.jpg')
@@ -123,32 +129,141 @@ async function searchArtists(query) {
         .replace('150x150.png', '500x500.png'),
       role: decodeEntities(a.role || 'Singer'),
       type: 'artist'
-    }));
+    })).filter(a => a.id && a.name);
   } catch (e) {
     console.error(`Artist search error for ${query}:`, e.message);
     return [];
   }
 }
 
-async function fetchArtistDetails(artistId) {
+async function searchAlbums(query) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&artistId=${artistId}&n_song=20&n_album=10`;
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=12&p=1&q=${encodeURIComponent(query)}`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const text = await res.text();
-    const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+    const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
+    const data = JSON.parse(clean);
+    const results = data.results || [];
+    return results.map(a => ({
+      id: a.id || a.albumid,
+      title: decodeEntities(a.title || a.name || a.album),
+      artist: decodeEntities(a.primary_artists || a.primaryArtists || a.music || a.artist || 'Various Artists'),
+      cover: (a.image || a.imageUrl || '').replace('150x150.jpg', '500x500.jpg').replace('50x50.jpg', '500x500.jpg'),
+      year: a.year || '',
+      songCount: a.song_count || (a.more_info?.song_pids ? a.more_info.song_pids.split(',').length : null),
+      type: 'album'
+    })).filter(a => a.id && a.title);
+  } catch (e) {
+    console.error(`Album search error for ${query}:`, e.message);
+    return [];
+  }
+}
+
+async function fetchArtistDetails(artistId) {
+  try {
+    const url = `https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&artistId=${artistId}&n_song=30&n_album=20`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await res.text();
+    const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
     const data = JSON.parse(clean);
     const rawSongs = data.topSongs?.songs || data.top_songs || [];
-    const songs = rawSongs.map(formatSong).filter(s => s.audioUrl);
+    const songs = rawSongs.map(formatSong).filter(s => s && s.audioUrl);
+
+    const rawAlbums = data.topAlbums?.albums || data.top_albums || [];
+    const albums = rawAlbums.map(a => ({
+      id: a.albumid || a.id,
+      title: decodeEntities(a.album || a.title || a.name),
+      artist: decodeEntities(a.primaryArtists || a.primary_artists || a.music || data.name),
+      cover: (a.imageUrl || a.image || '').replace('150x150.jpg', '500x500.jpg').replace('50x50.jpg', '500x500.jpg'),
+      year: a.year || '',
+      songCount: a.numSongs || a.song_count || null,
+      type: 'album'
+    })).filter(a => a.id && a.title);
+
+    const similar = (data.similarArtists || []).map(sa => ({
+      id: sa.id || sa.artistId,
+      name: decodeEntities(sa.name),
+      image: (sa.image || '').replace('150x150.jpg', '500x500.jpg').replace('50x50.jpg', '500x500.jpg'),
+      role: decodeEntities(sa.role || 'Artist'),
+      type: 'artist'
+    }));
+
     return {
       id: data.artistId || artistId,
-      name: decodeEntities(data.name),
+      name: decodeEntities(data.name || 'Unknown Artist'),
       image: (data.image || '').replace('150x150.jpg', '500x500.jpg').replace('50x50.jpg', '500x500.jpg'),
-      subtitle: decodeEntities(data.subtitle || 'Indian Singer'),
-      followerCount: data.follower_count || '1M+',
-      songs
+      subtitle: decodeEntities(data.subtitle || data.dominantType || 'Indian Artist'),
+      bio: decodeEntities(data.bio || ''),
+      followerCount: data.follower_count ? Number(data.follower_count).toLocaleString('en-IN') : '1M+',
+      isVerified: Boolean(data.isVerified),
+      songs,
+      topSongs: songs,
+      albums,
+      topAlbums: albums,
+      similarArtists: similar
     };
   } catch (e) {
     console.error(`Artist details error for ${artistId}:`, e.message);
+    return null;
+  }
+}
+
+async function fetchSongDetails(songId) {
+  try {
+    const url = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0&_format=json&pids=${encodeURIComponent(songId)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await res.text();
+    const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
+    const data = JSON.parse(clean);
+    const raw = data[songId] || Object.values(data)[0];
+    if (!raw || !raw.id) return null;
+
+    const formatted = formatSong(raw);
+    formatted.label = decodeEntities(raw.label || '');
+    formatted.copyright = decodeEntities(raw.copyright_text || '');
+    formatted.hasLyrics = raw.has_lyrics === 'true' || raw.has_lyrics === true;
+
+    // Fetch related songs by primary artist
+    let related = [];
+    const primaryArtist = (formatted.artist || '').split(',')[0].trim();
+    if (primaryArtist) {
+      const searchRes = await searchSongs(primaryArtist);
+      related = searchRes.filter(s => s && s.id !== formatted.id).slice(0, 10);
+    }
+
+    return {
+      song: formatted,
+      track: formatted,
+      related
+    };
+  } catch (e) {
+    console.error(`Error fetching song details for ${songId}:`, e.message);
+    return null;
+  }
+}
+
+async function fetchAlbumDetails(albumId) {
+  try {
+    const url = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=${albumId}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await res.text();
+    const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
+    const data = JSON.parse(clean);
+    const rawSongs = data.songs || [];
+    const songs = rawSongs.map(formatSong).filter(s => s && s.audioUrl);
+    return {
+      id: data.albumid || albumId,
+      title: decodeEntities(data.title || data.name || 'Unknown Album'),
+      artist: decodeEntities(data.primary_artists || data.primaryArtists || data.music || 'Various Artists'),
+      primaryArtistId: (data.primary_artists_id || '').split(',')[0].trim(),
+      year: data.year || data.release_date?.substring(0, 4) || '2024',
+      releaseDate: data.release_date || '',
+      cover: (data.image || '').replace('150x150.jpg', '500x500.jpg').replace('50x50.jpg', '500x500.jpg'),
+      songCount: songs.length,
+      songs
+    };
+  } catch (e) {
+    console.error(`Error fetching album ${albumId}:`, e.message);
     return null;
   }
 }
@@ -211,20 +326,6 @@ async function fetchNewReleases() {
   }
 }
 
-async function fetchAlbumSongs(albumId) {
-  try {
-    const url = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=${albumId}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    const text = await res.text();
-    const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-    const data = JSON.parse(clean);
-    return (data.songs || []).map(formatSong).filter(s => s.audioUrl);
-  } catch (e) {
-    console.error(`Error fetching album ${albumId}:`, e.message);
-    return [];
-  }
-}
-
 /**
  * Universal API Handler: compatible with Vercel Serverless Functions and Node.js http.Server
  */
@@ -253,6 +354,7 @@ export default async function handler(req, res) {
   const isDownload = pathname.endsWith('/download') || pathParam.startsWith('download');
   const isRecommendations = pathname.endsWith('/recommendations') || pathParam.startsWith('recommendations');
   const isArtist = pathname.endsWith('/artist') || pathParam.startsWith('artist');
+  const isSong = pathname.endsWith('/song') || pathParam.startsWith('song');
 
   const sendJson = (statusCode, data, maxAge = 120) => {
     if (statusCode === 200) {
@@ -298,11 +400,12 @@ export default async function handler(req, res) {
         return sendJson(500, { error: 'Download stream error', message: err.message });
       }
     }
-    // 1. Search Indian songs and singers/artists
+
+    // 1. Unified Search: Songs, Artists, and Albums
     if (isSearch) {
       const q = parsedUrl.searchParams.get('q');
       if (!q || !q.trim()) {
-        return sendJson(200, { results: [], artists: [] });
+        return sendJson(200, { results: [], artists: [], albums: [], topResult: null });
       }
 
       const cacheKey = q.trim().toLowerCase();
@@ -310,17 +413,138 @@ export default async function handler(req, res) {
         return sendJson(200, CACHE.search[cacheKey].data, 300);
       }
 
-      const [songs, artists] = await Promise.all([
+      const [songs, artists, albums] = await Promise.all([
         searchSongs(q),
-        searchArtists(q)
+        searchArtists(q),
+        searchAlbums(q)
       ]);
 
-      const payload = { results: songs, artists: artists };
+      // Calculate Top Result based on query relevance
+      let topResult = null;
+      const qLower = q.trim().toLowerCase();
+      
+      const exactArtist = artists.find(a => a.name.toLowerCase() === qLower);
+      const closeArtist = artists.find(a => a.name.toLowerCase().includes(qLower) || qLower.includes(a.name.toLowerCase()));
+      const exactSong = songs.find(s => s.title.toLowerCase() === qLower);
+      const exactAlbum = albums.find(a => a.title.toLowerCase() === qLower);
+
+      if (exactArtist) {
+        topResult = { type: 'artist', data: exactArtist };
+      } else if (exactSong) {
+        topResult = { type: 'song', data: exactSong };
+      } else if (exactAlbum) {
+        topResult = { type: 'album', data: exactAlbum };
+      } else if (closeArtist) {
+        topResult = { type: 'artist', data: closeArtist };
+      } else if (songs.length > 0) {
+        topResult = { type: 'song', data: songs[0] };
+      } else if (artists.length > 0) {
+        topResult = { type: 'artist', data: artists[0] };
+      } else if (albums.length > 0) {
+        topResult = { type: 'album', data: albums[0] };
+      }
+
+      const payload = {
+        results: songs,
+        artists,
+        albums,
+        topResult
+      };
+
       CACHE.search[cacheKey] = { time: Date.now(), data: payload };
       return sendJson(200, payload, 300);
     }
 
-    // 2. Indian Trending & Curated Shelves
+    // 2. Dedicated Song Details & Related Songs
+    if (isSong) {
+      const id = parsedUrl.searchParams.get('id');
+      if (!id) {
+        return sendJson(400, { error: 'Missing song id parameter' });
+      }
+
+      const cacheKey = id.trim();
+      if (CACHE.song[cacheKey] && Date.now() - CACHE.song[cacheKey].time < 600000) {
+        return sendJson(200, CACHE.song[cacheKey].data, 300);
+      }
+
+      const songData = await fetchSongDetails(id);
+      if (!songData) {
+        return sendJson(404, { error: 'Song not found' });
+      }
+
+      CACHE.song[cacheKey] = { time: Date.now(), data: songData };
+      return sendJson(200, songData, 300);
+    }
+
+    // 3. Dedicated Album Details & Full Tracklist
+    if (isAlbum) {
+      const id = parsedUrl.searchParams.get('id');
+      if (!id) {
+        return sendJson(400, { error: 'Missing album id parameter' });
+      }
+
+      const cacheKey = id.trim();
+      if (CACHE.album[cacheKey] && Date.now() - CACHE.album[cacheKey].time < 600000) {
+        return sendJson(200, CACHE.album[cacheKey].data, 300);
+      }
+
+      const albumData = await fetchAlbumDetails(id);
+      if (!albumData) {
+        return sendJson(404, { error: 'Album not found', songs: [] });
+      }
+
+      CACHE.album[cacheKey] = { time: Date.now(), data: albumData };
+      return sendJson(200, albumData, 300);
+    }
+
+    // 4. Dedicated Artist / Singer Page Details & Top Songs & Albums
+    if (isArtist) {
+      const id = parsedUrl.searchParams.get('id');
+      const name = parsedUrl.searchParams.get('name');
+      const cacheKey = (id || name || '').trim().toLowerCase();
+
+      if (cacheKey && CACHE.artist[cacheKey] && Date.now() - CACHE.artist[cacheKey].time < 600000) {
+        return sendJson(200, CACHE.artist[cacheKey].data, 300);
+      }
+
+      if (id && !id.startsWith('artist-')) {
+        const details = await fetchArtistDetails(id);
+        if (details) {
+          CACHE.artist[cacheKey] = { time: Date.now(), data: details };
+          return sendJson(200, details, 300);
+        }
+      }
+
+      if (name) {
+        const [songs, artists, albums] = await Promise.all([
+          searchSongs(name),
+          searchArtists(name),
+          searchAlbums(name)
+        ]);
+
+        const matchingArtist = artists.find(a => a.name.toLowerCase() === name.toLowerCase()) || artists[0];
+
+        const payload = {
+          id: matchingArtist?.id || `artist-${Date.now()}`,
+          name: matchingArtist?.name || name,
+          image: matchingArtist?.image || songs[0]?.cover || 'assets/logo.jpg',
+          subtitle: matchingArtist?.role || 'Indian Singer & Artist',
+          bio: '',
+          followerCount: '1M+',
+          isVerified: true,
+          songs,
+          albums,
+          similarArtists: artists.filter(a => a.name.toLowerCase() !== name.toLowerCase())
+        };
+
+        CACHE.artist[cacheKey] = { time: Date.now(), data: payload };
+        return sendJson(200, payload, 300);
+      }
+
+      return sendJson(400, { error: 'Missing artist id or name' });
+    }
+
+    // 5. Indian Trending & Curated Shelves
     if (isTrending) {
       const category = parsedUrl.searchParams.get('category') || 'all';
 
@@ -355,7 +579,7 @@ export default async function handler(req, res) {
       return sendJson(200, { songs });
     }
 
-    // 3. Synced Lyrics
+    // 6. Synced Lyrics
     if (isLyrics) {
       const track = parsedUrl.searchParams.get('track') || '';
       const artist = parsedUrl.searchParams.get('artist') || '';
@@ -363,7 +587,7 @@ export default async function handler(req, res) {
       return sendJson(200, lyricsData);
     }
 
-    // 4. Explore (New Releases, Charts, Moods)
+    // 7. Explore (New Releases, Charts, Moods)
     if (isExplore) {
       if (CACHE.trending['explore'] && Date.now() - CACHE.trending['explore'].time < 600000) {
         return sendJson(200, CACHE.trending['explore'].data);
@@ -387,17 +611,7 @@ export default async function handler(req, res) {
       return sendJson(200, exploreData);
     }
 
-    // 5. Album songs
-    if (isAlbum) {
-      const id = parsedUrl.searchParams.get('id');
-      if (!id) {
-        return sendJson(200, { songs: [] });
-      }
-      const songs = await fetchAlbumSongs(id);
-      return sendJson(200, { songs });
-    }
-
-    // 6. Indian Recommendations & Trending Search Suggestions
+    // 8. Indian Recommendations & Trending Search Suggestions
     if (isRecommendations) {
       const artist = parsedUrl.searchParams.get('artist') || '';
       const trackId = parsedUrl.searchParams.get('trackId') || '';
@@ -449,42 +663,22 @@ export default async function handler(req, res) {
       return sendJson(200, payload);
     }
 
-    // 7. Artist / Singer Page Details & Top Songs
-    if (isArtist) {
-      const id = parsedUrl.searchParams.get('id');
-      const name = parsedUrl.searchParams.get('name');
-      const cacheKey = (id || name || '').trim().toLowerCase();
-      if (cacheKey && CACHE.artist[cacheKey] && Date.now() - CACHE.artist[cacheKey].time < 600000) {
-        return sendJson(200, CACHE.artist[cacheKey].data, 300);
-      }
-      if (id) {
-        const details = await fetchArtistDetails(id);
-        if (details) {
-          CACHE.artist[cacheKey] = { time: Date.now(), data: details };
-          return sendJson(200, details, 300);
-        }
-      }
-      if (name) {
-        const songs = await searchSongs(name);
-        const payload = {
-          id: `artist-${Date.now()}`,
-          name,
-          image: songs[0]?.cover || '',
-          subtitle: 'Indian Singer / Artist',
-          songs
-        };
-        CACHE.artist[cacheKey] = { time: Date.now(), data: payload };
-        return sendJson(200, payload, 300);
-      }
-      return sendJson(400, { error: 'Missing artist id or name' });
-    }
-
     // Fallback status
     return sendJson(200, {
       name: 'REA Music API',
       status: 'online',
       version: '2.5.0',
-      routes: ['/api/search', '/api/trending', '/api/lyrics', '/api/explore', '/api/album', '/api/download', '/api/recommendations', '/api/artist']
+      routes: [
+        '/api/search',
+        '/api/song',
+        '/api/album',
+        '/api/artist',
+        '/api/trending',
+        '/api/lyrics',
+        '/api/explore',
+        '/api/download',
+        '/api/recommendations'
+      ]
     });
   } catch (err) {
     console.error('API Error:', err);

@@ -6,7 +6,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build": "node build.js",
+    "build:web": "node scripts/build-web.js",
+    "verify": "node scripts/verify-project.js",
+    "test": "node tests/smoke-test.js"
   },
   "keywords": [
     "music-player",
