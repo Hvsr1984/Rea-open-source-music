@@ -4,6 +4,21 @@ All notable changes to the **REA Music** web ecosystem are documented in this fi
 
 ---
 
+## [2.6.0] - 2026-10-18
+
+### 🧠 Smart Autoplay, Intelligent Next Song & Recommendation Engine
+- **Centralized Playback Controller**: Unified track transitions into a single controller (`advanceTrack`), handling manual Next clicks, the browser's native `ended` audio event, previous track, repeat modes (`off`, `one`, `all`), shuffle, and playback error recovery.
+- **3-Tier Real Play Queue**: Completely redesigned the Up Next drawer and Maximized Player queue with three distinct, interactive sections:
+  - **Section A: Currently Playing**: Live track card with cover art, singer, title, duration, and animated audio equalizer bars (`@keyframes eqBounce`).
+  - **Section B: Next in Queue (Manual Queue)**: High-priority user-curated queue with position numbers (`#1`, `#2`), Move Up/Down reordering, single-click removal, and bulk queue clear.
+  - **Section C: Recommended Next (Autoplay Queue)**: Intelligently predicted upcoming discovery tracks with dynamic reason badges (`✦ More from [Artist]`, `✦ Because you like [Artist]`, `✦ Similar vibe`, `✦ From your Liked Songs`), immediate Play Now, Add to Queue (`+ Queue`), and Dismiss (`✕ Not interested`).
+- **Normalized Client Recommendation Engine**: Developed a multi-signal scoring algorithm scoring candidate tracks across artist affinity (+35 pts), language cohesion (+20 pts), liked songs affinity (+30 pts), recent listening history recency penalties (-70 pts within last 5 tracks), and an artist diversity dampener (maximum 2 tracks per artist in upcoming queue).
+- **Context-Aware Playback Sequences**: Dynamic listening flows adapting to playback entry points: single song discovery, album sequential listening, playlist ordering, artist radio, search track playback, and recommendation continuation.
+- **Playback Reliability & Error Recovery**: Bounded retry handler (`handlePlaybackError`, max 3 attempts) catching expired CDN URLs and stream dropouts without freezing or entering infinite retry loops.
+- **Persistent Autoplay Controls**: Real Autoplay toggle switch added to the bottom player bar (`#barAutoplayBtn`), right drawer panel (`#queueAutoplayToggle`), and theater maximized player (`#maxAutoplayToggle`) with `localStorage` persistence.
+
+---
+
 ## [2.5.0-web] - 2026-10-18
 
 ### 🧹 Transition to Pure Web-Only Project

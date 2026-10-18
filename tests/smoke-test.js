@@ -124,6 +124,30 @@ async function runTests() {
     }
   });
 
+  // Test 9: Recommendations Engine API
+  await testCase('GET /api/recommendations returns 200 OK with recommendations array', async () => {
+    const res = await request('/api/recommendations?artist=Arijit+Singh&trackId=KGfDrbWe');
+    if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
+    const json = JSON.parse(res.body);
+    if (!json.recommendations || !Array.isArray(json.recommendations)) throw new Error('Missing recommendations array');
+    if (json.recommendations.length === 0) throw new Error('Recommendations array is empty');
+    if (!json.trendingSearches || !Array.isArray(json.trendingSearches)) throw new Error('Missing trendingSearches array');
+  });
+
+  // Test 10: 3-Tier Queue Architecture and Autoplay Toggle Elements
+  await testCase('HTML contains 3-tier queue sections (Now Playing, Manual, Recommended) and Autoplay toggles', async () => {
+    const res = await request('/');
+    if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
+    const body = res.body;
+    if (!body.includes('queueNowPlayingCard')) throw new Error('Missing queueNowPlayingCard');
+    if (!body.includes('queueManualList')) throw new Error('Missing queueManualList');
+    if (!body.includes('queueRecommendedList')) throw new Error('Missing queueRecommendedList');
+    if (!body.includes('barAutoplayBtn')) throw new Error('Missing barAutoplayBtn in player bar');
+    if (!body.includes('queueAutoplayToggle')) throw new Error('Missing queueAutoplayToggle');
+    if (!body.includes('songAddToQueueBtn')) throw new Error('Missing songAddToQueueBtn in song view hero');
+    if (!body.includes('maxQueuePane')) throw new Error('Missing maxQueuePane in maximized player');
+  });
+
   // Close server
   await new Promise(resolve => server.close(resolve));
   console.log('\n=======================================');
