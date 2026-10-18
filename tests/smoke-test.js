@@ -148,6 +148,26 @@ async function runTests() {
     if (!body.includes('maxQueuePane')) throw new Error('Missing maxQueuePane in maximized player');
   });
 
+  // Test 11: Play/Pause and Audio Engine Controls Integrity
+  await testCase('js/app.js defines functional playback controls (togglePlayPause, engine.play, spacebar shortcut)', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const appJs = fs.readFileSync(path.resolve('./js/app.js'), 'utf8');
+
+    if (!/togglePlayPause\s*\([^)]*\)\s*\{/.test(appJs)) {
+      throw new Error('togglePlayPause() method is missing from REAMusicApp in js/app.js');
+    }
+    if (!/play\s*\([^)]*\)\s*\{[\s\S]*?return\s+this\.resume\(\);?[\s\S]*?\}/.test(appJs)) {
+      throw new Error('play() method alias is missing from HybridAudioEngine in js/app.js');
+    }
+    if (!appJs.includes('this.playPauseBtn.addEventListener')) {
+      throw new Error('playPauseBtn listener is missing in js/app.js');
+    }
+    if (!appJs.includes('this.maxPlayPauseBtn.addEventListener')) {
+      throw new Error('maxPlayPauseBtn listener is missing in js/app.js');
+    }
+  });
+
   // Close server
   await new Promise(resolve => server.close(resolve));
   console.log('\n=======================================');

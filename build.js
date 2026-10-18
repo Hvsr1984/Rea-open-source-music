@@ -59,7 +59,8 @@ bundledHtml = bundledHtml.replace(/<style id="rea-embedded-styles">[\s\S]*?<\/st
 bundledHtml = bundledHtml.replace(/<script id="rea-embedded-script">[\s\S]*?<\/script>/g, '');
 bundledHtml = bundledHtml.replace(/<script src="js\/app\.js"><\/script>/g, '');
 
-// Brand logo inline fallback
+// Brand logo inline fallback (clean existing fallback first to ensure idempotency)
+bundledHtml = bundledHtml.replace(/<div class="brand-logo-fallback"[^>]*>[\s\S]*?<\/div>\s*/g, '');
 const brandImgRegex = /<img src="assets\/logo\.jpg"[^>]*class="brand-logo-img"[^>]*>/;
 const brandReplacement = `<img src="assets/logo.jpg" alt="REA Music Logo" class="brand-logo-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='inline-flex';">
         <div class="brand-logo-fallback" style="display:none; width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg, #0071e3, #42a5f5); align-items:center; justify-content:center; color:#fff; box-shadow:0 4px 12px rgba(0,113,227,0.35); margin-right:8px;">

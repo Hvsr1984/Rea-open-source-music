@@ -291,7 +291,13 @@ class HybridAudioEngine {
         promise.catch(e => console.warn('Resume notice:', e));
       }
       this.isPlaying = true;
+    } else if (this.currentTrack) {
+      this.playTrack(this.currentTrack);
     }
+  }
+
+  play() {
+    return this.resume();
   }
 
   seek(timeInSeconds) {
@@ -1775,7 +1781,12 @@ class REAMusicApp {
     }
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isPlayerMaximized) {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      const isInput = activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.isContentEditable;
+      if (e.code === 'Space' && !isInput) {
+        e.preventDefault();
+        this.togglePlayPause();
+      } else if (e.key === 'Escape' && this.isPlayerMaximized) {
         this.minimizePlayer();
       }
     });
@@ -2014,7 +2025,14 @@ class REAMusicApp {
         if (card) {
           if (card.dataset.songId) {
             const track = this.findTrackById(card.dataset.songId);
-            if (track) this.playTrackItem(track);
+            if (track) {
+              const currentId = this.currentTrack ? this.currentTrack.id : (this.queue[this.currentTrackIndex]?.id);
+              if (currentId && String(currentId) === String(track.id)) {
+                this.togglePlayPause();
+              } else {
+                this.playTrackItem(track);
+              }
+            }
           } else if (card.dataset.artistId || card.dataset.artistName) {
             this.loadSingerHits({ id: card.dataset.artistId, name: card.dataset.artistName });
           } else if (card.dataset.albumId) {
@@ -3750,6 +3768,38 @@ class REAMusicApp {
     this.playActualTrack(target);
   }
 
+  togglePlayPause() {
+    if (!this.isPlaying) {
+      if (!this.engine.currentTrack) {
+        if (this.currentTrack) {
+          this.playActualTrack(this.currentTrack);
+        } else if (this.sequenceQueue && this.sequenceQueue.length > 0 && this.sequenceIndex >= 0 && this.sequenceIndex < this.sequenceQueue.length) {
+          this.playActualTrack(this.sequenceQueue[this.sequenceIndex], this.playbackContext);
+        } else if (this.manualQueue && this.manualQueue.length > 0) {
+          const nextManual = this.manualQueue.shift();
+          this.playActualTrack(nextManual, { type: 'manual_queue' });
+        } else if (this.queue && this.queue.length > 0) {
+          const track = this.queue[this.currentTrackIndex] || this.queue[0];
+          this.playActualTrack(track);
+        } else if (this.quickPicks && this.quickPicks.length > 0) {
+          this.playActualTrack(this.quickPicks[0]);
+        } else if (typeof FALLBACK_TRACKS !== 'undefined' && FALLBACK_TRACKS && FALLBACK_TRACKS.length > 0) {
+          this.playActualTrack(FALLBACK_TRACKS[0]);
+        }
+      } else {
+        this.engine.resume();
+        this.isPlaying = true;
+        this.updatePlayPauseUI();
+      }
+    } else {
+      this.engine.pause();
+      this.isPlaying = false;
+      this.updatePlayPauseUI();
+    }
+    this.syncMediaControls();
+    this.renderShelves();
+  }
+
   nextTrack() {
     this.advanceTrack('manual');
   }
@@ -4367,6 +4417,10 @@ class REAMusicApp {
           }
           if (e.target.closest('.track-row-title')) {
             this.openSongView(track.id);
+            return;
+          }
+          if (currentId && String(currentId) === String(track.id)) {
+            this.togglePlayPause();
             return;
           }
           const queueIdx = this.queue.findIndex(t => t.id === track.id);

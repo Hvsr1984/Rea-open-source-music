@@ -16,6 +16,7 @@ All notable changes to the **REA Music** web ecosystem are documented in this fi
 - **Context-Aware Playback Sequences**: Dynamic listening flows adapting to playback entry points: single song discovery, album sequential listening, playlist ordering, artist radio, search track playback, and recommendation continuation.
 - **Playback Reliability & Error Recovery**: Bounded retry handler (`handlePlaybackError`, max 3 attempts) catching expired CDN URLs and stream dropouts without freezing or entering infinite retry loops.
 - **Persistent Autoplay Controls**: Real Autoplay toggle switch added to the bottom player bar (`#barAutoplayBtn`), right drawer panel (`#queueAutoplayToggle`), and theater maximized player (`#maxAutoplayToggle`) with `localStorage` persistence.
+- **Restored Play/Pause & Engine Controls**: Restored missing `togglePlayPause()` method on `REAMusicApp`, added `engine.play()` alias on `HybridAudioEngine`, enabled Spacebar keyboard playback toggling, and added contextual row play/pause support.
 
 ---
 
