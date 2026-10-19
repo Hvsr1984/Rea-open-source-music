@@ -4262,7 +4262,12 @@ class REAMusicApp {
         const isActive = idx === activeIndex;
         line.classList.toggle('active', isActive);
         if (isActive && this.activeTab === 'lyrics') {
-          line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const c = this.lyricsBody;
+          const lRect = line.getBoundingClientRect();
+          const cRect = c.getBoundingClientRect();
+          const relTop = lRect.top - cRect.top + c.scrollTop;
+          const target = relTop - (c.clientHeight / 2) + (line.clientHeight / 2);
+          c.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
         }
       });
     }
@@ -4274,7 +4279,12 @@ class REAMusicApp {
         const isActive = idx === activeIndex;
         line.classList.toggle('active-lyric', isActive);
         if (isActive && this.isPlayerMaximized && this.currentMaxTab !== 'queue') {
-          line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const c = this.maxLyricsScroll;
+          const lRect = line.getBoundingClientRect();
+          const cRect = c.getBoundingClientRect();
+          const relTop = lRect.top - cRect.top + c.scrollTop;
+          const target = relTop - (c.clientHeight / 2) + (line.clientHeight / 2);
+          c.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
         }
       });
     }
@@ -4427,8 +4437,9 @@ class REAMusicApp {
     }
 
     // Update Maximized Theater Player Information
-    if (this.maxAlbumArt) this.maxAlbumArt.src = track.cover;
-    if (this.maxAmbientGlow) this.maxAmbientGlow.style.backgroundImage = `url("${track.cover}")`;
+    const albumCover = track.cover || 'assets/midnight_vibes.jpg';
+    if (this.maxAlbumArt) this.maxAlbumArt.src = albumCover;
+    if (this.maxAmbientGlow) this.maxAmbientGlow.style.backgroundImage = `url("${albumCover}")`;
     if (this.maxTrackTitle) this.maxTrackTitle.textContent = track.title;
     if (this.maxTrackArtist) this.maxTrackArtist.innerHTML = this.renderClickableArtists(track);
     if (this.maxTrackAlbum) this.maxTrackAlbum.innerHTML = track.album ? `<span class="album-link" data-album-id="${track.albumId || ''}">${track.album}</span>` : '';
@@ -4720,7 +4731,9 @@ class REAMusicApp {
     if (this.maximizedPlayer) {
       this.maximizedPlayer.classList.add('open');
       this.maximizedPlayer.setAttribute('aria-hidden', 'false');
+      this.maximizedPlayer.scrollTop = 0;
     }
+    this.switchMaxTab(this.currentMaxTab || 'song');
     this.renderPlayerInfo();
     const cur = this.engine.audio.currentTime || 0;
     const dur = this.engine.audio.duration || this.queue[this.currentTrackIndex]?.duration || 1;
@@ -4746,6 +4759,9 @@ class REAMusicApp {
 
   switchMaxTab(tab) {
     this.currentMaxTab = tab;
+    if (this.maximizedPlayer) {
+      this.maximizedPlayer.setAttribute('data-max-tab', tab);
+    }
     this.maxTabBtns.forEach(b => b.classList.toggle('active', b.dataset.maxTab === tab));
 
     if (tab === 'song') {
