@@ -970,6 +970,7 @@ class REAMusicApp {
     this.maxDownloadBtn = document.getElementById('maxDownloadBtn');
     this.maxLyricsPane = document.getElementById('maxLyricsPane');
     this.maxQueuePane = document.getElementById('maxQueuePane');
+    this.maxQueueContent = document.getElementById('maxQueueContent');
     this.maxLyricsScroll = document.getElementById('maxLyricsScroll');
     this.maxQueueList = document.getElementById('maxQueueList');
     this.maxQueueCount = document.getElementById('maxQueueCount');
@@ -1523,6 +1524,21 @@ class REAMusicApp {
     }
     if (this.maxRefreshRecommendationsBtn) {
       this.maxRefreshRecommendationsBtn.addEventListener('click', () => this.refreshRecommendations());
+    }
+
+    // Allow mouse-wheel scrolling over the maximized queue header to scroll the queue content
+    if (this.maxQueuePane) {
+      const maxQueueHeader = this.maxQueuePane.querySelector('.max-pane-header');
+      if (maxQueueHeader) {
+        maxQueueHeader.addEventListener('wheel', (e) => {
+          if (this.maxQueueContent) {
+            this.maxQueueContent.scrollBy({
+              top: e.deltaY,
+              behavior: 'auto'
+            });
+          }
+        }, { passive: true });
+      }
     }
 
     // Unified Queue Interaction Delegation (Drawer + Maximized Player)

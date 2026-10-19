@@ -168,6 +168,18 @@ async function runTests() {
     }
   });
 
+  // Test 12: Full-Screen Queue Scrolling Layout and Hierarchy Integrity
+  await testCase('Full-Screen Player contains scrollable maxQueueContent and recommended-track-list layout', async () => {
+    const res = await request('/');
+    if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
+    const body = res.body;
+    if (!body.includes('id="maxQueueContent"')) throw new Error('Missing maxQueueContent in HTML');
+    if (!body.includes('queue-panel-content')) throw new Error('Missing queue-panel-content class');
+    if (!body.includes('recommended-track-list')) throw new Error('Missing recommended-track-list class');
+    if (!body.includes('.max-queue-content')) throw new Error('Missing .max-queue-content CSS rules');
+    if (!body.includes('overscroll-behavior-y: contain')) throw new Error('Missing overscroll-behavior-y containment');
+  });
+
   // Close server
   await new Promise(resolve => server.close(resolve));
   console.log('\n=======================================');
