@@ -2147,6 +2147,61 @@ a {
   gap: 4px;
 }
 
+/* ==========================================================================
+   Clean Empty Player State (Startup & No Active Track)
+   ========================================================================== */
+.player-bar.is-empty {
+  cursor: default;
+}
+
+.player-bar.is-empty .player-thumbnail-container {
+  display: none !important;
+}
+
+.player-bar.is-empty .player-actions {
+  display: none !important;
+}
+
+.player-bar.is-empty .player-title-row,
+.player-bar.is-empty .player-artist-row {
+  display: none !important;
+}
+
+.player-bar.is-empty .player-empty-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  letter-spacing: -0.01em;
+  user-select: none;
+}
+
+.player-bar:not(.is-empty) .player-empty-label {
+  display: none !important;
+}
+
+.player-bar.is-empty .progress-bar-fill,
+.player-bar.is-empty .progress-bar-buffered {
+  width: 0% !important;
+}
+
+.player-bar.is-empty .progress-container {
+  pointer-events: none;
+}
+
+.player-bar.is-empty .play-pause-btn {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.player-bar.is-empty #prevBtn,
+.player-bar.is-empty #nextBtn {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
 .action-thumb {
   width: 36px;
   height: 36px;
@@ -2615,6 +2670,10 @@ a {
     z-index: 450;
     cursor: pointer;
     overflow: hidden;
+  }
+
+  .player-bar.is-empty {
+    cursor: default;
   }
 
   .progress-container {

@@ -333,8 +333,8 @@ class REAMusicApp {
     this.romanticHits = [];
     this.exploreReleases = [];
     this.exploreCharts = [];
-    this.queue = [...FALLBACK_TRACKS];
-    this.currentTrackIndex = 0;
+    this.queue = [];
+    this.currentTrackIndex = -1;
     this.currentTrack = null;
     this.isPlaying = false;
     this.isMuted = false;
@@ -342,10 +342,10 @@ class REAMusicApp {
 
     // 3-Tier Queue & Autoplay Engine Architecture
     this.manualQueue = [];
-    this.sequenceQueue = [...FALLBACK_TRACKS];
-    this.sequenceIndex = 0;
+    this.sequenceQueue = [];
+    this.sequenceIndex = -1;
     this.recommendationQueue = [];
-    this.playbackContext = { type: 'initial' };
+    this.playbackContext = null;
 
     // Persistent Playback State
     this.autoplayEnabled = this.loadLocalStorage('rea_autoplay_enabled', true);
@@ -553,8 +553,16 @@ class REAMusicApp {
   }
 
   syncMediaControls() {
-    const track = this.queue[this.currentTrackIndex] || FALLBACK_TRACKS[0];
-    if (!track) return;
+    const track = this.currentTrack || (this.currentTrackIndex >= 0 && this.queue[this.currentTrackIndex] ? this.queue[this.currentTrackIndex] : null);
+    if (!track) {
+      if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = null;
+          navigator.mediaSession.playbackState = 'none';
+        } catch (_) {}
+      }
+      return;
+    }
 
     if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
       try {
@@ -849,6 +857,7 @@ class REAMusicApp {
     this.playerThumbContainer = document.getElementById('playerThumbContainer');
     this.playerThumb = document.getElementById('playerThumbImg');
     this.playerTrackTitle = document.getElementById('playerTitle');
+    this.playerEmptyLabel = document.getElementById('playerEmptyLabel');
     this.playerArtist = document.getElementById('playerArtist');
     this.playerAlbum = document.getElementById('playerAlbum');
     this.likeBtn = document.getElementById('likeBtn');
@@ -3239,7 +3248,6 @@ class REAMusicApp {
 
       if (data && Array.isArray(data.quickPicks) && data.quickPicks.length > 0) {
         this.quickPicks = data.quickPicks;
-        this.queue = [...this.quickPicks];
       }
       if (data && Array.isArray(data.trendingHits) && data.trendingHits.length > 0) {
         this.trendingHits = data.trendingHits;
@@ -3262,7 +3270,6 @@ class REAMusicApp {
       console.warn('Using fallback catalog:', e);
       if (!this.quickPicks || this.quickPicks.length === 0) {
         this.quickPicks = [...FALLBACK_TRACKS];
-        this.queue = [...FALLBACK_TRACKS];
       }
     } finally {
       this.renderShelves();
@@ -3608,14 +3615,6 @@ class REAMusicApp {
         this.quickPicks = songs.slice(0, 16);
         // Update the shelves with the filtered songs WITHOUT starting playback
         this.renderShelves();
-
-        // If nothing is currently playing, update player metadata preview and queue without starting playback
-        if (!this.isPlaying) {
-          this.queue = [...this.quickPicks];
-          this.currentTrackIndex = 0;
-          this.renderPlayerInfo();
-          this.renderQueue();
-        }
       }
     } catch (e) {
       console.warn('Filter fetch notice:', e);
@@ -3742,7 +3741,11 @@ class REAMusicApp {
       }
 
       // If recommendations are being loaded or empty, generate now
-      const seed = this.currentTrack || FALLBACK_TRACKS[0];
+      const seed = this.currentTrack;
+      if (!seed) {
+        this.stopPlaybackGracefully('Queue finished');
+        return;
+      }
       this.showToast('Autoplay: Finding next song...');
       this.generateSmartRecommendations(seed).then(recs => {
         if (recs && recs.length > 0) {
@@ -3809,13 +3812,12 @@ class REAMusicApp {
         } else if (this.manualQueue && this.manualQueue.length > 0) {
           const nextManual = this.manualQueue.shift();
           this.playActualTrack(nextManual, { type: 'manual_queue' });
-        } else if (this.queue && this.queue.length > 0) {
-          const track = this.queue[this.currentTrackIndex] || this.queue[0];
+        } else if (this.queue && this.queue.length > 0 && this.currentTrackIndex >= 0 && this.queue[this.currentTrackIndex]) {
+          const track = this.queue[this.currentTrackIndex];
           this.playActualTrack(track);
-        } else if (this.quickPicks && this.quickPicks.length > 0) {
-          this.playActualTrack(this.quickPicks[0]);
-        } else if (typeof FALLBACK_TRACKS !== 'undefined' && FALLBACK_TRACKS && FALLBACK_TRACKS.length > 0) {
-          this.playActualTrack(FALLBACK_TRACKS[0]);
+        } else {
+          // No active track selected - do not autoplay fallback song
+          return;
         }
       } else {
         this.engine.resume();
@@ -3842,6 +3844,7 @@ class REAMusicApp {
   }
 
   prevTrack() {
+    if (!this.currentTrack) return;
     if (this.engine.audio.currentTime > 3) {
       this.engine.seek(0);
       return;
@@ -3985,7 +3988,8 @@ class REAMusicApp {
   }
 
   async refreshRecommendations() {
-    const seed = this.currentTrack || FALLBACK_TRACKS[0];
+    const seed = this.currentTrack;
+    if (!seed) return;
     this.showToast('Refreshing recommendations...');
     if (seed.id) {
       this.recommendationCache.delete(seed.id);
@@ -4370,12 +4374,56 @@ class REAMusicApp {
   }
 
   renderPlayerInfo() {
-    const track = this.queue[this.currentTrackIndex] || FALLBACK_TRACKS[0];
-    if (this.playerThumb) this.playerThumb.src = track.cover;
-    if (this.playerTrackTitle) this.playerTrackTitle.textContent = track.title;
+    const track = this.currentTrack || (this.currentTrackIndex >= 0 && this.queue[this.currentTrackIndex] ? this.queue[this.currentTrackIndex] : null);
+    const playerBar = this.playerBar || document.getElementById('playerBar');
+
+    if (!track) {
+      if (playerBar) playerBar.classList.add('is-empty');
+      if (this.playerThumbContainer) this.playerThumbContainer.style.display = 'none';
+      if (this.playerThumb) this.playerThumb.src = '';
+      if (this.playerTrackTitle) this.playerTrackTitle.textContent = '';
+      if (this.playerArtist) this.playerArtist.innerHTML = '';
+      if (this.playerAlbum) this.playerAlbum.innerHTML = '';
+      if (this.lyricsTrackTitle) this.lyricsTrackTitle.textContent = '';
+      if (this.lyricsArtistName) this.lyricsArtistName.innerHTML = '';
+      if (this.likeBtn) this.likeBtn.classList.remove('liked');
+      if (this.maxLikeBtn) this.maxLikeBtn.classList.remove('active');
+      if (this.playerDownloadBtn) this.playerDownloadBtn.style.display = 'none';
+      if (this.dislikeBtn) this.dislikeBtn.style.display = 'none';
+
+      // Reset Scrubber and time labels
+      const fill = document.getElementById('progressFill');
+      const buffered = document.getElementById('progressBuffered');
+      const timeCur = document.getElementById('timeCurrent');
+      const timeTot = document.getElementById('timeTotal');
+      if (fill) fill.style.width = '0%';
+      if (buffered) buffered.style.width = '0%';
+      if (timeCur) timeCur.textContent = '0:00';
+      if (timeTot) timeTot.textContent = '0:00';
+
+      // Maximized player clean empty state
+      if (this.maxAlbumArt) this.maxAlbumArt.src = FALLBACK_COVER;
+      if (this.maxAmbientGlow) this.maxAmbientGlow.style.backgroundImage = 'none';
+      if (this.maxTrackTitle) this.maxTrackTitle.textContent = 'No track selected';
+      if (this.maxTrackArtist) this.maxTrackArtist.innerHTML = 'Select a song to play';
+      if (this.maxTrackAlbum) this.maxTrackAlbum.innerHTML = '';
+
+      this.renderMaxLyrics();
+      this.renderMaxQueue();
+      this.syncControlStates();
+      return;
+    }
+
+    if (playerBar) playerBar.classList.remove('is-empty');
+    if (this.playerThumbContainer) this.playerThumbContainer.style.display = '';
+    if (this.playerDownloadBtn) this.playerDownloadBtn.style.display = '';
+    if (this.dislikeBtn) this.dislikeBtn.style.display = '';
+
+    if (this.playerThumb) this.playerThumb.src = track.cover || FALLBACK_COVER;
+    if (this.playerTrackTitle) this.playerTrackTitle.textContent = track.title || '';
     if (this.playerArtist) this.playerArtist.innerHTML = this.renderClickableArtists(track);
     if (this.playerAlbum) this.playerAlbum.innerHTML = track.album ? `<span class="album-link" data-album-id="${track.albumId || ''}">${track.album}</span>` : '';
-    if (this.lyricsTrackTitle) this.lyricsTrackTitle.textContent = track.title;
+    if (this.lyricsTrackTitle) this.lyricsTrackTitle.textContent = track.title || '';
     if (this.lyricsArtistName) this.lyricsArtistName.innerHTML = this.renderClickableArtists(track);
 
     this.syncMediaControls();
@@ -4437,7 +4485,7 @@ class REAMusicApp {
     }
 
     // Update Maximized Theater Player Information
-    const albumCover = track.cover || 'assets/midnight_vibes.jpg';
+    const albumCover = track.cover || FALLBACK_COVER;
     if (this.maxAlbumArt) this.maxAlbumArt.src = albumCover;
     if (this.maxAmbientGlow) this.maxAmbientGlow.style.backgroundImage = `url("${albumCover}")`;
     if (this.maxTrackTitle) this.maxTrackTitle.textContent = track.title;
@@ -4450,7 +4498,7 @@ class REAMusicApp {
   }
 
   renderShelves() {
-    const currentId = this.queue[this.currentTrackIndex]?.id;
+    const currentId = this.currentTrack?.id || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex]?.id : null);
 
     // 1. Quick Picks Grid (India Superhits Top 50)
     if (this.quickPicksGrid) {
@@ -4573,24 +4621,33 @@ class REAMusicApp {
   }
 
   renderQueueSections({ nowPlayingCard, manualCount, clearBtn, manualList, autoplayToggle, recommendedList, isMax = false }) {
-    const curTrack = this.currentTrack || this.queue[this.currentTrackIndex] || FALLBACK_TRACKS[0];
+    const curTrack = this.currentTrack || (this.currentTrackIndex >= 0 && this.queue[this.currentTrackIndex] ? this.queue[this.currentTrackIndex] : null);
 
     // Section A: Currently Playing
-    if (nowPlayingCard && curTrack) {
-      nowPlayingCard.innerHTML = `
-        <img src="${curTrack.cover || FALLBACK_COVER}" alt="${curTrack.title}" class="queue-item-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
-        <div class="queue-now-playing-info">
-          <div class="queue-now-playing-title">${curTrack.title}</div>
-          <div class="queue-now-playing-artist">${curTrack.artist}</div>
-        </div>
-        <div class="queue-equalizer-bars ${this.isPlaying ? 'playing' : ''}">
-          <span class="bar bar-1"></span>
-          <span class="bar bar-2"></span>
-          <span class="bar bar-3"></span>
-          <span class="bar bar-4"></span>
-        </div>
-        <div class="queue-item-duration">${this.formatTime(curTrack.duration)}</div>
-      `;
+    if (nowPlayingCard) {
+      if (curTrack) {
+        nowPlayingCard.innerHTML = `
+          <img src="${curTrack.cover || FALLBACK_COVER}" alt="${curTrack.title}" class="queue-item-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <div class="queue-now-playing-info">
+            <div class="queue-now-playing-title">${curTrack.title}</div>
+            <div class="queue-now-playing-artist">${curTrack.artist}</div>
+          </div>
+          <div class="queue-equalizer-bars ${this.isPlaying ? 'playing' : ''}">
+            <span class="bar bar-1"></span>
+            <span class="bar bar-2"></span>
+            <span class="bar bar-3"></span>
+            <span class="bar bar-4"></span>
+          </div>
+          <div class="queue-item-duration">${this.formatTime(curTrack.duration)}</div>
+        `;
+      } else {
+        nowPlayingCard.innerHTML = `
+          <div class="queue-empty-state" style="padding: 14px 10px;">
+            <div>No track currently playing</div>
+            <p>Select any song to begin playback.</p>
+          </div>
+        `;
+      }
     }
 
     // Section B: Next in Queue (Manual Queue)
@@ -4727,6 +4784,9 @@ class REAMusicApp {
   // Maximized / Minimized Player Theater Controls
   // ===========================================================================
   maximizePlayer() {
+    if (!this.currentTrack && (!this.queue || this.currentTrackIndex < 0 || !this.queue[this.currentTrackIndex])) {
+      return;
+    }
     this.isPlayerMaximized = true;
     if (this.maximizedPlayer) {
       this.maximizedPlayer.classList.add('open');
@@ -5138,7 +5198,7 @@ class REAMusicApp {
 
   async loadRecommendations(targetArtist) {
     try {
-      const currentTrack = this.currentTrack || this.queue[this.currentTrackIndex];
+      const currentTrack = this.currentTrack || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex] : null);
       const artistParam = targetArtist || (currentTrack ? currentTrack.artist : 'Arijit Singh');
       const trackId = currentTrack ? currentTrack.id : '';
       const res = await fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(artistParam)}&trackId=${encodeURIComponent(trackId)}`);
@@ -5325,7 +5385,21 @@ class REAMusicApp {
   }
 
   renderRelatedPane() {
-    const currentTrack = this.queue[this.currentTrackIndex] || FALLBACK_TRACKS[0];
+    const currentTrack = this.currentTrack || (this.currentTrackIndex >= 0 && this.queue[this.currentTrackIndex] ? this.queue[this.currentTrackIndex] : null);
+    if (!currentTrack) {
+      if (this.relatedArtistCard) {
+        this.relatedArtistCard.innerHTML = `
+          <div class="related-artist-info" style="padding: 12px 0;">
+            <div class="related-artist-title">No track playing</div>
+            <div class="related-artist-subtitle">Choose a song to see related recommendations</div>
+          </div>
+        `;
+      }
+      if (this.relatedTracksList) {
+        this.relatedTracksList.innerHTML = '<div style="padding:16px;color:var(--text-tertiary);font-size:13px;text-align:center;">Select any song to explore related tracks</div>';
+      }
+      return;
+    }
     if (this.relatedArtistCard) {
       this.relatedArtistCard.innerHTML = `
         <img src="${currentTrack.cover}" alt="${currentTrack.artist}" class="related-artist-avatar" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
