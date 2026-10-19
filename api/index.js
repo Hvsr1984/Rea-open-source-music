@@ -601,13 +601,37 @@ export default async function handler(req, res) {
         fetchPlaylistSongs(CHARTS.superhits)
       ]);
 
+      const canonicalCharts = [
+        { id: 'chart-1', rank: 1, rankChange: '+1', title: 'Casa Tupka Anthem', artist: 'Yo Yo Honey Singh', album: 'Casa Tupka', cover: 'assets/casa_tupka.jpg', duration: 183, audioUrl: 'https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4' },
+        { id: 'chart-2', rank: 2, rankChange: '-1', title: 'Gehra Hua', artist: 'Arijit Singh, Armaan Malik', album: 'Gehra Hua', cover: 'https://c.saavncdn.com/475/Dhurandhar-Hindi-2025-20260203083204-500x500.jpg', duration: 362 },
+        { id: 'chart-3', rank: 3, rankChange: '—', title: 'Parvati', artist: 'Sadhu Tiwari', album: 'Parvati', cover: 'https://c.saavncdn.com/058/Hanuman-Ansh-Original-Motion-Picture-Soundtrack-Hindi-2026-20260710211303-500x500.jpg', duration: 284 },
+        { id: 'chart-4', rank: 4, rankChange: '+2', title: 'Tera Mera Rishta', artist: 'Mithoon, Pritam, Saaj Bhatt', album: 'Awarapan 2', cover: 'https://c.saavncdn.com/820/Awarapan-2-Hindi-2026-20260929184517-500x500.jpg', duration: 365 },
+        { id: 'chart-5', rank: 5, rankChange: 'NEW', title: 'Tum Hi Ho', artist: 'Arijit Singh', album: 'Aashiqui 2', cover: 'https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg', duration: 262 },
+        { id: 'chart-6', rank: 6, rankChange: '+1', title: 'Saiyaara', artist: 'Various Artists', album: 'Ek Tha Tiger', cover: 'https://c.saavncdn.com/598/Saiyaara-Hindi-2025-20250703061754-500x500.jpg', duration: 370 },
+        { id: 'chart-7', rank: 7, rankChange: '-2', title: 'Dheere Dheere', artist: 'Yo Yo Honey Singh', album: 'Dheere Dheere', cover: 'https://c.saavncdn.com/808/Dheere-Dheere-Hindi-2015-500x500.jpg', duration: 238 },
+        { id: 'chart-8', rank: 8, rankChange: '+1', title: 'Barbaad', artist: 'Jubin Nautiyal', album: 'Barbaad', cover: 'https://c.saavncdn.com/598/Saiyaara-Hindi-2025-20250703061754-500x500.jpg', duration: 255 },
+        { id: 'chart-9', rank: 9, rankChange: 'NEW', title: 'Apna Bana Le', artist: 'Sachin-Jigar, Arijit', album: 'Bhediya', cover: 'https://c.saavncdn.com/815/Bhediya-Hindi-2023-20230927155213-500x500.jpg', duration: 261 },
+        { id: 'chart-10', rank: 10, rankChange: '+2', title: 'Vaaroon Forever', artist: 'Various Artists', album: 'Vaaroon Forever', cover: 'https://c.saavncdn.com/381/Vaaroon-Forever-From-Mirzapur-The-Movie-Hindi-2026-20260817160523-500x500.jpg', duration: 252 },
+        { id: 'chart-11', rank: 11, rankChange: '—', title: 'Husn', artist: 'Anuv Jain', album: 'Husn', cover: 'https://c.saavncdn.com/436/Husn-Hindi-2023-20231129054140-500x500.jpg', duration: 306 },
+        { id: 'chart-12', rank: 12, rankChange: '+1', title: 'Arz Kiya Hai', artist: 'Anuv Jain', album: 'Coke Studio Bharat', cover: 'https://c.saavncdn.com/504/Arz-Kiya-Hai-Coke-Studio-Bharat-Hindi-2025-20250818054005-500x500.jpg', duration: 294 }
+      ];
+
+      // Merge audio from live tracks where title matches
+      canonicalCharts.forEach(c => {
+        const found = superhits.find(s => s && s.title && s.title.toLowerCase().includes(c.title.toLowerCase()));
+        if (found && found.audioUrl) c.audioUrl = found.audioUrl;
+      });
+
+      // Fill remaining spots up to 20 with live superhits
+      const remaining = superhits.slice(12, 20).map((s, idx) => ({
+        ...s,
+        rank: 13 + idx,
+        rankChange: idx % 2 === 0 ? '+1' : 'NEW'
+      }));
+
       const exploreData = {
         newReleases: newReleases.slice(0, 12),
-        topCharts: superhits.slice(0, 20).map((s, idx) => ({
-          ...s,
-          rank: idx + 1,
-          rankChange: idx === 0 ? '#1' : idx % 3 === 0 ? '+2' : idx % 2 === 0 ? 'NEW' : '+1'
-        }))
+        topCharts: [...canonicalCharts, ...remaining]
       };
 
       CACHE.trending['explore'] = { time: Date.now(), data: exploreData };

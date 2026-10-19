@@ -82,7 +82,7 @@ console.log('Desktop Startup State:', desktopEval.result.value);
 
 // Screenshot desktop initial
 const desktopShot = await send('Page.captureScreenshot', { format: 'png' });
-const artifactDir = 'C:\\Users\\harsh\\.gemini\\antigravity-ide\\brain\\a52fe635-e636-48a1-9c2f-837a6678debb';
+const artifactDir = 'C:\\Users\\harsh\\.gemini\\antigravity-ide\\brain\\b0af3e91-08af-45f2-af91-b3ddc492f33a';
 fs.writeFileSync(path.join(artifactDir, 'spatial-desktop-startup.png'), Buffer.from(desktopShot.data, 'base64'));
 console.log('Saved spatial-desktop-startup.png');
 
