@@ -460,6 +460,7 @@ class REAMusicApp {
     this.renderAll();
     this.loadIndianMusicCatalog();
     this.loadRecommendations();
+    this.loadExploreCatalog();
     this.initRouter();
   }
 
@@ -500,7 +501,7 @@ class REAMusicApp {
 
   initTheme() {
     const savedTheme = localStorage.getItem('rea_theme');
-    const validTheme = savedTheme === 'dark' ? 'dark' : 'white';
+    const validTheme = savedTheme === 'white' ? 'white' : savedTheme === 'dark' ? 'dark' : 'spatial';
     this.setTheme(validTheme, false);
   }
 
@@ -608,9 +609,9 @@ class REAMusicApp {
   }
 
   setTheme(themeName, showToastFeedback = true) {
-    const targetTheme = themeName === 'dark' ? 'dark' : 'white';
+    const targetTheme = (themeName === 'white' || themeName === 'dark' || themeName === 'spatial') ? themeName : 'spatial';
     this.currentTheme = targetTheme;
-    document.body.classList.remove('theme-white', 'theme-dark', 'theme-lilac', 'theme-peach');
+    document.body.classList.remove('theme-white', 'theme-dark', 'theme-spatial', 'theme-lilac', 'theme-peach');
     document.body.classList.add(`theme-${targetTheme}`);
 
     if (this.themeOptionBtns) {
@@ -828,6 +829,14 @@ class REAMusicApp {
     this.trendingNextBtn = document.getElementById('trendingNextBtn');
 
     // Explore View Elements
+    // Spatial Hero Elements
+    this.homeReleasesCarousel = document.getElementById('homeReleasesCarousel');
+    this.homeChartsGrid = document.getElementById('homeChartsGrid');
+    this.homeReleasesPrevBtn = document.getElementById('homeReleasesPrevBtn');
+    this.homeReleasesNextBtn = document.getElementById('homeReleasesNextBtn');
+    this.playAllHomeChartsBtn = document.getElementById('playAllHomeChartsBtn');
+    this.spatialBgImage = document.getElementById('spatialBgImage');
+
     this.exploreReleasesCarousel = document.getElementById('exploreReleasesCarousel');
     this.exploreChartsGrid = document.getElementById('exploreChartsGrid');
     this.exploreGenreGrid = document.getElementById('exploreGenreGrid');
@@ -2885,21 +2894,24 @@ class REAMusicApp {
   }
 
   renderExplore() {
-    // 1. New Releases Carousel
-    if (this.exploreReleasesCarousel) {
-      this.exploreReleasesCarousel.innerHTML = '';
+    // 1. New Releases Carousel (Home & Explore)
+    const releaseContainers = [this.exploreReleasesCarousel, this.homeReleasesCarousel].filter(Boolean);
+    releaseContainers.forEach(container => {
+      container.innerHTML = '';
+      const fragment = document.createDocumentFragment();
       this.exploreReleases.forEach(album => {
         const card = document.createElement('div');
-        card.className = 'music-card';
+        card.className = 'music-card spatial-album-card';
         card.innerHTML = `
           <div class="music-card-thumb">
-            <img src="${album.cover}" alt="${album.title}" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231c1c1e'/%3E%3Cstop offset='100%25' stop-color='%232c2c2e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='150' r='60' fill='%230071e3' opacity='0.85'/%3E%3Cpath d='M150 115v45.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V131h16.5v-16H150z' fill='%23ffffff'/%3E%3C/svg%3E'">
+            <img src="${album.cover}" alt="${album.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <div class="album-sheen-overlay"></div>
             <button class="music-card-play" aria-label="Play ${album.title}">
               <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
             </button>
           </div>
           <div class="music-card-title">${album.title}</div>
-          <div class="music-card-sub">${album.artist} • ${album.year}</div>
+          <div class="music-card-sub">${album.artist} • ${album.year || '2026'}</div>
         `;
         card.addEventListener('click', async () => {
           this.showToast(`Loading album "${album.title}"...`);
@@ -2915,22 +2927,39 @@ class REAMusicApp {
             console.warn('Album load failed:', e);
           }
         });
-        this.exploreReleasesCarousel.appendChild(card);
+        fragment.appendChild(card);
       });
-    }
+      container.appendChild(fragment);
+    });
 
-    // 2. Ranked Top Charts Grid (1 to 20)
-    if (this.exploreChartsGrid) {
-      this.exploreChartsGrid.innerHTML = '';
+    // 2. Ranked Top Charts Grid (Home & Explore: 3-column numbered ranking cards)
+    const chartContainers = [this.exploreChartsGrid, this.homeChartsGrid].filter(Boolean);
+    chartContainers.forEach(container => {
+      container.innerHTML = '';
       const fragment = document.createDocumentFragment();
       this.exploreCharts.forEach(track => {
         const isDl = this.isDownloaded(track.id);
         const card = document.createElement('div');
         card.className = 'ranked-track-card';
+
+        let deltaHtml = '';
+        const change = String(track.rankChange || '');
+        if (change === 'NEW') {
+          deltaHtml = `<span class="rank-badge badge-new">NEW</span>`;
+        } else if (change.startsWith('+') || change.startsWith('▲') || change === '#1') {
+          const val = change === '#1' ? '1' : change.replace(/^[+▲]\s*/, '');
+          deltaHtml = `<span class="rank-badge badge-up"><svg viewBox="0 0 10 10" width="8" height="8" fill="currentColor"><polygon points="5,1 9,8 1,8"/></svg> +${val}</span>`;
+        } else if (change.startsWith('-') || change.startsWith('▼')) {
+          const val = change.replace(/^[-▼]\s*/, '');
+          deltaHtml = `<span class="rank-badge badge-down"><svg viewBox="0 0 10 10" width="8" height="8" fill="currentColor"><polygon points="1,2 9,2 5,9"/></svg> -${val}</span>`;
+        } else {
+          deltaHtml = `<span class="rank-badge badge-same">—</span>`;
+        }
+
         card.innerHTML = `
           <div class="rank-number ${track.rank <= 3 ? 'top-three' : ''}">${track.rank}</div>
-          <div class="rank-badge ${track.rankChange === 'NEW' ? 'badge-new' : ''}">${track.rankChange || '#1'}</div>
-          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" style="width:46px;height:46px;border-radius:4px;object-fit:cover;">
+          ${deltaHtml}
+          <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" style="width:46px;height:46px;border-radius:8px;object-fit:cover;">
           <div class="track-row-info">
             <div class="track-row-title">${track.title}</div>
             <div class="track-row-artist">${track.artist}</div>
@@ -2941,6 +2970,9 @@ class REAMusicApp {
               : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
           </button>
           <div class="track-row-duration">${this.formatTime(track.duration)}</div>
+          <button class="track-more-menu-btn" title="Song options" aria-label="Song options">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </button>
         `;
         card.addEventListener('click', (e) => {
           if (e.target.closest('.track-inline-dl-btn')) {
@@ -2948,13 +2980,18 @@ class REAMusicApp {
             this.handleDownloadButtonClick(track);
             return;
           }
+          if (e.target.closest('.track-more-menu-btn')) {
+            e.stopPropagation();
+            this.openSongView(track.id);
+            return;
+          }
           this.queue.splice(this.currentTrackIndex + 1, 0, track);
           this.playTrack(this.currentTrackIndex + 1);
         });
         fragment.appendChild(card);
       });
-      this.exploreChartsGrid.appendChild(fragment);
-    }
+      container.appendChild(fragment);
+    });
   }
 
   // ===========================================================================
