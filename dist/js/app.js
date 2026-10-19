@@ -986,6 +986,8 @@ class REAMusicApp {
     this.maxPauseSvg = document.getElementById('maxPauseSvg');
     this.maxNextBtn = document.getElementById('maxNextBtn');
     this.maxRepeatBtn = document.getElementById('maxRepeatBtn');
+    this.maxQueueShortcutBtn = document.getElementById('maxQueueShortcutBtn');
+    this.maxMoreBtn = document.getElementById('maxMoreBtn');
     this.maxVolumeBtn = document.getElementById('maxVolumeBtn');
     this.maxVolHighSvg = document.getElementById('maxVolHighSvg');
     this.maxVolMuteSvg = document.getElementById('maxVolMuteSvg');
@@ -1914,6 +1916,18 @@ class REAMusicApp {
       this.maxRepeatBtn.addEventListener('click', () => {
         this.cycleRepeatMode();
         this.syncControlStates();
+      });
+    }
+    if (this.maxQueueShortcutBtn) {
+      this.maxQueueShortcutBtn.addEventListener('click', () => {
+        this.switchMaxTab(this.currentMaxTab === 'queue' ? 'song' : 'queue');
+      });
+    }
+    if (this.maxMoreBtn) {
+      this.maxMoreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const track = this.currentTrack || (this.queue && this.queue[this.currentTrackIndex]);
+        if (track) this.handleDownloadButtonClick(track);
       });
     }
     if (this.maxLikeBtn) {
@@ -5002,12 +5016,18 @@ class REAMusicApp {
     if (tab === 'song') {
       if (this.maxStageLeft) this.maxStageLeft.style.display = '';
       if (this.maxStageRight) this.maxStageRight.style.display = '';
-      if (this.maxLyricsPane) this.maxLyricsPane.classList.remove('hidden');
-      if (this.maxQueuePane) this.maxQueuePane.classList.add('hidden');
+      if (this.maxLyricsPane) this.maxLyricsPane.classList.add('hidden');
+      if (this.maxQueuePane) this.maxQueuePane.classList.remove('hidden');
+      this.renderMaxQueue();
     } else if (tab === 'lyrics') {
+      if (this.maxStageLeft) this.maxStageLeft.style.display = '';
+      if (this.maxStageRight) this.maxStageRight.style.display = '';
       if (this.maxLyricsPane) this.maxLyricsPane.classList.remove('hidden');
       if (this.maxQueuePane) this.maxQueuePane.classList.add('hidden');
+      this.renderMaxLyrics();
     } else if (tab === 'queue') {
+      if (this.maxStageLeft) this.maxStageLeft.style.display = '';
+      if (this.maxStageRight) this.maxStageRight.style.display = '';
       if (this.maxLyricsPane) this.maxLyricsPane.classList.add('hidden');
       if (this.maxQueuePane) this.maxQueuePane.classList.remove('hidden');
       this.renderMaxQueue();
