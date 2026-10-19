@@ -449,17 +449,19 @@ class REAMusicApp {
 
     // Popular Indian Singers / Artists for Search Hub
     this.popularSingers = [
-      { id: '459320', name: 'Arijit Singh', role: 'Singer', image: 'https://c.saavncdn.com/artists/Arijit_Singh_002_20230323062147_500x500.jpg' },
-      { id: '464932', name: 'Diljit Dosanjh', role: 'Singer', image: 'https://c.saavncdn.com/artists/Diljit_Dosanjh_004_20221006184545_500x500.jpg' },
-      { id: '456863', name: 'Shreya Ghoshal', role: 'Singer', image: 'https://c.saavncdn.com/artists/Shreya_Ghoshal_004_20230327063710_500x500.jpg' },
-      { id: '1177651', name: 'Karan Aujla', role: 'Singer', image: 'https://c.saavncdn.com/artists/Karan_Aujla_003_20230821072935_500x500.jpg' },
-      { id: '468245', name: 'Sid Sriram', role: 'Singer', image: 'https://c.saavncdn.com/artists/Sid_Sriram_002_20230323062758_500x500.jpg' },
-      { id: '456117', name: 'Anirudh Ravichander', role: 'Composer/Singer', image: 'https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20230323062428_500x500.jpg' },
-      { id: '455125', name: 'Sonu Nigam', role: 'Singer', image: 'https://c.saavncdn.com/artists/Sonu_Nigam_003_20230323062828_500x500.jpg' },
-      { id: '485956', name: 'Neha Kakkar', role: 'Singer', image: 'https://c.saavncdn.com/artists/Neha_Kakkar_006_20230323062635_500x500.jpg' },
-      { id: '464656', name: 'Badshah', role: 'Rapper/Singer', image: 'https://c.saavncdn.com/artists/Badshah_005_20230607061730_500x500.jpg' },
-      { id: '524956', name: 'AP Dhillon', role: 'Singer', image: 'https://c.saavncdn.com/artists/AP_Dhillon_002_20211118121655_500x500.jpg' }
+      { id: '459320', name: 'Arijit Singh', role: 'Singer', image: 'https://c.saavncdn.com/artists/Arijit_Singh_004_20241118063717_150x150.jpg' },
+      { id: '468245', name: 'Diljit Dosanjh', role: 'Singer', image: 'https://c.saavncdn.com/artists/Diljit_Dosanjh_005_20231025073054_150x150.jpg' },
+      { id: '455130', name: 'Shreya Ghoshal', role: 'Singer', image: 'https://c.saavncdn.com/artists/Shreya_Ghoshal_007_20241101074144_150x150.jpg' },
+      { id: '697691', name: 'Karan Aujla', role: 'Singer', image: 'https://c.saavncdn.com/artists/Karan_Aujla_005_20260925061936_150x150.jpg' },
+      { id: '689580', name: 'Sid Sriram', role: 'Singer', image: 'https://c.saavncdn.com/artists/Sid_Sriram_005_20240425180600_150x150.jpg' },
+      { id: '455663', name: 'Anirudh Ravichander', role: 'Composer/Singer', image: 'https://c.saavncdn.com/artists/Anirudh_Ravichander_003_20260121134149_150x150.jpg' },
+      { id: '455125', name: 'Sonu Nigam', role: 'Singer', image: 'https://c.saavncdn.com/artists/Sonu_Nigam_003_20260813182013_150x150.jpg' },
+      { id: '464932', name: 'Neha Kakkar', role: 'Singer', image: 'https://c.saavncdn.com/artists/Neha_Kakkar_007_20241212115832_150x150.jpg' },
+      { id: '456863', name: 'Badshah', role: 'Rapper/Singer', image: 'https://c.saavncdn.com/artists/Badshah_006_20241118064015_150x150.jpg' },
+      { id: '681966', name: 'AP Dhillon', role: 'Singer', image: 'https://c.saavncdn.com/artists/AP_Dhillon_004_20251023102150_150x150.jpg' }
     ];
+    this.searchSeq = 0;
+    this.inFlightSearches = new Map();
     this.searchCategory = 'all'; // 'all' | 'music' | 'singers'
     this.currentSearchArtists = [];
     this.currentSearchSongs = [];
@@ -1375,18 +1377,23 @@ class REAMusicApp {
         clearTimeout(this.searchDebounceTimer);
         const query = e.target.value;
         const clean = query.trim();
+
         if (!clean) {
-          if (this.searchAbortController) this.searchAbortController.abort();
+          if (this.searchAbortController) {
+            try { this.searchAbortController.abort(); } catch (err) {}
+          }
+          this.searchSeq++;
           if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
-          if (this.searchHubContent) this.searchHubContent.classList.remove('hidden');
           if (this.searchResultsList) this.searchResultsList.classList.add('hidden');
           if (this.searchTabsNav) this.searchTabsNav.classList.add('hidden');
           if (this.featuredSingerCard) this.featuredSingerCard.classList.add('hidden');
           if (this.searchArtistsList) this.searchArtistsList.classList.add('hidden');
+          if (this.searchHubContent) this.searchHubContent.classList.remove('hidden');
           this.setSearchCategory('all');
           this.renderSearchHub();
           return;
         }
+
         if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
         if (this.searchDropdown) this.searchDropdown.classList.remove('hidden');
         if (this.searchHubContent) this.searchHubContent.classList.add('hidden');
@@ -1395,17 +1402,22 @@ class REAMusicApp {
         const cacheKey = clean.toLowerCase();
         // 1. Instant display if already cached (0ms response)
         if (this.clientSearchCache && this.clientSearchCache.has(cacheKey)) {
-          this.performLiveSearch(clean, true);
+          const cached = this.clientSearchCache.get(cacheKey);
+          this.renderSearchResults(cached.results, cached.artists, clean);
+          // If cached over 90s, refresh in background without clearing
+          if (Date.now() - (cached.timestamp || 0) > 90000) {
+            this.performLiveSearch(clean, false);
+          }
           return;
         }
 
         // 2. Instant local preview from memory (0ms visual feedback)
         this.showInstantSearchPreview(clean);
 
-        // 3. Ultra-responsive 100ms debounce for remote search
+        // 3. Responsive 120ms debounce for remote search
         this.searchDebounceTimer = setTimeout(() => {
           this.performLiveSearch(clean);
-        }, 100);
+        }, 120);
       });
 
       this.searchInput.addEventListener('keydown', (e) => {
@@ -2416,10 +2428,12 @@ class REAMusicApp {
     if (topResult && this.searchTopResultSection && this.searchTopResultCard) {
       this.searchTopResultSection.classList.remove('hidden');
       if (topResult.type === 'artist') {
+        const topAvatar = this.getArtistAvatar(topResult);
+        const topFallback = this.getArtistFallbackSvg(topResult.name);
         this.searchTopResultCard.innerHTML = `
           <div class="top-result-card" data-artist-id="${topResult.id || ''}" data-artist-name="${topResult.name || ''}">
             <div class="top-result-thumb-wrap artist">
-              <img src="${topResult.image || FALLBACK_COVER}" class="top-result-thumb" alt="${topResult.name}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+              <img src="${topAvatar}" class="top-result-thumb" alt="${topResult.name}" onerror="this.onerror=null;this.src='${topFallback}'" loading="lazy" decoding="async">
             </div>
             <div class="top-result-info">
               <span class="top-result-badge">Top Artist</span>
@@ -2517,15 +2531,19 @@ class REAMusicApp {
       if (artists.length > 0) {
         this.searchArtistsSection.classList.remove('hidden');
         if (this.searchArtistsTitle) this.searchArtistsTitle.textContent = `Artists & Singers • ${artists.length}`;
-        this.searchArtistsGrid.innerHTML = artists.map(artist => `
+        this.searchArtistsGrid.innerHTML = artists.map(artist => {
+          const avatarUrl = this.getArtistAvatar(artist);
+          const fallbackSvg = this.getArtistFallbackSvg(artist.name);
+          return `
           <div class="artist-card" data-artist-id="${artist.id || ''}" data-artist-name="${artist.name || ''}">
             <div class="artist-avatar-wrap">
-              <img src="${artist.image || FALLBACK_COVER}" alt="${artist.name}" class="artist-avatar-img" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+              <img src="${avatarUrl}" alt="${artist.name}" class="artist-avatar-img" onerror="this.onerror=null;this.src='${fallbackSvg}'" loading="lazy" decoding="async">
             </div>
             <div class="artist-card-name">${artist.name}</div>
             <div class="artist-card-role">${artist.role || 'Artist / Singer'}</div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       } else {
         this.searchArtistsSection.classList.add('hidden');
       }
@@ -3541,6 +3559,52 @@ class REAMusicApp {
     }
   }
 
+  
+  createArtistInitialsSvg(name) {
+    const cleanName = (name || 'Artist').trim();
+    const words = cleanName.split(/\s+/).filter(Boolean);
+    let initials = '';
+    if (words.length >= 2) {
+      initials = (words[0][0] + words[1][0]).toUpperCase();
+    } else if (words.length === 1 && words[0].length >= 2) {
+      initials = words[0].slice(0, 2).toUpperCase();
+    } else {
+      initials = (cleanName[0] || 'A').toUpperCase();
+    }
+
+    let hash = 0;
+    for (let i = 0; i < cleanName.length; i++) {
+      hash = ((hash << 5) - hash + cleanName.charCodeAt(i)) | 0;
+    }
+    const gradients = [
+      ['#fa2d48', '#ff7a00'],
+      ['#7928ca', '#ff0080'],
+      ['#0071e3', '#42a5f5'],
+      ['#00b4db', '#0083b0'],
+      ['#f12711', '#f5af19'],
+      ['#8a2387', '#e94057'],
+      ['#11998e', '#38ef7d'],
+      ['#ec008c', '#fc6767']
+    ];
+    const pair = gradients[Math.abs(hash) % gradients.length];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${pair[0]}"/><stop offset="100%" stop-color="${pair[1]}"/></linearGradient></defs><circle cx="60" cy="60" r="60" fill="url(#g)"/><text x="60" y="68" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" font-weight="700" font-size="42" text-anchor="middle" dominant-baseline="central">${initials}</text></svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  getArtistFallbackSvg(name) {
+    return this.createArtistInitialsSvg(name || 'Artist');
+  }
+
+  getArtistAvatar(artist) {
+    if (!artist) return this.createArtistInitialsSvg('Artist');
+    const img = typeof artist === 'string' ? artist : (artist.image || '');
+    const name = typeof artist === 'string' ? 'Artist' : (artist.name || 'Singer');
+    if (img && !img.includes('artist-default') && !img.includes('default-artist') && !img.includes('undefined')) {
+      return img.replace(/500x500/g, '150x150').replace(/50x50/g, '150x150');
+    }
+    return this.createArtistInitialsSvg(name);
+  }
+
   showInstantSearchPreview(query) {
     if (!query) return;
     const qLower = query.toLowerCase();
@@ -3577,8 +3641,13 @@ class REAMusicApp {
 
     if (matchedSingers.length > 0 || matchedSongs.length > 0) {
       this.renderSearchResults(matchedSongs, matchedSingers, query, true);
-    } else if (this.searchResultsList) {
-      this.searchResultsList.innerHTML = `<div style="padding:14px;color:var(--text-secondary);text-align:center;font-size:13px;">Searching Indian hits & singers for "${query}"...</div>`;
+    } else {
+      if (this.featuredSingerCard) this.featuredSingerCard.classList.add("hidden");
+      if (this.searchArtistsList) this.searchArtistsList.classList.add("hidden");
+      if (this.searchResultsList) {
+        this.searchResultsList.classList.remove("hidden");
+        this.searchResultsList.innerHTML = `<div style="padding:14px;color:var(--text-secondary);text-align:center;font-size:13px;">Searching songs & artists for "${query}"...</div>`;
+      }
     }
   }
 
@@ -3592,10 +3661,12 @@ class REAMusicApp {
     if (this.featuredSingerCard) {
       if (artists && artists.length > 0) {
         const topArtist = artists[0];
+        const avatarUrl = this.getArtistAvatar(topArtist);
+        const fallbackSvg = this.getArtistFallbackSvg(topArtist.name);
         this.featuredSingerCard.dataset.hasArtist = 'true';
         this.featuredSingerCard.innerHTML = `
           <div class="featured-singer-left">
-            <img src="${topArtist.image || FALLBACK_COVER}" alt="${topArtist.name}" class="featured-singer-avatar" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <img src="${avatarUrl}" alt="${topArtist.name}" class="featured-singer-avatar" onerror="this.onerror=null;this.src='${fallbackSvg}'" loading="lazy" decoding="async">
             <div class="featured-singer-info">
               <div class="featured-singer-name">
                 <span>${topArtist.name}</span>
@@ -3624,7 +3695,7 @@ class REAMusicApp {
       }
     }
 
-    // 2. Render Matching Singers List
+    // 2. Render Matching Singers List (max 3 in dropdown for speed)
     if (this.searchArtistsList) {
       this.searchArtistsList.innerHTML = '';
       if (!artists || artists.length === 0) {
@@ -3632,12 +3703,15 @@ class REAMusicApp {
           this.searchArtistsList.innerHTML = `<div style="padding:14px;color:var(--text-secondary);text-align:center;font-size:13px;">No singers found for "${query}"</div>`;
         }
       } else {
-        artists.forEach(artist => {
+        const frag = document.createDocumentFragment();
+        artists.slice(0, 3).forEach(artist => {
+          const avatarUrl = this.getArtistAvatar(artist);
+          const fallbackSvg = this.getArtistFallbackSvg(artist.name);
           const row = document.createElement('div');
           row.className = 'artist-result-card';
           row.innerHTML = `
             <div class="artist-result-left">
-              <img src="${artist.image || FALLBACK_COVER}" alt="${artist.name}" class="artist-result-avatar" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+              <img src="${avatarUrl}" alt="${artist.name}" class="artist-result-avatar" onerror="this.onerror=null;this.src='${fallbackSvg}'" loading="lazy" decoding="async">
               <div class="artist-result-info">
                 <div class="artist-result-name">${artist.name}</div>
                 <div class="artist-result-meta">${artist.role || 'Singer'} • Artist</div>
@@ -3656,12 +3730,13 @@ class REAMusicApp {
               this.openArtistView(artist.id || artist.name, artist.name);
             }
           });
-          this.searchArtistsList.appendChild(row);
+          frag.appendChild(row);
         });
+        this.searchArtistsList.appendChild(frag);
       }
     }
 
-    // 3. Render Music (Songs) List
+    // 3. Render Song Results List (max 8 in dropdown)
     if (this.searchResultsList) {
       this.searchResultsList.innerHTML = '';
       if (!results || results.length === 0) {
@@ -3669,73 +3744,77 @@ class REAMusicApp {
           this.searchResultsList.innerHTML = `<div style="padding:14px;color:var(--text-secondary);text-align:center;font-size:13px;">No songs found for "${query}"</div>`;
         }
       } else {
-        results.forEach(track => {
+        const frag = document.createDocumentFragment();
+        results.slice(0, 8).forEach(track => {
           const isDl = this.isDownloaded(track.id);
           const row = document.createElement('div');
           row.className = 'search-item';
           row.innerHTML = `
-            <img src="${track.cover}" alt="${track.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <img src="${track.cover}" alt="${track.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" loading="lazy" decoding="async">
             <div class="search-item-info">
               <div class="search-item-title" style="cursor:pointer;">${track.title}</div>
               <div class="search-item-meta">${this.renderClickableArtists(track)} • ${track.album || 'Single'}</div>
             </div>
-            <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
-              ${isDl 
-                ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
-                : '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>'}
-            </button>
+            <div class="search-item-actions">
+              <button class="icon-btn search-item-action-btn search-item-dl-btn ${isDl ? 'downloaded' : ''}" data-track-id="${track.id}" title="${isDl ? 'Downloaded' : 'Download Lossless'}">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+              </button>
+              <button class="icon-btn search-item-action-btn search-item-play-btn" title="Play Now">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+            </div>
           `;
           row.addEventListener('click', (e) => {
-            if (e.target.closest('.track-inline-dl-btn') || e.target.closest('.artist-link')) {
+            if (e.target.closest('.artist-link')) {
+              e.stopPropagation();
+              const aName = e.target.closest('.artist-link').dataset.artist;
+              if (aName) this.openArtistView(aName, aName);
               return;
             }
-            if (e.target.closest('.search-item-title')) {
+            if (e.target.closest('.search-item-dl-btn')) {
               e.stopPropagation();
-              if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
-              this.openSongView(track.id);
+              this.handleDownloadClick(e.target.closest('.search-item-dl-btn'), track);
               return;
             }
             this.addSearchHistory(track.title);
             this.queue.splice(this.currentTrackIndex + 1, 0, track);
-            this.playTrack(this.currentTrackIndex + 1);
+            this.playTrackAtIndex(this.currentTrackIndex + 1);
             if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
-            if (this.searchInput) this.searchInput.value = '';
-            if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
           });
-          this.searchResultsList.appendChild(row);
+          frag.appendChild(row);
         });
 
-        if (query && !isPreview) {
-          const viewAllRow = document.createElement('div');
-          viewAllRow.className = 'search-dropdown-view-all';
-          viewAllRow.style.cssText = 'padding:12px;text-align:center;color:var(--accent-blue);font-weight:600;font-size:13px;cursor:pointer;border-top:1px solid var(--border-subtle);';
-          viewAllRow.innerHTML = `View all search results for "<b>${query}</b>" →`;
-          viewAllRow.addEventListener('click', () => {
-            this.addSearchHistory(query);
-            this.openSearchView(query);
-          });
-          this.searchResultsList.appendChild(viewAllRow);
-        }
+        // View All Row
+        const viewAllRow = document.createElement('div');
+        viewAllRow.className = 'search-dropdown-view-all';
+        viewAllRow.style.cssText = 'padding:12px;text-align:center;font-size:12px;font-weight:600;color:var(--accent-red);cursor:pointer;border-top:1px solid var(--border-subtle);transition:background 0.2s;';
+        viewAllRow.innerHTML = `View all search results for "<b>${query}</b>" →`;
+        viewAllRow.addEventListener('click', () => {
+          this.addSearchHistory(query);
+          this.openSearchView(query);
+        });
+        frag.appendChild(viewAllRow);
+        this.searchResultsList.appendChild(frag);
       }
     }
 
-    // Apply active category filter
     this.applySearchCategoryFilter();
   }
 
   async performLiveSearch(query, forceImmediate = false) {
-    const cleanQuery = (query || '').trim();
+    const cleanQuery = (query || "").trim();
     if (!cleanQuery) return;
     const cacheKey = cleanQuery.toLowerCase();
 
     // 1. Instant response if in client cache (0ms)
-    if (this.clientSearchCache && this.clientSearchCache.has(cacheKey)) {
+    if (this.clientSearchCache && this.clientSearchCache.has(cacheKey) && !forceImmediate) {
       const cached = this.clientSearchCache.get(cacheKey);
       this.renderSearchResults(cached.results, cached.artists, cleanQuery);
       return;
     }
 
-    // 2. Abort any previous pending search request to eliminate lag & race conditions
+    // 2. Monotonic sequence & Abort previous request to eliminate lag & stale race conditions
+    const currentSeq = ++this.searchSeq;
     if (this.searchAbortController) {
       try {
         this.searchAbortController.abort();
@@ -3744,32 +3823,47 @@ class REAMusicApp {
     this.searchAbortController = new AbortController();
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(cleanQuery)}`, {
-        signal: this.searchAbortController.signal
-      });
-      if (!res.ok) throw new Error('Search request failed');
-      const data = await res.json();
+      // 3. Deduplicate in-flight requests for identical queries
+      let fetchPromise;
+      if (this.inFlightSearches && this.inFlightSearches.has(cacheKey)) {
+        fetchPromise = this.inFlightSearches.get(cacheKey);
+      } else {
+        fetchPromise = fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(cleanQuery)}`, {
+          signal: this.searchAbortController.signal
+        }).then(async res => {
+          if (!res.ok) throw new Error("Search request failed");
+          return res.json();
+        }).finally(() => {
+          if (this.inFlightSearches) this.inFlightSearches.delete(cacheKey);
+        });
+        if (this.inFlightSearches) this.inFlightSearches.set(cacheKey, fetchPromise);
+      }
+
+      const data = await fetchPromise;
       const results = data.results || [];
       const artists = data.artists || [];
+      const albums = data.albums || [];
+      const topResult = data.topResult || null;
 
-      // Save to client cache
+      // Save to bounded client cache with timestamp
       if (this.clientSearchCache) {
-        this.clientSearchCache.set(cacheKey, { results, artists });
-        if (this.clientSearchCache.size > 60) {
+        this.clientSearchCache.set(cacheKey, { results, artists, albums, topResult, timestamp: Date.now() });
+        if (this.clientSearchCache.size > 80) {
           const firstKey = this.clientSearchCache.keys().next().value;
           this.clientSearchCache.delete(firstKey);
         }
       }
 
-      // Check that the user hasn't changed the search input since
-      if (this.searchInput && this.searchInput.value.trim().toLowerCase() === cacheKey) {
-        this.renderSearchResults(results, artists, cleanQuery);
-      }
+      // Stale response guard: check sequence ID and current input value
+      if (currentSeq !== this.searchSeq) return;
+      if (this.searchInput && this.searchInput.value.trim().toLowerCase() !== cacheKey) return;
+
+      this.renderSearchResults(results, artists, cleanQuery);
     } catch (e) {
-      if (e.name === 'AbortError') return; // Cancelled by newer keystroke
-      console.warn('Live search notice:', e);
+      if (e.name === "AbortError") return; // Cancelled cleanly by newer keystroke
+      console.warn("Live search notice:", e);
       if (this.searchResultsList && (!this.currentSearchSongs || this.currentSearchSongs.length === 0)) {
-        this.searchResultsList.innerHTML = `<div style="padding:14px;color:#f55;text-align:center;font-size:13px;">Error searching songs</div>`;
+        this.searchResultsList.innerHTML = `<div style="padding:14px;color:var(--text-secondary);text-align:center;font-size:13px;">No results found. Try another song or artist name.</div>`;
       }
     }
   }
@@ -5475,8 +5569,10 @@ class REAMusicApp {
         const card = document.createElement('div');
         card.className = 'singer-avatar-card';
         card.title = `Stream top hits of ${singer.name}`;
+        const avatarUrl = this.getArtistAvatar(singer);
+        const fallbackSvg = this.getArtistFallbackSvg(singer.name);
         card.innerHTML = `
-          <img src="${singer.image}" alt="${singer.name}" class="singer-avatar-img" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <img src="${avatarUrl}" alt="${singer.name}" class="singer-avatar-img" onerror="this.onerror=null;this.src='${fallbackSvg}'" loading="lazy" decoding="async">
           <span class="singer-avatar-name">${singer.name}</span>
           <span class="singer-avatar-role">${singer.role || 'Singer'}</span>
         `;

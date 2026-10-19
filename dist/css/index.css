@@ -8020,3 +8020,49 @@ body.theme-dark .dl-track-quality {
     color: #ff3157 !important;
   }
 }
+
+/* ==========================================================================
+   REA MUSIC - Optimized Search Dropdown & Singer Avatars
+   ========================================================================== */
+.singer-avatar-img,
+.artist-result-avatar,
+.featured-singer-avatar,
+.artist-avatar-img,
+.top-result-thumb-wrap.artist img {
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  display: block;
+}
+
+.search-item img {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.search-dropdown {
+  contain: content;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .search-dropdown {
+    position: fixed !important;
+    top: calc(var(--nav-height) + env(safe-area-inset-top, 0px) + 4px) !important;
+    left: 8px !important;
+    right: 8px !important;
+    max-height: calc(75vh - var(--nav-height)) !important;
+    backdrop-filter: blur(14px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55) !important;
+    border-radius: 16px !important;
+  }
+}

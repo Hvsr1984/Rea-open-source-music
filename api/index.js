@@ -122,17 +122,24 @@ async function searchArtists(query) {
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
     const data = JSON.parse(clean);
     const results = data.results || [];
-    return results.map(a => ({
-      id: a.id || a.artistId,
-      name: decodeEntities(a.name),
-      image: (a.image || '')
-        .replace('50x50.jpg', '500x500.jpg')
-        .replace('150x150.jpg', '500x500.jpg')
-        .replace('50x50.png', '500x500.png')
-        .replace('150x150.png', '500x500.png'),
-      role: decodeEntities(a.role || 'Singer'),
-      type: 'artist'
-    })).filter(a => a.id && a.name);
+    return results.map(a => {
+      let img = (a.image || '').trim();
+      if (img.includes('artist-default') || img.includes('default-artist')) {
+        img = '';
+      } else {
+        img = img.replace('50x50.jpg', '150x150.jpg')
+                 .replace('50x50.png', '150x150.png')
+                 .replace('500x500.jpg', '150x150.jpg')
+                 .replace('500x500.png', '150x150.png');
+      }
+      return {
+        id: a.id || a.artistId,
+        name: decodeEntities(a.name),
+        image: img,
+        role: decodeEntities(a.role || 'Singer'),
+        type: 'artist'
+      };
+    }).filter(a => a.id && a.name);
   } catch (e) {
     console.error(`Artist search error for ${query}:`, e.message);
     return [];
@@ -422,12 +429,14 @@ export default async function handler(req, res) {
         searchAlbums(q)
       ]);
 
-      // Calculate Top Result based on query relevance
+      // Calculate Top Result based on query relevance & photo availability
       let topResult = null;
       const qLower = q.trim().toLowerCase();
       
-      const exactArtist = artists.find(a => a.name.toLowerCase() === qLower);
-      const closeArtist = artists.find(a => a.name.toLowerCase().includes(qLower) || qLower.includes(a.name.toLowerCase()));
+      const artistsWithImages = artists.filter(a => a.image && !a.image.includes('artist-default'));
+      const exactArtist = artistsWithImages.find(a => a.name.toLowerCase() === qLower) || artists.find(a => a.name.toLowerCase() === qLower);
+      const closeArtist = artistsWithImages.find(a => a.name.toLowerCase().includes(qLower) || qLower.includes(a.name.toLowerCase())) ||
+                          artists.find(a => a.name.toLowerCase().includes(qLower) || qLower.includes(a.name.toLowerCase()));
       const exactSong = songs.find(s => s.title.toLowerCase() === qLower);
       const exactAlbum = albums.find(a => a.title.toLowerCase() === qLower);
 
