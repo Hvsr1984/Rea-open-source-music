@@ -46,6 +46,8 @@
   
   
   
+  
+  
   <style id="rea-embedded-styles">
 /* ==========================================================================
    REA MUSIC - Apple Music Clean Glass Design System & Multi-Theme Engine
@@ -10571,6 +10573,8 @@ body.theme-white #installPwaBtn {
             </div>
             <button class="settings-action-btn" id="settingClearHistoryBtn">Clear</button>
           </div>
+        </div>
+
         <!-- App Installation (PWA) -->
         <div class="settings-section" id="settingsInstallSection">
           <div class="settings-section-header">
@@ -10805,6 +10809,8 @@ body.theme-white #installPwaBtn {
     </footer>
   </div>
 
+  
+  
   
   
   
@@ -16081,9 +16087,6 @@ class REAMusicApp {
   // Maximized / Minimized Player Theater Controls
   // ===========================================================================
   maximizePlayer() {
-    if (!this.currentTrack && (!this.queue || this.currentTrackIndex < 0 || !this.queue[this.currentTrackIndex])) {
-      return;
-    }
     this.isPlayerMaximized = true;
     if (this.maximizedPlayer) {
       this.maximizedPlayer.classList.add('open');
@@ -16092,8 +16095,8 @@ class REAMusicApp {
     }
     this.switchMaxTab(this.currentMaxTab || 'song');
     this.renderPlayerInfo();
-    const cur = this.engine.audio.currentTime || 0;
-    const dur = this.engine.audio.duration || this.queue[this.currentTrackIndex]?.duration || 1;
+    const cur = this.engine?.audio?.currentTime || 0;
+    const dur = this.engine?.audio?.duration || (this.queue && this.queue[this.currentTrackIndex]?.duration) || 1;
     this.updateProgressBar(cur, dur);
     this.syncControlStates();
   }

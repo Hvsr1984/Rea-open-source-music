@@ -5208,9 +5208,6 @@ class REAMusicApp {
   // Maximized / Minimized Player Theater Controls
   // ===========================================================================
   maximizePlayer() {
-    if (!this.currentTrack && (!this.queue || this.currentTrackIndex < 0 || !this.queue[this.currentTrackIndex])) {
-      return;
-    }
     this.isPlayerMaximized = true;
     if (this.maximizedPlayer) {
       this.maximizedPlayer.classList.add('open');
@@ -5219,8 +5216,8 @@ class REAMusicApp {
     }
     this.switchMaxTab(this.currentMaxTab || 'song');
     this.renderPlayerInfo();
-    const cur = this.engine.audio.currentTime || 0;
-    const dur = this.engine.audio.duration || this.queue[this.currentTrackIndex]?.duration || 1;
+    const cur = this.engine?.audio?.currentTime || 0;
+    const dur = this.engine?.audio?.duration || (this.queue && this.queue[this.currentTrackIndex]?.duration) || 1;
     this.updateProgressBar(cur, dur);
     this.syncControlStates();
   }
