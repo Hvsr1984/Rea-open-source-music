@@ -180,6 +180,38 @@ async function runTests() {
     if (!body.includes('overscroll-behavior-y: contain')) throw new Error('Missing overscroll-behavior-y containment');
   });
 
+  // Test 13: Search Results Play Button and Playback Integration Integrity
+  await testCase('js/app.js & css/index.css define functional search result play button and playback flow', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const appJs = fs.readFileSync(path.resolve('./js/app.js'), 'utf8');
+    const css = fs.readFileSync(path.resolve('./css/index.css'), 'utf8');
+
+    // 1. playSearchTrack method defined
+    if (!/playSearchTrack\s*\([^)]*\)\s*\{/.test(appJs)) {
+      throw new Error('playSearchTrack() method is missing from REAMusicApp in js/app.js');
+    }
+    // 2. No invalid playTrackAtIndex calls anywhere
+    if (appJs.includes('playTrackAtIndex')) {
+      throw new Error('Invalid playTrackAtIndex call found in js/app.js');
+    }
+    // 3. Search play button delegates properly
+    if (!appJs.includes('.search-item-play-btn')) {
+      throw new Error('search-item-play-btn reference missing in js/app.js');
+    }
+    if (!appJs.includes('playSearchTrack(track')) {
+      throw new Error('playSearchTrack invocation missing in search item click handling');
+    }
+    // 4. Play/Pause UI synchronization for search items
+    if (!appJs.includes('.search-item-play-btn[data-track-id]')) {
+      throw new Error('Search item play button state synchronization missing in updatePlayPauseUI()');
+    }
+    // 5. CSS styles for search actions and playing states
+    if (!css.includes('.search-item-play-btn') || !css.includes('.search-item-play-btn.is-playing')) {
+      throw new Error('Search play button CSS styles missing in css/index.css');
+    }
+  });
+
   // Close server
   await new Promise(resolve => server.close(resolve));
   console.log('\n=======================================');

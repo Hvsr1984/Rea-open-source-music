@@ -518,6 +518,57 @@ a {
   color: var(--text-secondary);
 }
 
+.search-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.search-item-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all var(--transition-fast);
+}
+
+.search-item-play-btn {
+  background: rgba(0, 113, 227, 0.12);
+  color: var(--accent-blue, #0071e3);
+  border: 1px solid rgba(0, 113, 227, 0.25);
+}
+
+.search-item-play-btn:hover {
+  background: var(--accent-blue, #0071e3);
+  color: #fff;
+  border-color: var(--accent-blue, #0071e3);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.4);
+}
+
+.search-item-play-btn.is-playing {
+  background: var(--accent-blue, #0071e3);
+  color: #fff;
+  border-color: var(--accent-blue, #0071e3);
+  box-shadow: 0 2px 8px rgba(0, 113, 227, 0.35);
+}
+
+.search-item.is-active {
+  background-color: var(--bg-sidebar-hover);
+}
+
+.search-item.is-active .search-item-title {
+  color: var(--accent-blue, #0071e3);
+}
+
 /* Search Hub: Recent Searches, Trending Tags & Recommendations */
 .search-hub-content {
   display: flex;

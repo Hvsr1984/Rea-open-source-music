@@ -1,7 +1,7 @@
-// REA Music Service Worker v2.5.1
+// REA Music Service Worker v2.5.2
 // Provides reliable PWA installability, app shell offline fallback, and safe audio passthrough
 
-const CACHE_NAME = 'rea-music-shell-v2.5.1';
+const CACHE_NAME = 'rea-music-shell-v2.5.2';
 
 const PRECACHE_ASSETS = [
   '/',

@@ -48,6 +48,9 @@
   
   
   
+  
+  
+  
   <style id="rea-embedded-styles">
 /* ==========================================================================
    REA MUSIC - Apple Music Clean Glass Design System & Multi-Theme Engine
@@ -567,6 +570,57 @@ a {
 .search-item-meta {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.search-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.search-item-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all var(--transition-fast);
+}
+
+.search-item-play-btn {
+  background: rgba(0, 113, 227, 0.12);
+  color: var(--accent-blue, #0071e3);
+  border: 1px solid rgba(0, 113, 227, 0.25);
+}
+
+.search-item-play-btn:hover {
+  background: var(--accent-blue, #0071e3);
+  color: #fff;
+  border-color: var(--accent-blue, #0071e3);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.4);
+}
+
+.search-item-play-btn.is-playing {
+  background: var(--accent-blue, #0071e3);
+  color: #fff;
+  border-color: var(--accent-blue, #0071e3);
+  box-shadow: 0 2px 8px rgba(0, 113, 227, 0.35);
+}
+
+.search-item.is-active {
+  background-color: var(--bg-sidebar-hover);
+}
+
+.search-item.is-active .search-item-title {
+  color: var(--accent-blue, #0071e3);
 }
 
 /* Search Hub: Recent Searches, Trending Tags & Recommendations */
@@ -10876,6 +10930,9 @@ body.theme-white #installPwaBtn {
   
   
   
+  
+  
+  
   <script id="rea-embedded-script">
 // REA Music Engine v2.4.1
 if (window.__REA_INITIALIZED__) {
@@ -11139,6 +11196,7 @@ class HybridAudioEngine {
         promise.then(() => {
           this.isPlaying = true;
         }).catch(e => {
+          this.isPlaying = false;
           console.warn('[REA Audio Engine] Audio play rejected:', e);
           if (typeof this.onError === 'function') {
             this.onError(e, track);
@@ -13953,10 +14011,68 @@ class REAMusicApp {
         return;
       }
     }
+    // If in search view and track is in search songs
+    if (this.currentView === 'search' && this.currentSearchSongs && this.currentSearchSongs.length > 0) {
+      const idx = this.currentSearchSongs.findIndex(t => String(t.id) === String(track.id));
+      if (idx !== -1) {
+        this.sequenceQueue = [...this.currentSearchSongs];
+        this.sequenceIndex = idx;
+        this.playActualTrack(track, { type: 'search', id: track.id, query: this.lastSearchQuery || '' });
+        return;
+      }
+    }
     // Single song mode
     this.sequenceQueue = [track];
     this.sequenceIndex = 0;
     this.playActualTrack(track, { type: 'song', id: track.id });
+  }
+
+  async playSearchTrack(track, allTracks = null, query = '') {
+    if (!track) return;
+
+    // Toggle play/pause if clicked track is currently active
+    const currentId = this.currentTrack ? this.currentTrack.id : (this.queue[this.currentTrackIndex]?.id);
+    if (currentId && String(currentId) === String(track.id)) {
+      this.togglePlayPause();
+      this.updatePlayPauseUI();
+      return;
+    }
+
+    // Context sequence from search results list
+    const list = (allTracks && allTracks.length > 0) ? allTracks : (this.currentSearchSongs || [track]);
+    this.currentSearchSongs = list;
+    const trackIndex = list.findIndex(t => String(t.id) === String(track.id));
+    this.sequenceQueue = [...list];
+    this.sequenceIndex = trackIndex !== -1 ? trackIndex : 0;
+
+    if (track.title) {
+      this.addSearchHistory(track.title);
+    }
+
+    // Ensure playable audio source exists
+    if (!track.audioUrl && !track.localBlobUrl && track.id) {
+      this.showToast(`Loading audio for "${track.title}"...`);
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/song?id=${encodeURIComponent(track.id)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.track && (data.track.audioUrl || data.track.localBlobUrl)) {
+            Object.assign(track, data.track);
+          }
+        }
+      } catch (err) {
+        console.warn('[REA Music] Error fetching song stream:', err);
+      }
+    }
+
+    if (!track.audioUrl && !track.localBlobUrl) {
+      this.showToast(`Playable audio source not available for "${track.title}"`);
+      return;
+    }
+
+    // Execute playback using central playback controller
+    this.playActualTrack(track, { type: 'search', id: track.id, query: query || this.lastSearchQuery || '' });
+    this.updatePlayPauseUI();
   }
 
   playTrackList(tracks, shuffle = false, context = null) {
@@ -14757,6 +14873,7 @@ class REAMusicApp {
     }
 
     // 3. Render Song Results List (max 8 in dropdown)
+    this.currentSearchSongs = results || [];
     if (this.searchResultsList) {
       this.searchResultsList.innerHTML = '';
       if (!results || results.length === 0) {
@@ -14765,10 +14882,16 @@ class REAMusicApp {
         }
       } else {
         const frag = document.createDocumentFragment();
+        const currentId = this.currentTrack ? this.currentTrack.id : (this.queue[this.currentTrackIndex]?.id);
+
         results.slice(0, 8).forEach(track => {
           const isDl = this.isDownloaded(track.id);
+          const isCurrent = currentId && String(currentId) === String(track.id);
+          const isPlayingThis = isCurrent && this.isPlaying;
+
           const row = document.createElement('div');
-          row.className = 'search-item';
+          row.className = `search-item ${isCurrent ? 'is-active' : ''}`;
+          row.dataset.songId = track.id;
           row.innerHTML = `
             <img src="${track.cover}" alt="${track.title}" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" loading="lazy" decoding="async">
             <div class="search-item-info">
@@ -14776,11 +14899,13 @@ class REAMusicApp {
               <div class="search-item-meta">${this.renderClickableArtists(track)} • ${track.album || 'Single'}</div>
             </div>
             <div class="search-item-actions">
-              <button class="icon-btn search-item-action-btn search-item-dl-btn ${isDl ? 'downloaded' : ''}" data-track-id="${track.id}" title="${isDl ? 'Downloaded' : 'Download Lossless'}">
+              <button class="icon-btn search-item-action-btn search-item-dl-btn ${isDl ? 'downloaded' : ''}" data-track-id="${track.id}" title="${isDl ? 'Downloaded' : 'Download Lossless'}" aria-label="Download ${track.title}">
                 <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
               </button>
-              <button class="icon-btn search-item-action-btn search-item-play-btn" title="Play Now">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <button class="icon-btn search-item-action-btn search-item-play-btn ${isPlayingThis ? 'is-playing' : ''}" data-track-id="${track.id}" title="${isPlayingThis ? 'Pause' : 'Play Now'}" aria-label="${isPlayingThis ? 'Pause' : 'Play Now'}">
+                ${isPlayingThis
+                  ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
+                  : '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'}
               </button>
             </div>
           `;
@@ -14796,10 +14921,15 @@ class REAMusicApp {
               this.handleDownloadClick(e.target.closest('.search-item-dl-btn'), track);
               return;
             }
-            this.addSearchHistory(track.title);
-            this.queue.splice(this.currentTrackIndex + 1, 0, track);
-            this.playTrackAtIndex(this.currentTrackIndex + 1);
-            if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+            const playBtn = e.target.closest('.search-item-play-btn');
+            if (playBtn) {
+              e.stopPropagation();
+              e.preventDefault();
+              this.playSearchTrack(track, results, query);
+              return;
+            }
+            // Clicking row body also plays track
+            this.playSearchTrack(track, results, query);
           });
           frag.appendChild(row);
         });
@@ -15492,6 +15622,56 @@ class REAMusicApp {
       const textSpan = this.songPlayHeroBtn.querySelector('span');
       if (textSpan) {
         textSpan.textContent = (isCurrent && this.isPlaying) ? 'Pause Song' : 'Play Song';
+      }
+    }
+
+    // Synchronize Search Dropdown Play Buttons
+    const currentId = this.currentTrack ? this.currentTrack.id : (this.queue[this.currentTrackIndex]?.id);
+    const searchPlayBtns = document.querySelectorAll('.search-item-play-btn[data-track-id]');
+    searchPlayBtns.forEach(btn => {
+      const isCurrent = currentId && String(btn.dataset.trackId) === String(currentId);
+      const isPlayingThis = isCurrent && this.isPlaying;
+      btn.classList.toggle('is-playing', Boolean(isPlayingThis));
+      btn.title = isPlayingThis ? 'Pause' : 'Play Now';
+      btn.setAttribute('aria-label', isPlayingThis ? 'Pause' : 'Play Now');
+      btn.innerHTML = isPlayingThis
+        ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+      const parentRow = btn.closest('.search-item');
+      if (parentRow) parentRow.classList.toggle('is-active', Boolean(isCurrent));
+    });
+
+    // Synchronize Search View & General Track Row Play Buttons
+    const trackRowCards = document.querySelectorAll('.track-row-card[data-song-id]');
+    trackRowCards.forEach(card => {
+      const btn = card.querySelector('.track-row-play-btn');
+      if (!btn) return;
+      const isCurrent = currentId && String(card.dataset.songId) === String(currentId);
+      const isPlayingThis = isCurrent && this.isPlaying;
+      card.classList.toggle('is-active', Boolean(isCurrent));
+      btn.classList.toggle('is-playing', Boolean(isPlayingThis));
+      btn.title = isPlayingThis ? 'Pause' : 'Play song';
+      btn.setAttribute('aria-label', isPlayingThis ? 'Pause' : 'Play song');
+      btn.innerHTML = isPlayingThis
+        ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    });
+
+    // Synchronize Search Top Result Card (if Song)
+    const topSongCard = document.querySelector('.top-result-card[data-song-id]');
+    if (topSongCard) {
+      const btn = topSongCard.querySelector('.btn-top-play');
+      if (btn) {
+        const isCurrent = currentId && String(topSongCard.dataset.songId) === String(currentId);
+        const isPlayingThis = isCurrent && this.isPlaying;
+        const span = btn.querySelector('span');
+        if (span) span.textContent = isPlayingThis ? 'Pause Song' : 'Play Song';
+        const svg = btn.querySelector('svg');
+        if (svg) {
+          svg.innerHTML = isPlayingThis
+            ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'
+            : '<path d="M8 5v14l11-7z"/>';
+        }
       }
     }
   }
@@ -16644,9 +16824,7 @@ class REAMusicApp {
             this.handleDownloadButtonClick(track);
             return;
           }
-          this.addSearchHistory(track.title);
-          this.queue.splice(this.currentTrackIndex + 1, 0, track);
-          this.playTrack(this.currentTrackIndex + 1);
+          this.playSearchTrack(track, recoTracks, '');
           if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
           if (this.searchInput) this.searchInput.value = '';
           if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
