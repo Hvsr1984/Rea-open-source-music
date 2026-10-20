@@ -2800,6 +2800,14 @@ class REAMusicApp {
         }
       });
     }
+    if (this.playAllHomeChartsBtn) {
+      this.playAllHomeChartsBtn.addEventListener('click', () => {
+        if (this.exploreCharts.length > 0) {
+          this.queue = [...this.exploreCharts];
+          this.playTrack(0);
+        }
+      });
+    }
     if (this.playAllLikedBtn) {
       this.playAllLikedBtn.addEventListener('click', () => {
         if (this.likedTracks.length > 0) {
@@ -6085,6 +6093,7 @@ class REAMusicApp {
   renderAll() {
     this.renderShelves();
     this.renderRecommendedShelf();
+    this.renderExplore();
     this.renderPlayerInfo();
     this.renderQueue();
     this.renderSearchHub();
@@ -6547,7 +6556,6 @@ class REAMusicApp {
       const artistCount = Object.keys(profile.artistAffinities || {}).length;
       this.tasteStatArtists.textContent = artistCount;
     }
-  }
   }
 
   renderQueueSections({ nowPlayingCard, manualCount, clearBtn, manualList, autoplayToggle, recommendedList, isMax = false }) {

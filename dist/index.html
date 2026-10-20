@@ -61,6 +61,7 @@
   
   
   
+  
   <style id="rea-embedded-styles">
 /* ==========================================================================
    REA MUSIC - Apple Music Clean Glass Design System & Multi-Theme Engine
@@ -11719,6 +11720,7 @@ body.theme-white .btn-taste-action:hover {
   
   
   
+  
   <script id="rea-embedded-script">
 // REA Music Engine v2.4.1
 if (window.__REA_INITIALIZED__) {
@@ -14516,6 +14518,14 @@ class REAMusicApp {
     }
     if (this.playAllChartsBtn) {
       this.playAllChartsBtn.addEventListener('click', () => {
+        if (this.exploreCharts.length > 0) {
+          this.queue = [...this.exploreCharts];
+          this.playTrack(0);
+        }
+      });
+    }
+    if (this.playAllHomeChartsBtn) {
+      this.playAllHomeChartsBtn.addEventListener('click', () => {
         if (this.exploreCharts.length > 0) {
           this.queue = [...this.exploreCharts];
           this.playTrack(0);
@@ -17807,6 +17817,7 @@ class REAMusicApp {
   renderAll() {
     this.renderShelves();
     this.renderRecommendedShelf();
+    this.renderExplore();
     this.renderPlayerInfo();
     this.renderQueue();
     this.renderSearchHub();
@@ -18269,7 +18280,6 @@ class REAMusicApp {
       const artistCount = Object.keys(profile.artistAffinities || {}).length;
       this.tasteStatArtists.textContent = artistCount;
     }
-  }
   }
 
   renderQueueSections({ nowPlayingCard, manualCount, clearBtn, manualList, autoplayToggle, recommendedList, isMax = false }) {
