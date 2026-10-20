@@ -340,7 +340,7 @@ class REAMusicApp {
       { id: 'rel-prem-keetanu', title: 'Prem Keetanu', artist: 'Various Artists', year: '2026', cover: 'https://c.saavncdn.com/500/Prem-Keetanu-Hindi-2024-20240920151046-500x500.jpg' }
     ];
     this.exploreCharts = [
-      { id: 'chart-1', rank: 1, rankChange: '+1', title: 'Casa Tupka Anthem', artist: 'Yo Yo Honey Singh', album: 'Casa Tupka', cover: 'https://c.saavncdn.com/500/Casa-Tupka-Anthem-Hindi-2024-20241018151046-500x500.jpg', duration: 183 },
+      { id: 'chart-1', rank: 1, rankChange: '+1', title: 'Casa Tupka Anthem', artist: 'Yo Yo Honey Singh', album: 'Casa Tupka', cover: 'assets/casa_tupka.jpg', duration: 183 },
       { id: 'chart-2', rank: 2, rankChange: '-1', title: 'Gehra Hua', artist: 'Arijit Singh, Armaan Malik', album: 'Gehra Hua', cover: 'https://c.saavncdn.com/500/Gehra-Hua-Hindi-2024-20240918151046-500x500.jpg', duration: 362 },
       { id: 'chart-3', rank: 3, rankChange: '—', title: 'Parvati', artist: 'Sadhu Tiwari', album: 'Parvati', cover: 'https://c.saavncdn.com/500/Parvati-Hindi-2024-20240912151046-500x500.jpg', duration: 284 },
       { id: 'chart-4', rank: 4, rankChange: '+2', title: 'Tera Mera Rishta', artist: 'Mithoon, Pritam, Saaj Bhatt', album: 'Awarapan 2', cover: 'https://c.saavncdn.com/500/Tera-Mera-Rishta-Hindi-2024-20240822151046-500x500.jpg', duration: 365 },
@@ -359,7 +359,7 @@ class REAMusicApp {
       title: 'Casa Tupka Anthem',
       artist: 'Yo Yo Honey Singh',
       album: 'Casa Tupka',
-      cover: 'https://c.saavncdn.com/500/Casa-Tupka-Anthem-Hindi-2024-20241018151046-500x500.jpg',
+      cover: 'assets/casa_tupka.jpg',
       duration: 183,
       audioUrl: 'https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4',
       language: 'hindi'
@@ -558,7 +558,8 @@ class REAMusicApp {
 
   initTheme() {
     const savedTheme = localStorage.getItem('rea_theme');
-    const validTheme = savedTheme === 'white' ? 'white' : savedTheme === 'dark' ? 'dark' : 'spatial';
+    // Default to Simple Black ('dark') for new users
+    const validTheme = savedTheme === 'white' ? 'white' : 'dark';
     this.setTheme(validTheme, false);
   }
 
@@ -666,7 +667,7 @@ class REAMusicApp {
   }
 
   setTheme(themeName, showToastFeedback = true) {
-    const targetTheme = (themeName === 'white' || themeName === 'dark' || themeName === 'spatial') ? themeName : 'spatial';
+    const targetTheme = (themeName === 'white' || themeName === 'spatial') ? themeName : 'dark';
     this.currentTheme = targetTheme;
     document.body.classList.remove('theme-white', 'theme-dark', 'theme-spatial', 'theme-lilac', 'theme-peach');
     document.body.classList.add(`theme-${targetTheme}`);
@@ -1236,13 +1237,19 @@ class REAMusicApp {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           const view = btn.dataset.view;
-          if (view) {
-            this.switchView(view);
-          } else if (btn.id === 'mobileTabSearch') {
+          if (view === 'search' || btn.id === 'mobileTabSearch') {
+            const mainContent = document.getElementById('mainContent');
+            if (mainContent) mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+            try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (err) {}
             if (this.searchInput) {
               this.searchInput.focus();
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              this.showSearchDropdown();
             }
+            if (this.mobileTabBtns) {
+              this.mobileTabBtns.forEach(b => b.classList.toggle('active', b === btn));
+            }
+          } else if (view) {
+            this.switchView(view);
           }
         });
       });
@@ -2254,6 +2261,7 @@ class REAMusicApp {
     // Scroll main content to top
     const mainContent = document.getElementById('mainContent');
     if (mainContent) mainContent.scrollTop = 0;
+    try { window.scrollTo({ top: 0 }); } catch (err) {}
 
     if (pushState && typeof history !== 'undefined' && history.pushState) {
       if (viewName === 'home') this.updateUrl('/');
@@ -5108,20 +5116,14 @@ class REAMusicApp {
     this.maxTabBtns.forEach(b => b.classList.toggle('active', b.dataset.maxTab === tab));
 
     if (tab === 'song') {
-      if (this.maxStageLeft) this.maxStageLeft.style.display = '';
-      if (this.maxStageRight) this.maxStageRight.style.display = '';
       if (this.maxLyricsPane) this.maxLyricsPane.classList.add('hidden');
       if (this.maxQueuePane) this.maxQueuePane.classList.remove('hidden');
       this.renderMaxQueue();
     } else if (tab === 'lyrics') {
-      if (this.maxStageLeft) this.maxStageLeft.style.display = '';
-      if (this.maxStageRight) this.maxStageRight.style.display = '';
       if (this.maxLyricsPane) this.maxLyricsPane.classList.remove('hidden');
       if (this.maxQueuePane) this.maxQueuePane.classList.add('hidden');
       this.renderMaxLyrics();
     } else if (tab === 'queue') {
-      if (this.maxStageLeft) this.maxStageLeft.style.display = '';
-      if (this.maxStageRight) this.maxStageRight.style.display = '';
       if (this.maxLyricsPane) this.maxLyricsPane.classList.add('hidden');
       if (this.maxQueuePane) this.maxQueuePane.classList.remove('hidden');
       this.renderMaxQueue();
