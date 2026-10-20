@@ -4,6 +4,40 @@ All notable changes to the **REA Music** web ecosystem are documented in this fi
 
 ---
 
+## [2.7.0] - 2026-10-20
+
+### 🔮 Intelligent Personalization & Adaptive Home Recommendation Engine
+- **Balanced Cold Start Discovery (New User)**:
+  - Fresh users launch into a balanced discovery home screen featuring 9 distinct sections: **Trending in India**, **Latest Releases**, **India Superhits Top 50**, **Punjabi Superhits & Desi Bass**, **Haryanvi Hits & Regional Rap**, **Bollywood Melodies & Romance**, **Popular Independent Artists & Pop**, **Mood Categories**, and **Discover Indian Artists**.
+  - Strict cold-start invariant: Bottom player bar initializes in an empty state (`.is-empty`, "Nothing playing") without auto-assigning or auto-playing default songs.
+  - Browsing tracks or navigating views does not inflate or pollute music preferences until intentional playback occurs.
+- **Event-Driven Listening Behaviour Tracking (`ListeningHistoryService`)**:
+  - Tracks rich playback events: `song_started`, `song_completed` (>=85% listen or >=150s), `song_skipped` (quick skips <25s penalize without permanently banning), `song_replayed` (+3.0 affinity), `song_favourited` (+3.5 affinity), `playlist_added` (+2.5 affinity), `artist_opened` (+1.2 affinity), and explicit negative feedback (`song_not_interested`, `show_less_artist`).
+  - Stores rich playback context: `trackId`, `title`, `artist`, `album`, `genres`, `languages`, `moods`, `durationListened`, and `completionPct` in bounded localStorage (`rea_listening_events_v2`).
+- **Dynamic Preference Profile & Recency Decay (`UserPreferenceService`)**:
+  - Tracks decaying artist affinities, genre weights, language preferences, and mood weights.
+  - Implements exponential recency decay with a 7-day half-life ($W \times 2^{-\Delta t / 7\text{ days}}$), allowing user taste to shift organically (e.g. from Haryanvi rap to Bollywood romance) without permanent genre lock-in.
+  - Real-time Taste Profile Confidence Score ($0\% - 100\%$) derived from session completions, diversity of artists explored, and explicit likes.
+- **Modular Multi-Signal Recommendation Ranking (`RecommendationEngine`)**:
+  - Scores eligible catalogue candidates across 6 configurable dimensions:
+    - 30% User listening & artist affinity
+    - 25% Similarity to recently enjoyed tracks (multi-attribute similarity: artist, genre, mood tags, era)
+    - 15% Genre and language preference
+    - 10% Mood and musical metadata similarity
+    - 10% Personal replay, completion, and favourite signals
+    - 10% Freshness, discovery, and contextual relevance
+  - Excludes unplayable/disliked tracks (`dislikedTrackIds`, `dislikedArtists`).
+  - Penalizes recent playback repetitions (-50% score for tracks played in last 15 songs) to prevent repetitive feeds.
+  - Strict artist diversity dampener: maximum 3 songs per artist in any recommendation shelf.
+- **Dynamic Adaptive Home Screen (`HomeFeedService`)**:
+  - Dynamically activates `#personalizedShelf` ("Because you listened to [Artist]" / "Your [Genre] Favourites") and `#jumpBackInShelf` ("Jump Back In") as confidence builds.
+  - Elevates high-confidence users with high-affinity badges while preserving trending and new release sections for broad exploration.
+- **Contextual Song Options & Privacy Controls**:
+  - Contextual 3-dots and right-click song options modal (`#trackOptionsBackdrop`) with **Play next**, **Add to queue**, **More like this**, **Add/Remove Favorites**, **Not interested**, **Show less from this artist**, and **View artist profile**.
+  - Settings Modal Taste Profile Card (`#tasteProfileCard`) with live confidence meter, listen stats, and 1-click **Clear History** and **Reset Taste Profile** operations.
+
+---
+
 ## [2.6.0] - 2026-10-18
 
 ### 🧠 Smart Autoplay, Intelligent Next Song & Recommendation Engine

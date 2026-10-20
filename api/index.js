@@ -556,37 +556,72 @@ export default async function handler(req, res) {
       return sendJson(400, { error: 'Missing artist id or name' });
     }
 
+// Regional & Genre Search Queries for Indian Catalogue Discovery
+const GENRE_QUERIES = {
+  haryanvi: 'Haryanvi Hits',
+  punjabi: 'Punjabi Hits',
+  bollywood: 'Bollywood Hits',
+  hindi: 'Hindi Top Songs',
+  indie: 'Indie India',
+  chill: 'Hindi Acoustic',
+  romantic: 'Love Songs Hindi',
+  workout: 'Workout Hindi',
+  party: 'Bollywood Dance'
+};
+
+async function fetchGenreSongs(genreKey) {
+  const q = GENRE_QUERIES[genreKey] || `${genreKey} Indian Hits`;
+  return searchSongs(q);
+}
+
     // 5. Indian Trending & Curated Shelves
     if (isTrending) {
-      const category = parsedUrl.searchParams.get('category') || 'all';
+      const category = (parsedUrl.searchParams.get('category') || 'all').toLowerCase();
 
       if (CACHE.trending[category] && Date.now() - CACHE.trending[category].time < 600000) {
         return sendJson(200, CACHE.trending[category].data);
       }
 
       if (category === 'all') {
-        const [superhits, punjabi, romantic, trending, arijit] = await Promise.all([
+        const [superhits, trending, punjabi, romantic, arijit, haryanvi, bollywood, indie] = await Promise.all([
           fetchPlaylistSongs(CHARTS.superhits),
+          fetchPlaylistSongs(CHARTS.trending),
           fetchPlaylistSongs(CHARTS.punjabi),
           fetchPlaylistSongs(CHARTS.romantic),
-          fetchPlaylistSongs(CHARTS.trending),
-          fetchPlaylistSongs(CHARTS.arijit)
+          fetchPlaylistSongs(CHARTS.arijit),
+          fetchGenreSongs('haryanvi'),
+          fetchGenreSongs('bollywood'),
+          fetchGenreSongs('indie')
         ]);
 
         const payload = {
           quickPicks: superhits.slice(0, 16),
           trendingHits: trending.slice(0, 12),
-          punjabiHits: punjabi.slice(0, 12),
-          romanticHits: romantic.slice(0, 12),
-          arijitHits: arijit.slice(0, 12)
+          punjabiHits: (punjabi.length > 0 ? punjabi : trending).slice(0, 12),
+          romanticHits: (romantic.length > 0 ? romantic : superhits).slice(0, 12),
+          arijitHits: (arijit.length > 0 ? arijit : superhits).slice(0, 12),
+          haryanviHits: haryanvi.slice(0, 12),
+          bollywoodHits: bollywood.slice(0, 12),
+          indieHits: indie.slice(0, 12)
         };
 
         CACHE.trending['all'] = { time: Date.now(), data: payload };
         return sendJson(200, payload);
       }
 
-      const chartId = CHARTS[category] || CHARTS.superhits;
-      const songs = await fetchPlaylistSongs(chartId);
+      let songs = [];
+      if (CHARTS[category]) {
+        songs = await fetchPlaylistSongs(CHARTS[category]);
+      } else if (GENRE_QUERIES[category]) {
+        songs = await fetchGenreSongs(category);
+      } else {
+        songs = await searchSongs(`${category} Songs`);
+      }
+
+      if (!songs || songs.length === 0) {
+        songs = await fetchPlaylistSongs(CHARTS.superhits);
+      }
+
       CACHE.trending[category] = { time: Date.now(), data: { songs } };
       return sendJson(200, { songs });
     }
@@ -647,16 +682,22 @@ export default async function handler(req, res) {
       return sendJson(200, exploreData);
     }
 
-    // 8. Indian Recommendations & Trending Search Suggestions
+    // 8. Indian Recommendations & Adaptive Discovery Engine
     if (isRecommendations) {
       const artist = parsedUrl.searchParams.get('artist') || '';
+      const genre = parsedUrl.searchParams.get('genre') || '';
+      const qParam = parsedUrl.searchParams.get('q') || '';
       const trackId = parsedUrl.searchParams.get('trackId') || '';
+      const limit = Math.min(30, parseInt(parsedUrl.searchParams.get('limit') || '16', 10));
+
       const trendingSearches = [
         'Arijit Singh',
+        'Dhanda Nyoliwala',
         'Diljit Dosanjh',
         'Tauba Tauba',
         'Kesariya',
         'Bollywood Romance',
+        'Haryanvi Hits',
         'Sid Sriram',
         'Anirudh Ravichander',
         'Punjabi Hits',
@@ -665,20 +706,32 @@ export default async function handler(req, res) {
         'Lofi Hindi'
       ];
 
-      const cacheKey = ('reco__' + (artist || 'all')).toLowerCase();
+      const cacheKey = ('reco__' + (artist || genre || qParam || 'all')).toLowerCase();
       if (CACHE.trending[cacheKey] && Date.now() - CACHE.trending[cacheKey].time < 300000) {
         return sendJson(200, CACHE.trending[cacheKey].data);
       }
 
       let recommendedTracks = [];
+
+      // 1. If artist specified: query top songs by primary artist
       if (artist && artist.trim()) {
         const primaryArtist = artist.split(',')[0].replace(/\([^)]*\)/g, '').trim();
         const searchResults = await searchSongs(primaryArtist);
-        recommendedTracks = searchResults
-          .filter(t => t.id !== trackId)
-          .slice(0, 14);
+        recommendedTracks = searchResults.filter(t => t && t.id !== trackId);
       }
 
+      // 2. If genre or query specified
+      if (genre && recommendedTracks.length < limit) {
+        const genreSongs = await fetchGenreSongs(genre);
+        const filteredGenre = genreSongs.filter(t => t && t.id !== trackId && !recommendedTracks.some(r => r.id === t.id));
+        recommendedTracks = [...recommendedTracks, ...filteredGenre];
+      } else if (qParam && recommendedTracks.length < limit) {
+        const querySongs = await searchSongs(qParam);
+        const filteredQ = querySongs.filter(t => t && t.id !== trackId && !recommendedTracks.some(r => r.id === t.id));
+        recommendedTracks = [...recommendedTracks, ...filteredQ];
+      }
+
+      // 3. Fallback to broad Indian discovery pool if sparse
       if (recommendedTracks.length < 8) {
         const [superhits, trending] = await Promise.all([
           fetchPlaylistSongs(CHARTS.superhits),
@@ -686,13 +739,17 @@ export default async function handler(req, res) {
         ]);
         const pool = [...superhits, ...trending];
         const additional = pool.filter(t => t.id !== trackId && !recommendedTracks.some(r => r.id === t.id));
-        recommendedTracks = [...recommendedTracks, ...additional].slice(0, 18);
+        recommendedTracks = [...recommendedTracks, ...additional];
       }
+
+      recommendedTracks = recommendedTracks.slice(0, limit);
 
       const payload = {
         recommendations: recommendedTracks,
         trendingSearches,
-        artist: artist || 'Top Indian Hits'
+        artist: artist || '',
+        genre: genre || '',
+        count: recommendedTracks.length
       };
 
       CACHE.trending[cacheKey] = { time: Date.now(), data: payload };

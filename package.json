@@ -11,7 +11,8 @@
     "build:local": "node build.js",
     "build:web": "node scripts/build-web.js",
     "verify": "node scripts/verify-project.js",
-    "test": "node tests/smoke-test.js"
+    "test": "node tests/smoke-test.js",
+    "test:personalization": "node tests/test-personalization-engine.mjs"
   },
   "keywords": [
     "music-player",

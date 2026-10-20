@@ -59,6 +59,8 @@
   
   
   
+  
+  
   <style id="rea-embedded-styles">
 /* ==========================================================================
    REA MUSIC - Apple Music Clean Glass Design System & Multi-Theme Engine
@@ -9441,6 +9443,502 @@ body.theme-white #installPwaBtn {
   box-shadow: 0 4px 14px rgba(255, 49, 84, 0.35) !important;
 }
 
+/* =============================================================================
+   REA MUSIC — INTELLIGENT PERSONALIZATION & ADAPTIVE HOME SYSTEM
+   Adaptive Shelves, Taste Profile, and Song Options Contextual Menu
+   ============================================================================= */
+
+/* 1. Track Contextual Options Menu Modal */
+.track-options-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.track-options-backdrop.hidden {
+  display: none !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.track-options-menu {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(22, 24, 34, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  padding: 20px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPopIn {
+  from {
+    transform: scale(0.92) translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.track-options-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.track-options-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.track-options-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-options-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.track-options-artist {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-options-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.track-options-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.track-options-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.track-option-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.track-option-item svg {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.65);
+  transition: color 0.15s ease;
+}
+
+.track-option-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.track-option-item:hover svg {
+  color: var(--accent-red, #ff3154);
+}
+
+.track-option-item.danger-option:hover {
+  background: rgba(255, 49, 84, 0.12);
+  color: #ff4d6d;
+}
+
+.track-option-item.danger-option:hover svg {
+  color: #ff4d6d;
+}
+
+/* Track Card Options Button */
+.track-card-more-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.15s ease, background 0.15s ease;
+  z-index: 4;
+  cursor: pointer;
+}
+
+.music-card {
+  position: relative;
+}
+
+.music-card:hover .track-card-more-btn,
+.track-row-card:hover .track-card-more-btn {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .track-card-more-btn {
+    opacity: 0.85;
+  }
+}
+
+.track-card-more-btn:hover {
+  transform: scale(1.1);
+  background: rgba(255, 49, 84, 0.85);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+body.theme-white .track-card-more-btn {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #1c1c1e;
+}
+
+body.theme-white .track-card-more-btn:hover {
+  background: #ff3154;
+  color: #ffffff;
+}
+
+/* 2. Personalized Shelf Badges & Header */
+.shelf-header-personalized {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shelf-badge-personalized {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(255, 49, 84, 0.22), rgba(255, 120, 60, 0.22));
+  border: 1px solid rgba(255, 49, 84, 0.45);
+  color: #ff4d6d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+
+/* 3. Discover Artists Grid in Home */
+.discover-artists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 16px;
+  padding: 6px 2px 14px 2px;
+}
+
+.discover-artist-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: var(--glass-bg-card);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 20px;
+  padding: 16px 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.discover-artist-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  background: var(--glass-bg-card-hover);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: var(--glass-shadow-hover);
+}
+
+.discover-artist-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.discover-artist-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.discover-artist-role {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 2px;
+}
+
+/* 4. Taste Profile Card in Settings Modal */
+.taste-profile-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.taste-confidence-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.taste-confidence-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.taste-confidence-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.taste-confidence-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-red, #ff3154);
+}
+
+.taste-confidence-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.taste-confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff3154, #ff7844);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.taste-confidence-desc {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.taste-stats-row {
+  display: flex;
+  gap: 8px;
+}
+
+.taste-stat-pill {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.taste-stat-pill .stat-num {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.taste-stat-pill .stat-lbl {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.taste-actions-grid {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-taste-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-taste-action:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+/* 5. Theme White Overrides for Personalization */
+body.theme-white .track-options-menu {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #1d1d1f !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18) !important;
+}
+
+body.theme-white .track-options-header {
+  border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .track-options-title {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .track-options-artist {
+  color: #86868b !important;
+}
+
+body.theme-white .track-options-close {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .track-option-item {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .track-option-item svg {
+  color: #86868b !important;
+}
+
+body.theme-white .track-option-item:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .discover-artist-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.theme-white .discover-artist-name {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .discover-artist-role {
+  color: #86868b !important;
+}
+
+body.theme-white .taste-profile-card {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .taste-confidence-label,
+body.theme-white .taste-stat-pill .stat-num {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .taste-confidence-desc,
+body.theme-white .taste-stat-pill .stat-lbl {
+  color: #86868b !important;
+}
+
+body.theme-white .taste-confidence-bar {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .taste-stat-pill {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+body.theme-white .btn-taste-action {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .btn-taste-action:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
 
 
   </style>
@@ -9664,6 +10162,36 @@ body.theme-white #installPwaBtn {
     <main class="main-content" id="mainContent">
       <!-- VIEW 1: HOME -->
       <div class="view-pane active" id="viewHome">
+        <!-- Adaptive Personalized Shelf (Dynamically activated when user has listening history) -->
+        <section class="shelf" id="personalizedShelf" style="display:none;">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow" id="personalizedEyebrow">TAILORED FOR YOU</span>
+              <h2 class="shelf-title" id="personalizedTitle">Because you listened to Dhanda Nyoliwala <span class="shelf-title-arrow">›</span></h2>
+            </div>
+            <div class="carousel-arrows">
+              <button class="arrow-btn" id="personalizedPrevBtn" aria-label="Previous">❮</button>
+              <button class="arrow-btn" id="personalizedNextBtn" aria-label="Next">❯</button>
+            </div>
+          </div>
+          <div class="cards-carousel" id="personalizedCarousel">
+            <!-- Populated dynamically by Recommendation Engine -->
+          </div>
+        </section>
+
+        <!-- Jump Back In / Recently Played Shelf (Active when user has recent history) -->
+        <section class="shelf" id="jumpBackInShelf" style="display:none;">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">CONTINUE LISTENING</span>
+              <h2 class="shelf-title">Jump Back In <span class="shelf-title-arrow">›</span></h2>
+            </div>
+          </div>
+          <div class="cards-carousel" id="jumpBackInCarousel">
+            <!-- Populated dynamically with recent tracks -->
+          </div>
+        </section>
+
         <!-- Section 1: Latest Indian Releases (Spatial 3D Album Carousel) -->
         <section class="shelf spatial-hero-shelf" id="homeReleasesShelf">
           <div class="shelf-header">
@@ -9806,13 +10334,85 @@ body.theme-white #installPwaBtn {
         <section class="shelf" id="focusShelf">
           <div class="shelf-header">
             <div class="shelf-header-text">
-              <span class="shelf-eyebrow">TOP PLAYLIST</span>
-              <h2 class="shelf-title">Punjabi Superhits & Desi Bass</h2>
+              <span class="shelf-eyebrow">PUNJABI HITS</span>
+              <h2 class="shelf-title">Punjabi Superhits & Desi Bass <span class="shelf-title-arrow">›</span></h2>
+            </div>
+            <div class="carousel-arrows">
+              <button class="arrow-btn" id="focusPrevBtn" aria-label="Previous">❮</button>
+              <button class="arrow-btn" id="focusNextBtn" aria-label="Next">❯</button>
             </div>
           </div>
 
           <div class="cards-carousel" id="focusCarousel">
             <!-- Populated by JavaScript -->
+          </div>
+        </section>
+
+        <!-- Section: Haryanvi Hits & Regional Rap -->
+        <section class="shelf" id="haryanviShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">HARYANVI SPOTLIGHT</span>
+              <h2 class="shelf-title">Haryanvi Hits & Desi Hip Hop <span class="shelf-title-arrow">›</span></h2>
+            </div>
+            <div class="carousel-arrows">
+              <button class="arrow-btn" id="haryanviPrevBtn" aria-label="Previous">❮</button>
+              <button class="arrow-btn" id="haryanviNextBtn" aria-label="Next">❯</button>
+            </div>
+          </div>
+
+          <div class="cards-carousel" id="haryanviCarousel">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+
+        <!-- Section: Bollywood Essentials & Romance -->
+        <section class="shelf" id="bollywoodShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">BOLLYWOOD ESSENTIALS</span>
+              <h2 class="shelf-title">Bollywood Melodies & Romance <span class="shelf-title-arrow">›</span></h2>
+            </div>
+            <div class="carousel-arrows">
+              <button class="arrow-btn" id="bollywoodPrevBtn" aria-label="Previous">❮</button>
+              <button class="arrow-btn" id="bollywoodNextBtn" aria-label="Next">❯</button>
+            </div>
+          </div>
+
+          <div class="cards-carousel" id="bollywoodCarousel">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+
+        <!-- Section: Popular Independent Artists -->
+        <section class="shelf" id="indieShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">INDIE INDIA</span>
+              <h2 class="shelf-title">Popular Independent Artists & Pop <span class="shelf-title-arrow">›</span></h2>
+            </div>
+            <div class="carousel-arrows">
+              <button class="arrow-btn" id="indiePrevBtn" aria-label="Previous">❮</button>
+              <button class="arrow-btn" id="indieNextBtn" aria-label="Next">❯</button>
+            </div>
+          </div>
+
+          <div class="cards-carousel" id="indieCarousel">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+
+        <!-- Section: Discover Artists -->
+        <section class="shelf" id="discoverArtistsShelf">
+          <div class="shelf-header">
+            <div class="shelf-header-text">
+              <span class="shelf-eyebrow">ARTIST DISCOVERY</span>
+              <h2 class="shelf-title">Discover Indian Artists <span class="shelf-title-arrow">›</span></h2>
+            </div>
+          </div>
+
+          <div class="discover-artists-grid" id="discoverArtistsGrid">
+            <!-- Populated dynamically with artist circular cards -->
           </div>
         </section>
       </div>
@@ -10721,25 +11321,49 @@ body.theme-white #installPwaBtn {
           </div>
         </div>
 
-        <!-- Playback & Lyrics Settings -->
+        <!-- Personalization & Privacy Settings -->
         <div class="settings-section">
           <div class="settings-section-header">
-            <span class="settings-section-tag">PLAYBACK & LYRICS</span>
-            <h4>Features</h4>
+            <span class="settings-section-tag">PERSONALIZATION</span>
+            <h4>Music Taste & Discovery</h4>
           </div>
-          <div class="settings-row-item">
-            <div class="settings-row-text">
-              <div class="settings-row-title">Synchronized Lyrics</div>
-              <div class="settings-row-desc">Real-time dynamic timecode lyrics engine</div>
+          <div class="taste-profile-card" id="tasteProfileCard">
+            <div class="taste-confidence-wrap">
+              <div class="taste-confidence-header">
+                <span class="taste-confidence-label">Taste Profile Confidence</span>
+                <span class="taste-confidence-value" id="tasteConfidenceValue">0% (Discovery Mode)</span>
+              </div>
+              <div class="taste-confidence-bar">
+                <div class="taste-confidence-fill" id="tasteConfidenceFill" style="width: 0%;"></div>
+              </div>
+              <p class="taste-confidence-desc" id="tasteConfidenceDesc">
+                REA Music adapts your home screen as you listen. Start playing songs to build your profile.
+              </p>
             </div>
-            <span class="settings-badge-active">ENABLED</span>
-          </div>
-          <div class="settings-row-item">
-            <div class="settings-row-text">
-              <div class="settings-row-title">Clear Listening History</div>
-              <div class="settings-row-desc">Remove local play count and recent history</div>
+            <div class="taste-stats-row">
+              <div class="taste-stat-pill">
+                <span class="stat-num" id="tasteStatPlays">0</span>
+                <span class="stat-lbl">Listens</span>
+              </div>
+              <div class="taste-stat-pill">
+                <span class="stat-num" id="tasteStatCompletions">0</span>
+                <span class="stat-lbl">Completions</span>
+              </div>
+              <div class="taste-stat-pill">
+                <span class="stat-num" id="tasteStatArtists">0</span>
+                <span class="stat-lbl">Artists</span>
+              </div>
             </div>
-            <button class="settings-action-btn" id="settingClearHistoryBtn">Clear</button>
+            <div class="taste-actions-grid">
+              <button class="btn-taste-action" id="clearListeningHistoryBtn">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15 16h4v2h-4zm0-8h7v2h-7zm0 4h6v2h-6zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zM14 5h-3l-1-1H6L5 5H2v2h12z"/></svg>
+                <span>Clear History</span>
+              </button>
+              <button class="btn-taste-action" id="resetRecommendationsBtn">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                <span>Reset Taste Profile</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -10769,6 +11393,47 @@ body.theme-white #installPwaBtn {
           </div>
           <p class="settings-about-note">100% Free & Open Source • Zero Ads • No Subscriptions</p>
         </div>
+      </div>
+  <!-- Contextual Song Options Modal -->
+  <div class="track-options-backdrop hidden" id="trackOptionsBackdrop">
+    <div class="track-options-menu" id="trackOptionsMenu">
+      <div class="track-options-header">
+        <img src="" alt="" class="track-options-thumb" id="trackOptionsThumb">
+        <div class="track-options-info">
+          <div class="track-options-title" id="trackOptionsTitle">Song Title</div>
+          <div class="track-options-artist" id="trackOptionsArtist">Artist Name</div>
+        </div>
+        <button class="track-options-close" id="trackOptionsCloseBtn" aria-label="Close song options">✕</button>
+      </div>
+      <div class="track-options-actions">
+        <button class="track-option-item" id="optPlayNext">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M16 7l-7 5 7 5V7zm-9 0v10h2V7H7z"/></svg>
+          <span>Play next</span>
+        </button>
+        <button class="track-option-item" id="optAddQueue">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
+          <span>Add to queue</span>
+        </button>
+        <button class="track-option-item" id="optMoreLikeThis">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          <span>More like this</span>
+        </button>
+        <button class="track-option-item" id="optToggleLike">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <span id="optToggleLikeLabel">Add to Favorites</span>
+        </button>
+        <button class="track-option-item danger-option" id="optNotInterested">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.42 0 8 3.58 8 8 0 1.85-.63 3.55-1.69 4.9z"/></svg>
+          <span>Not interested</span>
+        </button>
+        <button class="track-option-item danger-option" id="optShowLessArtist">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          <span id="optShowLessArtistLabel">Show less from this artist</span>
+        </button>
+        <button class="track-option-item" id="optViewArtist">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+          <span>View artist profile</span>
+        </button>
       </div>
     </div>
   </div>
@@ -10977,6 +11642,8 @@ body.theme-white #installPwaBtn {
     </footer>
   </div>
 
+  
+  
   
   
   
@@ -11364,6 +12031,879 @@ class HybridAudioEngine {
 }
 
 // =============================================================================
+// Intelligent Personalization & Adaptive Recommendation Engine Services
+// =============================================================================
+
+const REGIONAL_ARTISTS = {
+  haryanvi: [
+    'dhanda nyoliwala', 'khasa aala chahar', 'gulzaar chhaniwala', 'masoom sharma',
+    'amit saini rohtakiya', 'renuka panwar', 'raju punjabi', 'sapna choudhary',
+    'pranjal dahiya', 'sumit goswami', 'bintu pabra', 'kd desirock', 'md', 'ajay hooda',
+    'manisha sharma', 'vicky kajla', 'komal choudhary', 'aman jaji', 'ruchika jangid'
+  ],
+  punjabi: [
+    'karan aujla', 'diljit dosanjh', 'sidhu moose wala', 'ap dhillon', 'shubh',
+    'gurinder gill', 'amrit maan', 'jassi gill', 'jass manak', 'b praak', 'harrdy sandhu',
+    'yo yo honey singh', 'badshah', 'raftaar', 'sukhe', 'mankirt aulakh', 'tarsem jassar',
+    'kulwinder billa', 'parmish verma', 'jordan sandhu', 'guru randhawa'
+  ],
+  bollywood: [
+    'arijit singh', 'pritam', 'sachin-jigar', 'amitabh bhattacharya', 'shreya ghoshal',
+    'sonu nigam', 'jubin nautiyal', 'neha kakkar', 'armaan malik', 'darshan raval',
+    'vishal-shekhar', 'atif aslam', 'mohit chauhan', 'kk', 'alka yagnik', 'kumar sanu',
+    'udit narayan', 'kishore kumar', 'lata mangeshkar', 'mithoon', 'anupam aravind',
+    'badshah', 'vishal mishra', 'jasleen royal', 'shankar-ehsaan-loy'
+  ],
+  indie: [
+    'anuv jain', 'prateek kuhad', 'zaeden', 'ritviz', 'when chai met toast',
+    'the local train', 'jasleen royal', 'taba chake', 'aditya a', 'sanah moidutty',
+    'o shoot', 'achint', 'sai abhyankkar', 'seedhe maut', 'kr$na', 'divine'
+  ]
+};
+
+function detectTrackTags(track) {
+  if (!track) return { genres: [], languages: [], moods: [], artistTokens: [] };
+  const title = (track.title || '').toLowerCase();
+  const artist = (track.artist || '').toLowerCase();
+  const album = (track.album || '').toLowerCase();
+  const explicitLang = (track.language || '').toLowerCase();
+
+  const artistTokens = artist
+    .split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const genres = new Set();
+  const languages = new Set();
+  const moods = new Set();
+
+  if (explicitLang) {
+    languages.add(explicitLang);
+    if (explicitLang === 'haryanvi') genres.add('haryanvi');
+    if (explicitLang === 'punjabi') genres.add('punjabi');
+    if (explicitLang === 'hindi') genres.add('bollywood');
+  }
+
+  // Artist-based matching
+  for (const hArtist of REGIONAL_ARTISTS.haryanvi) {
+    if (artist.includes(hArtist) || title.includes(hArtist)) {
+      genres.add('haryanvi');
+      languages.add('haryanvi');
+      break;
+    }
+  }
+  for (const pArtist of REGIONAL_ARTISTS.punjabi) {
+    if (artist.includes(pArtist) || title.includes(pArtist)) {
+      genres.add('punjabi');
+      languages.add('punjabi');
+      break;
+    }
+  }
+  for (const bArtist of REGIONAL_ARTISTS.bollywood) {
+    if (artist.includes(bArtist)) {
+      genres.add('bollywood');
+      languages.add('hindi');
+      break;
+    }
+  }
+  for (const iArtist of REGIONAL_ARTISTS.indie) {
+    if (artist.includes(iArtist)) {
+      genres.add('indie');
+      break;
+    }
+  }
+
+  // Keyword-based genre & language heuristics
+  const combined = `${title} ${album} ${artist}`;
+  if (/haryanvi|ragni|desi hip hop|haryana/i.test(combined)) {
+    genres.add('haryanvi');
+    languages.add('haryanvi');
+  }
+  if (/punjabi|bhangra|desi bass|punjab/i.test(combined)) {
+    genres.add('punjabi');
+    languages.add('punjabi');
+  }
+  if (/bollywood|soundtrack|film|cinema/i.test(combined)) {
+    genres.add('bollywood');
+    languages.add('hindi');
+  }
+  if (/indie|acoustic|unplugged|pop indie/i.test(combined)) {
+    genres.add('indie');
+  }
+
+  // Mood tags
+  if (/romantic|love|ishq|pyaar|dil|tum|hum|heart|kasam|deewani/i.test(combined)) {
+    moods.add('romantic');
+  }
+  if (/chill|lofi|relax|peace|acoustic|slowed|reverb|ambient|sufi/i.test(combined)) {
+    moods.add('chill');
+  }
+  if (/party|dance|club|dj|remix|dhamaka|celebration|banger|nach/i.test(combined)) {
+    moods.add('party');
+  }
+  if (/workout|gym|beast|power|pump|energy|motivation|fitness|hard/i.test(combined)) {
+    moods.add('workout');
+  }
+
+  return {
+    genres: Array.from(genres),
+    languages: Array.from(languages),
+    moods: Array.from(moods),
+    artistTokens
+  };
+}
+
+class ListeningHistoryService {
+  constructor(preferenceService) {
+    this.preferenceService = preferenceService;
+    this.storageKey = 'rea_listening_events_v2';
+    this.activeSession = null;
+    this.events = this.loadEvents();
+  }
+
+  loadEvents() {
+    try {
+      const data = localStorage.getItem(this.storageKey);
+      return data ? JSON.parse(data) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  saveEvents() {
+    try {
+      if (this.events.length > 200) {
+        this.events = this.events.slice(0, 200);
+      }
+      localStorage.setItem(this.storageKey, JSON.stringify(this.events));
+    } catch (_) {}
+  }
+
+  recordEvent(eventType, track, metadata = {}) {
+    if (!track) return;
+    const tags = detectTrackTags(track);
+    const event = {
+      id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      eventType,
+      trackId: track.id,
+      title: track.title,
+      artist: track.artist,
+      album: track.album || '',
+      genres: tags.genres,
+      languages: tags.languages,
+      moods: tags.moods,
+      timestamp: Date.now(),
+      ...metadata
+    };
+    this.events.unshift(event);
+    this.saveEvents();
+    return event;
+  }
+
+  onTrackStarted(track, context = null) {
+    if (!track) return;
+    this.activeSession = {
+      trackId: track.id,
+      track,
+      startTime: Date.now(),
+      durationListened: 0,
+      totalDuration: track.duration || 180,
+      completed: false,
+      context: context ? context.type || 'home' : 'unknown'
+    };
+    this.recordEvent('song_started', track, { source: this.activeSession.context });
+    if (this.preferenceService) {
+      this.preferenceService.recordSongStarted(track, this.activeSession.context);
+    }
+  }
+
+  updateActiveSession(currentTime, duration) {
+    if (!this.activeSession) return;
+    if (duration && duration > 0) {
+      this.activeSession.totalDuration = duration;
+    }
+    this.activeSession.durationListened = Math.max(this.activeSession.durationListened, currentTime || 0);
+    const pct = this.activeSession.durationListened / (this.activeSession.totalDuration || 1);
+
+    if (!this.activeSession.completed && (pct >= 0.85 || this.activeSession.durationListened >= 150)) {
+      this.activeSession.completed = true;
+      this.onTrackCompleted(this.activeSession.track);
+    }
+  }
+
+  onTrackCompleted(track) {
+    if (!track) return;
+    this.recordEvent('song_completed', track, {
+      durationListened: this.activeSession ? this.activeSession.durationListened : track.duration,
+      completionPct: 1.0
+    });
+    if (this.preferenceService) {
+      this.preferenceService.recordTrackCompleted(track);
+    }
+  }
+
+  onTrackSkipped(track) {
+    if (!track) return;
+    const durationListened = this.activeSession ? this.activeSession.durationListened : 0;
+    const totalDuration = (this.activeSession && this.activeSession.totalDuration) || track.duration || 180;
+    const pct = durationListened / (totalDuration || 1);
+    const isHardSkip = durationListened < 25 || pct < 0.30;
+
+    this.recordEvent('song_skipped', track, {
+      durationListened,
+      completionPct: Math.round(pct * 100) / 100,
+      isHardSkip
+    });
+
+    if (this.preferenceService) {
+      this.preferenceService.recordTrackSkipped(track, isHardSkip, durationListened);
+    }
+    this.activeSession = null;
+  }
+
+  onTrackReplayed(track) {
+    if (!track) return;
+    this.recordEvent('song_replayed', track);
+    if (this.preferenceService) {
+      this.preferenceService.recordTrackReplayed(track);
+    }
+  }
+
+  onTrackLiked(track, isLiked) {
+    if (!track) return;
+    this.recordEvent(isLiked ? 'song_favourited' : 'song_unfavourited', track);
+    if (this.preferenceService) {
+      this.preferenceService.recordTrackLiked(track, isLiked);
+    }
+  }
+
+  onTrackPlaylistAdded(track, playlistTitle = '') {
+    if (!track) return;
+    this.recordEvent('playlist_added', track, { playlist: playlistTitle });
+    if (this.preferenceService) {
+      this.preferenceService.recordPlaylistAdded(track);
+    }
+  }
+
+  onArtistOpened(artistId, artistName) {
+    if (this.preferenceService) {
+      this.preferenceService.recordArtistOpened(artistId, artistName);
+    }
+  }
+
+  onExplicitDislike(track) {
+    if (!track) return;
+    this.recordEvent('song_not_interested', track);
+    if (this.preferenceService) {
+      this.preferenceService.recordExplicitDislike(track);
+    }
+  }
+
+  onShowLessArtist(artistName) {
+    if (!artistName) return;
+    if (this.preferenceService) {
+      this.preferenceService.recordShowLessArtist(artistName);
+    }
+  }
+
+  clearHistory() {
+    this.events = [];
+    this.activeSession = null;
+    try {
+      localStorage.removeItem(this.storageKey);
+    } catch (_) {}
+  }
+}
+
+class UserPreferenceService {
+  constructor() {
+    this.storageKey = 'rea_user_preferences_v3';
+    this.halfLifeMs = 7 * 24 * 60 * 60 * 1000; // 7-day half life for recency decay
+    this.profile = this.loadProfile();
+  }
+
+  getDefaultProfile() {
+    return {
+      artistAffinities: {},
+      genreWeights: {},
+      languageWeights: {},
+      moodWeights: {},
+      dislikedTrackIds: [],
+      dislikedArtists: [],
+      totalPlays: 0,
+      totalCompletions: 0,
+      confidence: 0,
+      lastUpdated: Date.now()
+    };
+  }
+
+  loadProfile() {
+    try {
+      const data = localStorage.getItem(this.storageKey);
+      if (data) {
+        const parsed = JSON.parse(data);
+        return { ...this.getDefaultProfile(), ...parsed };
+      }
+    } catch (_) {}
+    return this.getDefaultProfile();
+  }
+
+  saveProfile() {
+    try {
+      this.profile.lastUpdated = Date.now();
+      this.recalculateConfidence();
+      localStorage.setItem(this.storageKey, JSON.stringify(this.profile));
+    } catch (_) {}
+  }
+
+  getDecayedWeight(entry) {
+    if (!entry || typeof entry.weight !== 'number') return 0;
+    const lastPlayed = entry.lastPlayed || entry.lastUpdated || Date.now();
+    const age = Math.max(0, Date.now() - lastPlayed);
+    const decayFactor = Math.pow(0.5, age / this.halfLifeMs);
+    return entry.weight * decayFactor;
+  }
+
+  recalculateConfidence() {
+    const completions = this.profile.totalCompletions || 0;
+    const plays = this.profile.totalPlays || 0;
+    const artistKeys = Object.keys(this.profile.artistAffinities || {});
+    const activeArtists = artistKeys.filter(a => this.getDecayedWeight(this.profile.artistAffinities[a]) > 0.5);
+
+    const score = (completions * 0.10) + (plays * 0.04) + (activeArtists.length * 0.06);
+    this.profile.confidence = Math.min(1.0, Math.max(0, Math.round(score * 100) / 100));
+    return this.profile.confidence;
+  }
+
+  recordSongStarted(track, source = '') {
+    if (!track) return;
+    this.profile.totalPlays = (this.profile.totalPlays || 0) + 1;
+    const tags = detectTrackTags(track);
+
+    tags.artistTokens.forEach(rawArtist => {
+      const artist = rawArtist.toLowerCase();
+      if (!this.profile.artistAffinities[artist]) {
+        this.profile.artistAffinities[artist] = {
+          weight: 0,
+          plays: 0,
+          completions: 0,
+          skips: 0,
+          likes: 0,
+          lastPlayed: Date.now()
+        };
+      }
+      const a = this.profile.artistAffinities[artist];
+      a.plays = (a.plays || 0) + 1;
+      a.weight = Math.min(15, (a.weight || 0) + 1.2);
+      a.lastPlayed = Date.now();
+    });
+
+    tags.genres.forEach(g => {
+      if (!this.profile.genreWeights[g]) {
+        this.profile.genreWeights[g] = { weight: 0, plays: 0, completions: 0, lastPlayed: Date.now() };
+      }
+      const entry = this.profile.genreWeights[g];
+      entry.plays = (entry.plays || 0) + 1;
+      entry.weight = Math.min(10, (entry.weight || 0) + 0.8);
+      entry.lastPlayed = Date.now();
+    });
+
+    tags.languages.forEach(l => {
+      if (!this.profile.languageWeights[l]) {
+        this.profile.languageWeights[l] = { weight: 0, plays: 0, lastPlayed: Date.now() };
+      }
+      const entry = this.profile.languageWeights[l];
+      entry.plays = (entry.plays || 0) + 1;
+      entry.weight = Math.min(10, (entry.weight || 0) + 0.8);
+      entry.lastPlayed = Date.now();
+    });
+
+    tags.moods.forEach(m => {
+      if (!this.profile.moodWeights[m]) {
+        this.profile.moodWeights[m] = { weight: 0, plays: 0, lastPlayed: Date.now() };
+      }
+      const entry = this.profile.moodWeights[m];
+      entry.plays = (entry.plays || 0) + 1;
+      entry.weight = Math.min(8, (entry.weight || 0) + 0.6);
+      entry.lastPlayed = Date.now();
+    });
+
+    this.saveProfile();
+  }
+
+  recordTrackCompleted(track) {
+    if (!track) return;
+    this.profile.totalCompletions = (this.profile.totalCompletions || 0) + 1;
+    const tags = detectTrackTags(track);
+
+    tags.artistTokens.forEach(rawArtist => {
+      const artist = rawArtist.toLowerCase();
+      if (this.profile.artistAffinities[artist]) {
+        const a = this.profile.artistAffinities[artist];
+        a.completions = (a.completions || 0) + 1;
+        a.weight = Math.min(20, a.weight + 2.5);
+        a.lastPlayed = Date.now();
+      }
+    });
+
+    tags.genres.forEach(g => {
+      if (this.profile.genreWeights[g]) {
+        const entry = this.profile.genreWeights[g];
+        entry.completions = (entry.completions || 0) + 1;
+        entry.weight = Math.min(15, entry.weight + 1.5);
+        entry.lastPlayed = Date.now();
+      }
+    });
+
+    this.saveProfile();
+  }
+
+  recordTrackSkipped(track, isHardSkip = false, durationListened = 0) {
+    if (!track) return;
+    const tags = detectTrackTags(track);
+    const penalty = isHardSkip ? 1.5 : 0.4;
+
+    tags.artistTokens.forEach(rawArtist => {
+      const artist = rawArtist.toLowerCase();
+      if (this.profile.artistAffinities[artist]) {
+        const a = this.profile.artistAffinities[artist];
+        a.skips = (a.skips || 0) + 1;
+        a.weight = Math.max(0, a.weight - penalty);
+      }
+    });
+
+    this.saveProfile();
+  }
+
+  recordTrackReplayed(track) {
+    if (!track) return;
+    const tags = detectTrackTags(track);
+    tags.artistTokens.forEach(rawArtist => {
+      const artist = rawArtist.toLowerCase();
+      if (this.profile.artistAffinities[artist]) {
+        const a = this.profile.artistAffinities[artist];
+        a.weight = Math.min(20, a.weight + 3.0);
+        a.lastPlayed = Date.now();
+      }
+    });
+    this.saveProfile();
+  }
+
+  recordTrackLiked(track, isLiked) {
+    if (!track) return;
+    const tags = detectTrackTags(track);
+    tags.artistTokens.forEach(rawArtist => {
+      const artist = rawArtist.toLowerCase();
+      if (!this.profile.artistAffinities[artist]) {
+        this.profile.artistAffinities[artist] = { weight: 0, plays: 0, completions: 0, skips: 0, likes: 0, lastPlayed: Date.now() };
+      }
+      const a = this.profile.artistAffinities[artist];
+      if (isLiked) {
+        a.likes = (a.likes || 0) + 1;
+        a.weight = Math.min(25, a.weight + 3.5);
+      } else {
+        a.likes = Math.max(0, (a.likes || 1) - 1);
+        a.weight = Math.max(0, a.weight - 2.0);
+      }
+      a.lastPlayed = Date.now();
+    });
+
+    tags.genres.forEach(g => {
+      if (!this.profile.genreWeights[g]) {
+        this.profile.genreWeights[g] = { weight: 0, plays: 0, completions: 0, lastPlayed: Date.now() };
+      }
+      const entry = this.profile.genreWeights[g];
+      entry.weight = isLiked ? Math.min(15, entry.weight + 2.0) : Math.max(0, entry.weight - 1.0);
+      entry.lastPlayed = Date.now();
+    });
+
+    this.saveProfile();
+  }
+
+  recordPlaylistAdded(track) {
+    if (!track) return;
+    const tags = detectTrackTags(track);
+    tags.artistTokens.forEach(rawArtist => {
+      const artist = rawArtist.toLowerCase();
+      if (!this.profile.artistAffinities[artist]) {
+        this.profile.artistAffinities[artist] = { weight: 0, plays: 0, completions: 0, skips: 0, likes: 0, lastPlayed: Date.now() };
+      }
+      const a = this.profile.artistAffinities[artist];
+      a.weight = Math.min(25, a.weight + 2.5);
+      a.lastPlayed = Date.now();
+    });
+    this.saveProfile();
+  }
+
+  recordArtistOpened(artistId, artistName) {
+    if (!artistName) return;
+    const artist = artistName.toLowerCase().trim();
+    if (!this.profile.artistAffinities[artist]) {
+      this.profile.artistAffinities[artist] = { weight: 0, plays: 0, completions: 0, skips: 0, likes: 0, lastPlayed: Date.now() };
+    }
+    const a = this.profile.artistAffinities[artist];
+    a.weight = Math.min(20, a.weight + 1.2);
+    a.lastPlayed = Date.now();
+    this.saveProfile();
+  }
+
+  recordExplicitDislike(track) {
+    if (!track || !track.id) return;
+    if (!this.profile.dislikedTrackIds.includes(track.id)) {
+      this.profile.dislikedTrackIds.push(track.id);
+    }
+    const tags = detectTrackTags(track);
+    tags.artistTokens.forEach(rawArtist => {
+      const artist = rawArtist.toLowerCase();
+      if (this.profile.artistAffinities[artist]) {
+        this.profile.artistAffinities[artist].weight = Math.max(0, this.profile.artistAffinities[artist].weight - 4.0);
+      }
+    });
+    this.saveProfile();
+  }
+
+  recordShowLessArtist(artistName) {
+    if (!artistName) return;
+    const artist = artistName.toLowerCase().trim();
+    if (!this.profile.dislikedArtists.includes(artist)) {
+      this.profile.dislikedArtists.push(artist);
+    }
+    if (this.profile.artistAffinities[artist]) {
+      this.profile.artistAffinities[artist].weight = 0;
+    }
+    this.saveProfile();
+  }
+
+  resetPreferences() {
+    this.profile = this.getDefaultProfile();
+    try {
+      localStorage.removeItem(this.storageKey);
+    } catch (_) {}
+  }
+}
+
+class ArtistAffinityService {
+  constructor(preferenceService) {
+    this.preferenceService = preferenceService;
+  }
+
+  getAffinity(artistName) {
+    if (!artistName) return 0;
+    const aKey = artistName.toLowerCase().trim();
+    const affinities = this.preferenceService.profile.artistAffinities;
+    if (!affinities || !affinities[aKey]) return 0;
+    return this.preferenceService.getDecayedWeight(affinities[aKey]);
+  }
+
+  getTopArtists(limit = 5) {
+    const affinities = this.preferenceService.profile.artistAffinities || {};
+    const disliked = new Set(this.preferenceService.profile.dislikedArtists || []);
+    return Object.keys(affinities)
+      .filter(artist => !disliked.has(artist))
+      .map(artist => ({
+        artist,
+        score: this.preferenceService.getDecayedWeight(affinities[artist]),
+        plays: affinities[artist].plays || 0,
+        completions: affinities[artist].completions || 0,
+        likes: affinities[artist].likes || 0
+      }))
+      .filter(a => a.score > 0.5)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
+  getTopGenre() {
+    const genres = this.preferenceService.profile.genreWeights || {};
+    const sorted = Object.keys(genres)
+      .map(g => ({
+        genre: g,
+        score: this.preferenceService.getDecayedWeight(genres[g])
+      }))
+      .filter(g => g.score > 0.5)
+      .sort((a, b) => b.score - a.score);
+    return sorted.length > 0 ? sorted[0] : null;
+  }
+}
+
+class TrackSimilarityService {
+  calculateSimilarity(trackA, trackB) {
+    if (!trackA || !trackB) return 0;
+    if (trackA.id === trackB.id) return 1.0;
+
+    const tagsA = detectTrackTags(trackA);
+    const tagsB = detectTrackTags(trackB);
+
+    let score = 0;
+
+    const artistA = (trackA.artist || '').toLowerCase();
+    const artistB = (trackB.artist || '').toLowerCase();
+    if (artistA === artistB && artistA.length > 0) {
+      score += 0.40;
+    } else {
+      const sharedArtist = tagsA.artistTokens.some(a => tagsB.artistTokens.includes(a));
+      if (sharedArtist) score += 0.30;
+    }
+
+    const sharedGenre = tagsA.genres.some(g => tagsB.genres.includes(g));
+    if (sharedGenre) score += 0.20;
+    const sharedLang = tagsA.languages.some(l => tagsB.languages.includes(l));
+    if (sharedLang) score += 0.10;
+
+    const sharedMood = tagsA.moods.some(m => tagsB.moods.includes(m));
+    if (sharedMood) score += 0.20;
+
+    if (trackA.album && trackB.album && trackA.album.toLowerCase() === trackB.album.toLowerCase()) {
+      score += 0.10;
+    }
+
+    return Math.min(1.0, score);
+  }
+}
+
+class RecommendationEngine {
+  constructor(preferenceService, affinityService, similarityService) {
+    this.preferenceService = preferenceService;
+    this.affinityService = affinityService;
+    this.similarityService = similarityService;
+    this.weights = {
+      artistAffinity: 0.30,
+      recentSimilarity: 0.25,
+      genreLanguage: 0.15,
+      mood: 0.10,
+      engagement: 0.10,
+      freshnessDiscovery: 0.10
+    };
+  }
+
+  scoreCandidate(track, recentTracks = []) {
+    if (!track) return 0;
+    const dislikedTracks = this.preferenceService.profile.dislikedTrackIds || [];
+    if (dislikedTracks.includes(track.id)) return -1;
+
+    const dislikedArtists = this.preferenceService.profile.dislikedArtists || [];
+    const tags = detectTrackTags(track);
+    if (tags.artistTokens.some(a => dislikedArtists.includes(a))) return -1;
+
+    let artistAffinityScore = 0;
+    tags.artistTokens.forEach(a => {
+      const aff = this.affinityService.getAffinity(a);
+      if (aff > artistAffinityScore) artistAffinityScore = aff;
+    });
+    const normArtist = Math.min(1.0, artistAffinityScore / 15);
+
+    let recentSimScore = 0;
+    if (recentTracks.length > 0) {
+      const topSims = recentTracks.slice(0, 5).map(rt => this.similarityService.calculateSimilarity(track, rt));
+      recentSimScore = topSims.reduce((sum, s) => sum + s, 0) / topSims.length;
+    }
+
+    let genreScore = 0;
+    tags.genres.forEach(g => {
+      const gEntry = this.preferenceService.profile.genreWeights[g];
+      if (gEntry) {
+        const w = this.preferenceService.getDecayedWeight(gEntry);
+        if (w > genreScore) genreScore = w;
+      }
+    });
+    const normGenre = Math.min(1.0, genreScore / 10);
+
+    let moodScore = 0;
+    tags.moods.forEach(m => {
+      const mEntry = this.preferenceService.profile.moodWeights[m];
+      if (mEntry) {
+        const w = this.preferenceService.getDecayedWeight(mEntry);
+        if (w > moodScore) moodScore = w;
+      }
+    });
+    const normMood = Math.min(1.0, moodScore / 8);
+
+    let engagementScore = 0;
+    tags.artistTokens.forEach(a => {
+      const entry = this.preferenceService.profile.artistAffinities[a];
+      if (entry) {
+        if (entry.likes > 0) engagementScore += 0.5;
+        if (entry.completions > 1) engagementScore += 0.5;
+      }
+    });
+    engagementScore = Math.min(1.0, engagementScore);
+
+    const discoveryScore = 0.5;
+
+    let totalScore =
+      (normArtist * this.weights.artistAffinity) +
+      (recentSimScore * this.weights.recentSimilarity) +
+      (normGenre * this.weights.genreLanguage) +
+      (normMood * this.weights.mood) +
+      (engagementScore * this.weights.engagement) +
+      (discoveryScore * this.weights.freshnessDiscovery);
+
+    const recentIds = JSON.parse(localStorage.getItem('rea_recently_played_ids') || '[]');
+    if (recentIds.slice(0, 15).includes(track.id)) {
+      totalScore *= 0.5;
+    }
+
+    tags.artistTokens.forEach(a => {
+      const entry = this.preferenceService.profile.artistAffinities[a];
+      if (entry && entry.skips > 2 && entry.skips > (entry.completions || 0)) {
+        totalScore *= 0.65;
+      }
+    });
+
+    return totalScore;
+  }
+
+  rankTracks(candidates, recentTracks = [], maxPerArtist = 3) {
+    if (!candidates || candidates.length === 0) return [];
+
+    const seenIds = new Set();
+    const uniqueCandidates = [];
+    for (const track of candidates) {
+      if (track && track.id && !seenIds.has(track.id)) {
+        seenIds.add(track.id);
+        uniqueCandidates.push(track);
+      }
+    }
+
+    const scored = [];
+    for (const track of uniqueCandidates) {
+      const score = this.scoreCandidate(track, recentTracks);
+      if (score >= 0) {
+        scored.push({ track, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+
+    const artistCounts = new Map();
+    const finalRanked = [];
+
+    for (const item of scored) {
+      const artist = (item.track.artist || 'unknown').toLowerCase().split(',')[0].trim();
+      const count = artistCounts.get(artist) || 0;
+      if (count < maxPerArtist) {
+        artistCounts.set(artist, count + 1);
+        finalRanked.push(item.track);
+      }
+    }
+
+    return finalRanked;
+  }
+}
+
+class HomeFeedService {
+  constructor(app, preferenceService, affinityService, recoEngine) {
+    this.app = app;
+    this.preferenceService = preferenceService;
+    this.affinityService = affinityService;
+    this.recoEngine = recoEngine;
+    this.cachedPersonalizedTracks = [];
+    this.isLoadingPersonalized = false;
+  }
+
+  async renderAdaptiveFeed() {
+    const confidence = this.preferenceService.recalculateConfidence();
+    const topArtists = this.affinityService.getTopArtists(3);
+    const topArtistObj = topArtists.length > 0 ? topArtists[0] : null;
+    const topArtist = topArtistObj ? topArtistObj.artist : null;
+    const topGenreObj = this.affinityService.getTopGenre();
+
+    if (this.app.updateTasteProfileUI) {
+      this.app.updateTasteProfileUI();
+    }
+
+    if (confidence < 0.15 || !topArtist) {
+      if (this.app.personalizedShelf) {
+        this.app.personalizedShelf.style.display = 'none';
+      }
+      if (this.app.jumpBackInShelf) {
+        this.app.jumpBackInShelf.style.display = 'none';
+      }
+      return;
+    }
+
+    this.renderJumpBackInShelf();
+    await this.renderPersonalizedShelf(topArtist, topGenreObj, confidence);
+  }
+
+  renderJumpBackInShelf() {
+    const history = this.app.history || [];
+    if (!this.app.jumpBackInShelf || !this.app.jumpBackInCarousel) return;
+
+    if (history.length === 0) {
+      this.app.jumpBackInShelf.style.display = 'none';
+      return;
+    }
+
+    this.app.jumpBackInShelf.style.display = '';
+    this.app.jumpBackInCarousel.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    history.slice(0, 10).forEach(track => {
+      const card = this.app.createMusicCardElement(track);
+      fragment.appendChild(card);
+    });
+    this.app.jumpBackInCarousel.appendChild(fragment);
+  }
+
+  async renderPersonalizedShelf(topArtist, topGenreObj, confidence) {
+    if (!this.app.personalizedShelf || !this.app.personalizedCarousel) return;
+
+    const formattedArtist = topArtist
+      ? topArtist.replace(/\b\w/g, c => c.toUpperCase())
+      : 'Your Favourites';
+
+    if (this.app.personalizedTitle) {
+      if (confidence > 0.45 && topGenreObj && topGenreObj.score > 3.0) {
+        const capGenre = topGenreObj.genre.replace(/\b\w/g, c => c.toUpperCase());
+        this.app.personalizedTitle.innerHTML = `Your ${capGenre} & ${formattedArtist} Favourites <span class="shelf-title-arrow">›</span>`;
+      } else {
+        this.app.personalizedTitle.innerHTML = `Because you listened to ${formattedArtist} <span class="shelf-title-arrow">›</span>`;
+      }
+    }
+
+    if (this.app.personalizedEyebrow) {
+      this.app.personalizedEyebrow.innerHTML = confidence > 0.45
+        ? `TAILORED FOR YOU <span class="shelf-badge-personalized">★ High Affinity</span>`
+        : `BASED ON YOUR LISTENING`;
+    }
+
+    this.app.personalizedShelf.style.display = '';
+
+    try {
+      const genreParam = topGenreObj ? topGenreObj.genre : '';
+      const res = await fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(topArtist)}&genre=${encodeURIComponent(genreParam)}&limit=18`);
+      if (res.ok) {
+        const data = await res.json();
+        const apiCandidates = data.recommendations || [];
+
+        const allCandidates = [
+          ...apiCandidates,
+          ...(this.app.haryanviHits || []),
+          ...(this.app.punjabiHits || []),
+          ...(this.app.trendingHits || []),
+          ...(this.app.quickPicks || [])
+        ];
+
+        const recentTracks = (this.app.history || []).slice(0, 5);
+        const ranked = this.recoEngine.rankTracks(allCandidates, recentTracks, 3);
+
+        this.cachedPersonalizedTracks = ranked.slice(0, 12);
+        this.app.personalizedCarousel.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        this.cachedPersonalizedTracks.forEach(track => {
+          const card = this.app.createMusicCardElement(track);
+          fragment.appendChild(card);
+        });
+        this.app.personalizedCarousel.appendChild(fragment);
+      }
+    } catch (err) {
+      console.warn('[HomeFeedService] Error rendering personalized shelf:', err);
+    }
+  }
+}
+
+// =============================================================================
 // 3. Main REA Music UI & Application Controller
 // =============================================================================
 class REAMusicApp {
@@ -11387,6 +12927,27 @@ class REAMusicApp {
     this.trendingHits = [];
     this.punjabiHits = [];
     this.romanticHits = [];
+    this.haryanviHits = [];
+    this.bollywoodHits = [];
+    this.indieHits = [];
+    this.selectedMenuTrack = null;
+
+    // Intelligent Personalization & Discovery Engine Services
+    this.userPreferenceService = new UserPreferenceService();
+    this.artistAffinityService = new ArtistAffinityService(this.userPreferenceService);
+    this.trackSimilarityService = new TrackSimilarityService();
+    this.recommendationEngine = new RecommendationEngine(
+      this.userPreferenceService,
+      this.artistAffinityService,
+      this.trackSimilarityService
+    );
+    this.listeningHistoryService = new ListeningHistoryService(this.userPreferenceService);
+    this.homeFeedService = new HomeFeedService(
+      this,
+      this.userPreferenceService,
+      this.artistAffinityService,
+      this.recommendationEngine
+    );
         this.exploreReleases = [
       { id: 'rel-udta-teer', title: 'Udta Teer', artist: 'Various Artists', year: '2026', cover: 'https://c.saavncdn.com/500/Udta-Teer-Hindi-2024-20240816124503-500x500.jpg' },
       { id: 'rel-tu-hai-meri-kiran', title: 'Tu Hai Meri Kiran', artist: 'Various Artists', year: '2026', cover: 'https://c.saavncdn.com/500/Tu-Hai-Meri-Kiran-Hindi-2024-20240906151046-500x500.jpg' },
@@ -12015,6 +13576,62 @@ class REAMusicApp {
     this.recommendedPrevBtn = document.getElementById('recommendedPrevBtn');
     this.recommendedNextBtn = document.getElementById('recommendedNextBtn');
 
+    // Personalized Adaptive Shelves & Discovery Shelves
+    this.personalizedShelf = document.getElementById('personalizedShelf');
+    this.personalizedCarousel = document.getElementById('personalizedCarousel');
+    this.personalizedTitle = document.getElementById('personalizedTitle');
+    this.personalizedEyebrow = document.getElementById('personalizedEyebrow');
+    this.personalizedPrevBtn = document.getElementById('personalizedPrevBtn');
+    this.personalizedNextBtn = document.getElementById('personalizedNextBtn');
+
+    this.jumpBackInShelf = document.getElementById('jumpBackInShelf');
+    this.jumpBackInCarousel = document.getElementById('jumpBackInCarousel');
+
+    this.haryanviShelf = document.getElementById('haryanviShelf');
+    this.haryanviCarousel = document.getElementById('haryanviCarousel');
+    this.haryanviPrevBtn = document.getElementById('haryanviPrevBtn');
+    this.haryanviNextBtn = document.getElementById('haryanviNextBtn');
+
+    this.bollywoodShelf = document.getElementById('bollywoodShelf');
+    this.bollywoodCarousel = document.getElementById('bollywoodCarousel');
+    this.bollywoodPrevBtn = document.getElementById('bollywoodPrevBtn');
+    this.bollywoodNextBtn = document.getElementById('bollywoodNextBtn');
+
+    this.indieShelf = document.getElementById('indieShelf');
+    this.indieCarousel = document.getElementById('indieCarousel');
+    this.indiePrevBtn = document.getElementById('indiePrevBtn');
+    this.indieNextBtn = document.getElementById('indieNextBtn');
+
+    this.discoverArtistsShelf = document.getElementById('discoverArtistsShelf');
+    this.discoverArtistsGrid = document.getElementById('discoverArtistsGrid');
+
+    // Track Options Contextual Modal
+    this.trackOptionsBackdrop = document.getElementById('trackOptionsBackdrop');
+    this.trackOptionsMenu = document.getElementById('trackOptionsMenu');
+    this.trackOptionsThumb = document.getElementById('trackOptionsThumb');
+    this.trackOptionsTitle = document.getElementById('trackOptionsTitle');
+    this.trackOptionsArtist = document.getElementById('trackOptionsArtist');
+    this.trackOptionsCloseBtn = document.getElementById('trackOptionsCloseBtn');
+    this.optPlayNext = document.getElementById('optPlayNext');
+    this.optAddQueue = document.getElementById('optAddQueue');
+    this.optMoreLikeThis = document.getElementById('optMoreLikeThis');
+    this.optToggleLike = document.getElementById('optToggleLike');
+    this.optToggleLikeLabel = document.getElementById('optToggleLikeLabel');
+    this.optNotInterested = document.getElementById('optNotInterested');
+    this.optShowLessArtist = document.getElementById('optShowLessArtist');
+    this.optShowLessArtistLabel = document.getElementById('optShowLessArtistLabel');
+    this.optViewArtist = document.getElementById('optViewArtist');
+
+    // Taste Profile in Settings
+    this.tasteConfidenceValue = document.getElementById('tasteConfidenceValue');
+    this.tasteConfidenceFill = document.getElementById('tasteConfidenceFill');
+    this.tasteConfidenceDesc = document.getElementById('tasteConfidenceDesc');
+    this.tasteStatPlays = document.getElementById('tasteStatPlays');
+    this.tasteStatCompletions = document.getElementById('tasteStatCompletions');
+    this.tasteStatArtists = document.getElementById('tasteStatArtists');
+    this.clearListeningHistoryBtn = document.getElementById('clearListeningHistoryBtn');
+    this.resetRecommendationsBtn = document.getElementById('resetRecommendationsBtn');
+
     // Drawer Related & Recommendations Pane
     this.relatedContainer = document.getElementById('relatedContainer');
     this.relatedArtistCard = document.getElementById('relatedArtistCard');
@@ -12274,8 +13891,46 @@ class REAMusicApp {
         e.preventDefault();
         this.history = [];
         this.saveLocalStorage('rea_history', []);
+        if (this.listeningHistoryService) {
+          this.listeningHistoryService.clearHistory();
+        }
         this.renderHistory();
+        this.updateTasteProfileUI();
+        if (this.homeFeedService) {
+          this.homeFeedService.renderAdaptiveFeed();
+        }
         this.showToast('Listening history cleared');
+      });
+    }
+
+    if (this.clearListeningHistoryBtn) {
+      this.clearListeningHistoryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.history = [];
+        this.saveLocalStorage('rea_history', []);
+        if (this.listeningHistoryService) {
+          this.listeningHistoryService.clearHistory();
+        }
+        this.renderHistory();
+        this.updateTasteProfileUI();
+        if (this.homeFeedService) {
+          this.homeFeedService.renderAdaptiveFeed();
+        }
+        this.showToast('Listening history cleared');
+      });
+    }
+
+    if (this.resetRecommendationsBtn) {
+      this.resetRecommendationsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (this.userPreferenceService) {
+          this.userPreferenceService.resetPreferences();
+        }
+        this.updateTasteProfileUI();
+        if (this.homeFeedService) {
+          this.homeFeedService.renderAdaptiveFeed();
+        }
+        this.showToast('Music recommendations & taste profile reset');
       });
     }
 
@@ -12448,9 +14103,15 @@ class REAMusicApp {
       const dur = this.engine.audio.duration || this.queue[this.currentTrackIndex]?.duration || 1;
       this.updateProgressBar(cur, dur);
       this.updateSyncedLyrics(cur);
+      if (this.listeningHistoryService) {
+        this.listeningHistoryService.updateActiveSession(cur, dur);
+      }
     });
 
     this.engine.audio.addEventListener('ended', () => {
+      if (this.listeningHistoryService && this.currentTrack) {
+        this.listeningHistoryService.onTrackCompleted(this.currentTrack);
+      }
       this.advanceTrack('auto');
     });
 
@@ -13030,6 +14691,102 @@ class REAMusicApp {
     if (this.trendingNextBtn && this.trendingCarousel) {
       this.trendingNextBtn.addEventListener('click', () => {
         this.trendingCarousel.scrollBy({ left: 400, behavior: 'smooth' });
+      });
+    }
+
+    // Personalized & Regional Carousel Arrows
+    const setupCarouselArrows = (prevBtn, nextBtn, carousel) => {
+      if (prevBtn && carousel) {
+        prevBtn.addEventListener('click', () => { carousel.scrollBy({ left: -400, behavior: 'smooth' }); });
+      }
+      if (nextBtn && carousel) {
+        nextBtn.addEventListener('click', () => { carousel.scrollBy({ left: 400, behavior: 'smooth' }); });
+      }
+    };
+
+    setupCarouselArrows(this.personalizedPrevBtn, this.personalizedNextBtn, this.personalizedCarousel);
+    setupCarouselArrows(this.haryanviPrevBtn, this.haryanviNextBtn, this.haryanviCarousel);
+    setupCarouselArrows(this.bollywoodPrevBtn, this.bollywoodNextBtn, this.bollywoodCarousel);
+    setupCarouselArrows(this.indiePrevBtn, this.indieNextBtn, this.indieCarousel);
+
+    // Track Contextual Options Modal Listeners
+    if (this.trackOptionsCloseBtn) {
+      this.trackOptionsCloseBtn.addEventListener('click', () => this.closeTrackOptionsMenu());
+    }
+    if (this.trackOptionsBackdrop) {
+      this.trackOptionsBackdrop.addEventListener('click', (e) => {
+        if (e.target === this.trackOptionsBackdrop) this.closeTrackOptionsMenu();
+      });
+    }
+    if (this.optPlayNext) {
+      this.optPlayNext.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          this.manualQueue.unshift(this.selectedMenuTrack);
+          this.showToast(`Playing next: "${this.selectedMenuTrack.title}"`);
+          this.renderQueue();
+        }
+        this.closeTrackOptionsMenu();
+      });
+    }
+    if (this.optAddQueue) {
+      this.optAddQueue.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          this.manualQueue.push(this.selectedMenuTrack);
+          this.showToast(`Added to queue: "${this.selectedMenuTrack.title}"`);
+          this.renderQueue();
+        }
+        this.closeTrackOptionsMenu();
+      });
+    }
+    if (this.optMoreLikeThis) {
+      this.optMoreLikeThis.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          this.openMoreLikeThis(this.selectedMenuTrack);
+        }
+      });
+    }
+    if (this.optToggleLike) {
+      this.optToggleLike.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          this.toggleLikeTrack(this.selectedMenuTrack);
+        }
+        this.closeTrackOptionsMenu();
+      });
+    }
+    if (this.optNotInterested) {
+      this.optNotInterested.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          const t = this.selectedMenuTrack;
+          this.listeningHistoryService.onExplicitDislike(t);
+          this.showToast(`Recommendation hidden: "${t.title}"`);
+          this.closeTrackOptionsMenu();
+          if (this.homeFeedService) {
+            this.homeFeedService.renderAdaptiveFeed();
+          }
+        }
+      });
+    }
+    if (this.optShowLessArtist) {
+      this.optShowLessArtist.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          const artistName = (this.selectedMenuTrack.artist || '').split(/[,&]/)[0].trim();
+          this.listeningHistoryService.onShowLessArtist(artistName);
+          this.showToast(`Showing less from "${artistName}"`);
+          this.closeTrackOptionsMenu();
+          if (this.homeFeedService) {
+            this.homeFeedService.renderAdaptiveFeed();
+          }
+        }
+      });
+    }
+    if (this.optViewArtist) {
+      this.optViewArtist.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          const track = this.selectedMenuTrack;
+          const artistName = (track.artist || '').split(/[,&]/)[0].trim();
+          this.closeTrackOptionsMenu();
+          this.openArtistView(track.artistId || track.id, artistName);
+        }
       });
     }
 
@@ -13806,6 +15563,10 @@ class REAMusicApp {
     if (!artistIdOrName) return;
     this.currentArtistId = artistIdOrName;
     this.currentArtistName = artistName || artistIdOrName;
+
+    if (this.listeningHistoryService) {
+      this.listeningHistoryService.onArtistOpened(artistIdOrName, this.currentArtistName);
+    }
 
     this.switchView('artist', false);
     if (pushState) {
@@ -14643,6 +16404,9 @@ class REAMusicApp {
       if (this.maxLikeBtn) this.maxLikeBtn.classList.add('active');
       this.showToast(`Saved to Liked Music`);
     }
+    if (this.listeningHistoryService) {
+      this.listeningHistoryService.onTrackLiked(track, this.likedTrackIds.has(track.id));
+    }
     this.saveLocalStorage('rea_liked_tracks', this.likedTracks);
     if (this.likedCount) this.likedCount.textContent = this.likedTracks.length;
     if (this.libLikedTotalCount) this.libLikedTotalCount.textContent = this.likedTracks.length;
@@ -14718,6 +16482,9 @@ class REAMusicApp {
           this.trendingHits = data.trendingHits || [];
           this.punjabiHits = data.punjabiHits || [];
           this.romanticHits = data.romanticHits || [];
+          this.haryanviHits = data.haryanviHits || [];
+          this.bollywoodHits = data.bollywoodHits || [];
+          this.indieHits = data.indieHits || [];
           this.renderShelves();
         }
       }
@@ -14747,12 +16514,25 @@ class REAMusicApp {
       if (data && Array.isArray(data.romanticHits) && data.romanticHits.length > 0) {
         this.romanticHits = data.romanticHits;
       }
+      if (data && Array.isArray(data.haryanviHits) && data.haryanviHits.length > 0) {
+        this.haryanviHits = data.haryanviHits;
+      }
+      if (data && Array.isArray(data.bollywoodHits) && data.bollywoodHits.length > 0) {
+        this.bollywoodHits = data.bollywoodHits;
+      }
+      if (data && Array.isArray(data.indieHits) && data.indieHits.length > 0) {
+        this.indieHits = data.indieHits;
+      }
+
       try {
         localStorage.setItem('rea_cached_catalog_v2', JSON.stringify({
           quickPicks: this.quickPicks,
           trendingHits: this.trendingHits,
           punjabiHits: this.punjabiHits,
-          romanticHits: this.romanticHits
+          romanticHits: this.romanticHits,
+          haryanviHits: this.haryanviHits,
+          bollywoodHits: this.bollywoodHits,
+          indieHits: this.indieHits
         }));
       } catch (_) {}
     } catch (e) {
@@ -15246,6 +17026,11 @@ class REAMusicApp {
     this.engine.playTrack(track);
     this.isPlaying = true;
 
+    // Record listening start in service
+    if (this.listeningHistoryService) {
+      this.listeningHistoryService.onTrackStarted(track, context);
+    }
+
     // Synchronize UI
     this.renderPlayerInfo();
     this.updatePlayPauseUI();
@@ -15264,6 +17049,9 @@ class REAMusicApp {
   advanceTrack(source = 'manual') {
     if (!this.currentTrack && (!this.manualQueue || this.manualQueue.length === 0) && (!this.sequenceQueue || this.sequenceQueue.length === 0)) {
       return;
+    }
+    if (source === 'manual' && this.currentTrack && this.listeningHistoryService) {
+      this.listeningHistoryService.onTrackSkipped(this.currentTrack);
     }
     if (this.isTransitioning) {
       console.log('[Playback] Transition lock active, ignoring advance request');
@@ -16178,6 +17966,7 @@ class REAMusicApp {
         const isDl = this.isDownloaded(track.id);
         const card = document.createElement('div');
         card.className = `track-row-card ${currentId === track.id ? 'active-track' : ''}`;
+        card.setAttribute('data-track-id', track.id);
         card.innerHTML = `
           <div class="track-thumb-wrapper">
             <img src="${track.cover}" alt="${track.title}" class="track-thumb-img" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
@@ -16192,6 +17981,9 @@ class REAMusicApp {
             <div class="track-row-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
             <div class="track-row-artist">${this.renderClickableArtists(track)}</div>
           </div>
+          <button class="track-card-more-btn track-row-more-btn" title="More options" aria-label="More options for ${track.title}">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </button>
           <button class="track-inline-dl-btn ${isDl ? 'downloaded' : ''}" title="${isDl ? 'Downloaded (320kbps) - Click to export' : 'Download for offline playback'}">
             ${isDl 
               ? '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' 
@@ -16200,6 +17992,12 @@ class REAMusicApp {
           <div class="track-row-duration">${this.formatTime(track.duration)}</div>
         `;
         card.addEventListener('click', (e) => {
+          if (e.target.closest('.track-card-more-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.openTrackOptionsMenu(track, e);
+            return;
+          }
           if (e.target.closest('.track-inline-dl-btn') || e.target.closest('.artist-link')) {
             if (e.target.closest('.track-inline-dl-btn')) this.handleDownloadButtonClick(track);
             return;
@@ -16220,38 +18018,24 @@ class REAMusicApp {
             this.playTrack(this.queue.length - 1);
           }
         });
+
+        card.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.openTrackOptionsMenu(track, e);
+        });
+
         fragment.appendChild(card);
       });
       this.quickPicksGrid.appendChild(fragment);
     }
 
-    // 2. Trending Carousel
+    // 2. Trending Carousel (Trending Hits & Viral India)
     if (this.trendingCarousel) {
       const trendingSource = this.trendingHits.length > 0 ? this.trendingHits : this.quickPicks;
       this.trendingCarousel.innerHTML = '';
       const fragment = document.createDocumentFragment();
       trendingSource.forEach(track => {
-        const card = document.createElement('div');
-        card.className = 'music-card';
-        card.innerHTML = `
-          <div class="music-card-thumb">
-            <img src="${track.cover}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
-            <button class="music-card-play" aria-label="Play ${track.title}">
-              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
-            </button>
-          </div>
-          <div class="music-card-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
-          <div class="music-card-sub">${this.renderClickableArtists(track)}</div>
-        `;
-        card.addEventListener('click', (e) => {
-          if (e.target.closest('.artist-link')) return;
-          if (e.target.closest('.music-card-title')) {
-            this.openSongView(track.id);
-            return;
-          }
-          this.queue.splice(this.currentTrackIndex + 1, 0, track);
-          this.playTrack(this.currentTrackIndex + 1);
-        });
+        const card = this.createMusicCardElement(track);
         fragment.appendChild(card);
       });
       this.trendingCarousel.appendChild(fragment);
@@ -16263,31 +18047,229 @@ class REAMusicApp {
       this.focusCarousel.innerHTML = '';
       const fragment = document.createDocumentFragment();
       focusSource.forEach(track => {
-        const card = document.createElement('div');
-        card.className = 'music-card';
-        card.innerHTML = `
-          <div class="music-card-thumb">
-            <img src="${track.cover}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
-            <button class="music-card-play" aria-label="Play ${track.title}">
-              <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
-            </button>
-          </div>
-          <div class="music-card-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
-          <div class="music-card-sub">${this.renderClickableArtists(track)}</div>
-        `;
-        card.addEventListener('click', (e) => {
-          if (e.target.closest('.artist-link')) return;
-          if (e.target.closest('.music-card-title')) {
-            this.openSongView(track.id);
-            return;
-          }
-          this.queue.splice(this.currentTrackIndex + 1, 0, track);
-          this.playTrack(this.currentTrackIndex + 1);
-        });
+        const card = this.createMusicCardElement(track);
         fragment.appendChild(card);
       });
       this.focusCarousel.appendChild(fragment);
     }
+
+    // 4. Haryanvi Hits & Regional Rap Shelf
+    if (this.haryanviCarousel) {
+      const haryanviSource = (this.haryanviHits && this.haryanviHits.length > 0)
+        ? this.haryanviHits
+        : this.quickPicks;
+      this.haryanviCarousel.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      haryanviSource.forEach(track => {
+        const card = this.createMusicCardElement(track);
+        fragment.appendChild(card);
+      });
+      this.haryanviCarousel.appendChild(fragment);
+    }
+
+    // 5. Bollywood Essentials & Melodies Shelf
+    if (this.bollywoodCarousel) {
+      const bollywoodSource = (this.bollywoodHits && this.bollywoodHits.length > 0)
+        ? this.bollywoodHits
+        : this.quickPicks;
+      this.bollywoodCarousel.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      bollywoodSource.forEach(track => {
+        const card = this.createMusicCardElement(track);
+        fragment.appendChild(card);
+      });
+      this.bollywoodCarousel.appendChild(fragment);
+    }
+
+    // 6. Popular Independent Artists Shelf
+    if (this.indieCarousel) {
+      const indieSource = (this.indieHits && this.indieHits.length > 0)
+        ? this.indieHits
+        : this.quickPicks;
+      this.indieCarousel.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      indieSource.forEach(track => {
+        const card = this.createMusicCardElement(track);
+        fragment.appendChild(card);
+      });
+      this.indieCarousel.appendChild(fragment);
+    }
+
+    // 7. Discover Artists Shelf
+    if (this.discoverArtistsGrid) {
+      this.discoverArtistsGrid.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      const allArtists = [
+        ...this.popularSingers,
+        { id: '8812560', name: 'Dhanda Nyoliwala', role: 'Haryanvi Rap', image: 'https://c.saavncdn.com/artists/Dhanda_Nyoliwala_000_20230725114757_150x150.jpg' },
+        { id: '1138356', name: 'Sidhu Moose Wala', role: 'Punjabi Legend', image: 'https://c.saavncdn.com/artists/Sidhu_Moose_Wala_003_20230613054522_150x150.jpg' },
+        { id: '455124', name: 'Yo Yo Honey Singh', role: 'Desi Hip Hop', image: 'https://c.saavncdn.com/artists/Yo_Yo_Honey_Singh_002_20221130103622_150x150.jpg' },
+        { id: '464656', name: 'Khasa Aala Chahar', role: 'Haryanvi Star', image: 'https://c.saavncdn.com/artists/Khasa_Aala_Chahar_001_20230713075218_150x150.jpg' },
+        { id: '1274534', name: 'Gulzaar Chhaniwala', role: 'Haryanvi Pop', image: 'https://c.saavncdn.com/artists/Gulzaar_Chhaniwala_002_20230504100518_150x150.jpg' },
+        { id: '456863', name: 'Badshah', role: 'Hip Hop / Rap', image: 'https://c.saavncdn.com/artists/Badshah_006_20241118064015_150x150.jpg' }
+      ];
+
+      const seen = new Set();
+      const uniqueArtists = [];
+      for (const a of allArtists) {
+        if (!seen.has(a.name)) {
+          seen.add(a.name);
+          uniqueArtists.push(a);
+        }
+      }
+
+      uniqueArtists.forEach(artist => {
+        const card = document.createElement('div');
+        card.className = 'discover-artist-card';
+        card.innerHTML = `
+          <img src="${artist.image || FALLBACK_COVER}" alt="${artist.name}" class="discover-artist-avatar" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <div class="discover-artist-name">${artist.name}</div>
+          <div class="discover-artist-genre">${artist.role || 'Artist'}</div>
+        `;
+        card.addEventListener('click', () => {
+          this.openArtistView(artist.id, artist.name);
+        });
+        fragment.appendChild(card);
+      });
+      this.discoverArtistsGrid.appendChild(fragment);
+    }
+
+    // 8. Render Adaptive Personalized Feed
+    if (this.homeFeedService) {
+      this.homeFeedService.renderAdaptiveFeed();
+    }
+  }
+
+  createMusicCardElement(track) {
+    const card = document.createElement('div');
+    card.className = 'music-card';
+    card.setAttribute('data-track-id', track.id);
+    card.innerHTML = `
+      <div class="music-card-thumb">
+        <img src="${track.cover || FALLBACK_COVER}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+        <button class="music-card-play" aria-label="Play ${track.title}">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
+        </button>
+      </div>
+      <button class="track-card-more-btn" aria-label="More options for ${track.title}" title="More options">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+      </button>
+      <div class="music-card-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
+      <div class="music-card-sub">${this.renderClickableArtists(track)}</div>
+    `;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.track-card-more-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.openTrackOptionsMenu(track, e);
+        return;
+      }
+      if (e.target.closest('.artist-link')) return;
+      if (e.target.closest('.music-card-title')) {
+        this.openSongView(track.id);
+        return;
+      }
+      this.playActualTrack(track, { type: 'card_click' });
+    });
+
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.openTrackOptionsMenu(track, e);
+    });
+
+    return card;
+  }
+
+  openTrackOptionsMenu(track, e) {
+    if (!track) return;
+    this.selectedMenuTrack = track;
+    if (this.trackOptionsThumb) {
+      this.trackOptionsThumb.src = track.cover || FALLBACK_COVER;
+      this.trackOptionsThumb.onerror = () => { this.trackOptionsThumb.src = FALLBACK_COVER; };
+    }
+    if (this.trackOptionsTitle) {
+      this.trackOptionsTitle.textContent = track.title || 'Untitled Track';
+    }
+    if (this.trackOptionsArtist) {
+      this.trackOptionsArtist.textContent = track.artist || 'Unknown Artist';
+    }
+    if (this.optToggleLikeLabel) {
+      const isLiked = this.likedTrackIds.has(track.id);
+      this.optToggleLikeLabel.textContent = isLiked ? 'Remove from Favorites' : 'Add to Favorites';
+    }
+    if (this.optShowLessArtistLabel) {
+      const primaryArtist = (track.artist || '').split(/[,&]/)[0].trim();
+      this.optShowLessArtistLabel.textContent = primaryArtist
+        ? `Show less from ${primaryArtist}`
+        : 'Show less from this artist';
+    }
+    if (this.trackOptionsBackdrop) {
+      this.trackOptionsBackdrop.classList.remove('hidden');
+    }
+  }
+
+  closeTrackOptionsMenu() {
+    this.selectedMenuTrack = null;
+    if (this.trackOptionsBackdrop) {
+      this.trackOptionsBackdrop.classList.add('hidden');
+    }
+  }
+
+  openMoreLikeThis(track) {
+    if (!track) return;
+    this.closeTrackOptionsMenu();
+    this.showToast(`Finding tracks similar to "${track.title}"...`);
+    this.switchView('home');
+    if (this.personalizedShelf) {
+      this.personalizedShelf.scrollIntoView({ behavior: 'smooth' });
+    }
+    if (this.userPreferenceService) {
+      this.userPreferenceService.recordSongStarted(track, 'more_like_this');
+      if (this.homeFeedService) {
+        this.homeFeedService.renderAdaptiveFeed();
+      }
+    }
+  }
+
+  updateTasteProfileUI() {
+    if (!this.userPreferenceService) return;
+    const profile = this.userPreferenceService.profile;
+    const confidence = this.userPreferenceService.recalculateConfidence();
+    const pct = Math.round(confidence * 100);
+
+    if (this.tasteConfidenceFill) {
+      this.tasteConfidenceFill.style.width = `${pct}%`;
+    }
+    if (this.tasteConfidenceValue) {
+      let label = `${pct}% (Discovery Mode)`;
+      if (pct >= 45) {
+        label = `${pct}% (Personalized Discovery)`;
+      } else if (pct >= 15) {
+        label = `${pct}% (Learning Your Taste)`;
+      }
+      this.tasteConfidenceValue.textContent = label;
+    }
+    if (this.tasteConfidenceDesc) {
+      if (pct === 0) {
+        this.tasteConfidenceDesc.textContent = 'REA Music adapts your home screen as you listen. Start playing songs to build your profile.';
+      } else if (pct < 45) {
+        this.tasteConfidenceDesc.textContent = 'Learning from your plays, replays, and favourites. Keep listening to refine recommendations.';
+      } else {
+        this.tasteConfidenceDesc.textContent = 'High confidence profile active. Your home feed dynamically emphasizes your favourite artists and regional styles.';
+      }
+    }
+    if (this.tasteStatPlays) {
+      this.tasteStatPlays.textContent = profile.totalPlays || 0;
+    }
+    if (this.tasteStatCompletions) {
+      this.tasteStatCompletions.textContent = profile.totalCompletions || 0;
+    }
+    if (this.tasteStatArtists) {
+      const artistCount = Object.keys(profile.artistAffinities || {}).length;
+      this.tasteStatArtists.textContent = artistCount;
+    }
+  }
   }
 
   renderQueueSections({ nowPlayingCard, manualCount, clearBtn, manualList, autoplayToggle, recommendedList, isMax = false }) {
