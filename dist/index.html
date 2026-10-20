@@ -39,6 +39,7 @@
   
   
   
+  
   <style id="rea-embedded-styles">
 /* ==========================================================================
    REA MUSIC - Apple Music Clean Glass Design System & Multi-Theme Engine
@@ -8340,9 +8341,9 @@ body.theme-dark .dl-track-quality {
     right: 10px !important;
     width: auto !important;
     transform: none !important;
-    height: 58px !important;
+    height: 60px !important;
     border-radius: 16px !important;
-    background: rgba(24, 20, 30, 0.92) !important;
+    background: rgba(24, 20, 30, 0.94) !important;
     border: 1px solid rgba(255, 255, 255, 0.16) !important;
     backdrop-filter: blur(28px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
@@ -8355,6 +8356,18 @@ body.theme-dark .dl-track-quality {
     cursor: pointer !important;
     user-select: none !important;
     overflow: hidden !important;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, background 0.25s ease !important;
+  }
+
+  .player-bar:active {
+    transform: scale(0.985) !important;
+  }
+
+  /* Completely suppress leaked desktop scrubber row, player actions, and volume controls on mobile mini-player */
+  .player-bar .player-scrubber-row,
+  .player-bar .player-actions,
+  .player-bar .player-right {
+    display: none !important;
   }
 
   .player-bar .progress-container {
@@ -8362,11 +8375,12 @@ body.theme-dark .dl-track-quality {
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    height: 2.5px !important;
+    height: 3px !important;
     background: rgba(255, 255, 255, 0.15) !important;
     margin: 0 !important;
     padding: 0 !important;
     cursor: pointer !important;
+    z-index: 10 !important;
   }
 
   .player-bar .progress-bar-fill {
@@ -8377,18 +8391,20 @@ body.theme-dark .dl-track-quality {
   .player-bar .player-left {
     display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
+    gap: 12px !important;
     flex: 1 1 auto !important;
     min-width: 0 !important;
+    pointer-events: none !important; /* Allow taps to trigger maximize on the parent bar */
   }
 
   .player-bar .player-thumb-img {
-    width: 42px !important;
-    height: 42px !important;
-    min-width: 42px !important;
-    border-radius: 8px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    border-radius: 10px !important;
     object-fit: cover !important;
     flex-shrink: 0 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
   }
 
   .player-bar .player-meta {
@@ -8398,23 +8414,25 @@ body.theme-dark .dl-track-quality {
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
+    gap: 2px !important;
   }
 
   .player-bar .player-title {
     color: #ffffff !important;
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     font-weight: 600 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     line-height: 1.25 !important;
+    letter-spacing: -0.2px !important;
   }
 
   .player-bar .player-artist,
   .player-bar .player-artist a,
   .player-bar .player-artist-row {
     color: rgba(255, 255, 255, 0.72) !important;
-    font-size: 11px !important;
+    font-size: 11.5px !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -8427,6 +8445,7 @@ body.theme-dark .dl-track-quality {
     gap: 6px !important;
     flex-shrink: 0 !important;
     width: auto !important;
+    z-index: 15 !important;
   }
 
   .player-bar .controls-row {
@@ -8436,9 +8455,9 @@ body.theme-dark .dl-track-quality {
   }
 
   .player-bar .play-pause-btn {
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
     border-radius: 50% !important;
     background: var(--accent-red, #ff3154) !important;
     color: #ffffff !important;
@@ -8447,7 +8466,13 @@ body.theme-dark .dl-track-quality {
     justify-content: center !important;
     border: none !important;
     padding: 0 !important;
-    box-shadow: 0 4px 12px rgba(255, 49, 84, 0.45) !important;
+    box-shadow: 0 4px 14px rgba(255, 49, 84, 0.45) !important;
+    cursor: pointer !important;
+    transition: transform 0.15s ease !important;
+  }
+
+  .player-bar .play-pause-btn:active {
+    transform: scale(0.92) !important;
   }
 
   .player-bar .play-pause-btn svg {
@@ -8457,21 +8482,27 @@ body.theme-dark .dl-track-quality {
   }
 
   .player-bar #nextBtn {
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     background: transparent !important;
     border: none !important;
-    color: rgba(255, 255, 255, 0.85) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
     padding: 0 !important;
+    cursor: pointer !important;
+    transition: transform 0.15s ease !important;
+  }
+
+  .player-bar #nextBtn:active {
+    transform: scale(0.9) !important;
   }
 
   .player-bar #nextBtn svg {
-    width: 20px !important;
-    height: 20px !important;
+    width: 22px !important;
+    height: 22px !important;
     fill: currentColor !important;
   }
 
@@ -8873,6 +8904,371 @@ body.theme-dark .dl-track-quality {
     border-radius: 16px !important;
   }
 }
+
+/* ==========================================================================
+   REA MUSIC - COMPLETE WHITE UI (LIGHT MODE) DESIGN SYSTEM
+   Apple Music Crisp Frosted Glass Aesthetics, High Contrast Typography
+   ========================================================================== */
+
+body.theme-white {
+  background-color: #f7f8fa !important;
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 1) 0%, transparent 40%),
+    radial-gradient(circle at 90% 15%, rgba(232, 238, 248, 0.85) 0%, transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #f4f5f8 50%, #eaedf3 100%) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .spatial-bg-wrapper,
+body.theme-white .spatial-aurora-orb {
+  display: none !important;
+}
+
+/* Header & Top Navigation */
+body.theme-white .top-nav {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+}
+
+body.theme-white .brand-title,
+body.theme-white .brand-logo-text {
+  color: #111111 !important;
+}
+
+body.theme-white .search-input {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .search-input::placeholder {
+  color: #86868b !important;
+}
+
+body.theme-white .search-icon {
+  color: #86868b !important;
+}
+
+body.theme-white .search-clear-btn {
+  color: #86868b !important;
+}
+
+body.theme-white .settings-btn,
+body.theme-white .cast-btn,
+body.theme-white .icon-btn {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .settings-btn:hover,
+body.theme-white .icon-btn:hover {
+  background: rgba(0, 0, 0, 0.09) !important;
+  color: #000000 !important;
+}
+
+/* Desktop Sidebar */
+body.theme-white .sidebar {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .nav-item {
+  color: #6e6e73 !important;
+}
+
+body.theme-white .nav-item:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .nav-item.active {
+  background: rgba(255, 49, 84, 0.08) !important;
+  color: #ff3154 !important;
+}
+
+/* Titles and Headings */
+body.theme-white h1,
+body.theme-white h2,
+body.theme-white h3,
+body.theme-white h4,
+body.theme-white .section-title,
+body.theme-white .shelf-title,
+body.theme-white .hero-title {
+  color: #111111 !important;
+}
+
+body.theme-white .section-subtitle,
+body.theme-white .shelf-subtitle,
+body.theme-white .hero-subtitle,
+body.theme-white .official-ranking-tag {
+  color: #86868b !important;
+}
+
+/* Category Chips */
+body.theme-white .genre-pill,
+body.theme-white .chip {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1d1d1f !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+}
+
+body.theme-white .genre-pill:hover,
+body.theme-white .chip:hover {
+  background: #ffffff !important;
+  border-color: rgba(255, 49, 84, 0.35) !important;
+}
+
+body.theme-white .genre-pill.active,
+body.theme-white .chip.active {
+  background: #1d1d1f !important;
+  color: #ffffff !important;
+  border-color: #1d1d1f !important;
+}
+
+/* Cards & Shelves */
+body.theme-white .music-card,
+body.theme-white .album-card,
+body.theme-white .playlist-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+body.theme-white .music-card:hover,
+body.theme-white .album-card:hover {
+  background: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .music-card-title {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .music-card-subtitle,
+body.theme-white .music-card-artist {
+  color: #6e6e73 !important;
+}
+
+/* Ranked Cards (Top 20 Songs) */
+body.theme-white .ranked-track-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+}
+
+body.theme-white .ranked-track-card:hover {
+  background: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07) !important;
+}
+
+body.theme-white .ranked-track-title {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .ranked-track-artist,
+body.theme-white .ranked-track-duration {
+  color: #6e6e73 !important;
+}
+
+body.theme-white .ranked-track-number {
+  color: #86868b !important;
+}
+
+/* Quick Picks & Track Rows */
+body.theme-white .track-row-card {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+body.theme-white .track-row-card:hover {
+  background: #ffffff !important;
+}
+
+body.theme-white .track-row-title {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .track-row-artist {
+  color: #6e6e73 !important;
+}
+
+/* Mini Player Bar in White UI */
+body.theme-white .player-bar {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.09) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09), inset 0 1px 1px rgba(255, 255, 255, 1) !important;
+}
+
+body.theme-white .player-bar .progress-container {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .player-bar .player-title {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .player-bar .player-artist,
+body.theme-white .player-bar .player-artist a,
+body.theme-white .player-bar .player-artist-row {
+  color: #6e6e73 !important;
+}
+
+body.theme-white .player-bar #nextBtn {
+  color: #222222 !important;
+}
+
+body.theme-white .player-bar .play-pause-btn {
+  background: var(--accent-red, #ff3154) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(255, 49, 84, 0.35) !important;
+}
+
+/* Mobile Bottom Tab Bar in White UI */
+body.theme-white .mobile-tab-bar {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.theme-white .mobile-tab-btn {
+  color: #86868b !important;
+}
+
+body.theme-white .mobile-tab-btn.active {
+  color: #ff3154 !important;
+}
+
+/* Settings Modal in White UI */
+body.theme-white .settings-modal-box {
+  background: rgba(255, 255, 255, 0.97) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .settings-modal-title-group h3 {
+  color: #111111 !important;
+}
+
+body.theme-white .settings-modal-subtitle {
+  color: #6e6e73 !important;
+}
+
+body.theme-white .settings-section-header h4 {
+  color: #111111 !important;
+}
+
+body.theme-white .settings-section-tag {
+  color: #86868b !important;
+}
+
+body.theme-white .settings-modal-box .modal-close-btn {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .theme-choice-card {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 2px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .theme-choice-card.active {
+  border-color: #ff3154 !important;
+  background: rgba(255, 49, 84, 0.05) !important;
+}
+
+body.theme-white .theme-choice-name {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .theme-choice-desc {
+  color: #6e6e73 !important;
+}
+
+/* Maximized Player in White UI */
+body.theme-white #maximizedTheater {
+  background: linear-gradient(160deg, #ffffff 0%, #f4f5f8 50%, #e9edf3 100%) !important;
+}
+
+body.theme-white .max-tab-pills {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+body.theme-white .max-tab-btn {
+  color: #6e6e73 !important;
+}
+
+body.theme-white .max-tab-btn.active {
+  background: #ff3154 !important;
+  color: #ffffff !important;
+}
+
+body.theme-white .max-control-btn,
+body.theme-white .btn-minimize-player {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .max-track-title {
+  color: #111111 !important;
+}
+
+body.theme-white .max-track-artist,
+body.theme-white .max-track-album {
+  color: #6e6e73 !important;
+}
+
+body.theme-white .max-thumb-btn {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1d1d1f !important;
+}
+
+body.theme-white .max-ctrl-btn,
+body.theme-white .max-skip-btn {
+  color: #222222 !important;
+}
+
+body.theme-white .max-lyrics-card,
+body.theme-white .max-queue-card {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.theme-white .max-lyrics-header,
+body.theme-white .max-queue-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #111111 !important;
+}
+
+body.theme-white .lyrics-line {
+  color: rgba(0, 0, 0, 0.42) !important;
+}
+
+body.theme-white .lyrics-line.active {
+  color: #111111 !important;
+  font-weight: 700 !important;
+}
+
+body.theme-white .max-queue-item {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+body.theme-white .max-queue-item-title {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .max-queue-item-artist {
+  color: #6e6e73 !important;
+}
+
 
   </style>
 </head>
@@ -10067,7 +10463,7 @@ body.theme-dark .dl-track-quality {
             <h4>Theme</h4>
           </div>
           <div class="theme-selection-grid">
-            <button class="theme-choice-card" data-theme="white" id="themeChoiceWhite">
+            <button class="theme-choice-card" data-theme="white" id="themeChoiceWhite" onclick="if(window.reamusic)window.reamusic.setTheme('white',true);">
               <div class="theme-preview-card preview-white">
                 <div class="preview-mini-nav"></div>
                 <div class="preview-mini-body">
@@ -10078,16 +10474,16 @@ body.theme-dark .dl-track-quality {
               <div class="theme-choice-info">
                 <div class="theme-choice-name">
                   <span class="theme-color-dot dot-white"></span>
-                  <span>Glass White</span>
+                  <span>White UI (Light Mode)</span>
                 </div>
-                <span class="theme-choice-desc">Crisp light frosted glass</span>
+                <span class="theme-choice-desc">Crisp Apple Music light frosted glass</span>
               </div>
               <div class="theme-check-icon">
                 <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
               </div>
             </button>
 
-            <button class="theme-choice-card active" data-theme="dark" id="themeChoiceDark">
+            <button class="theme-choice-card active" data-theme="dark" id="themeChoiceDark" onclick="if(window.reamusic)window.reamusic.setTheme('dark',true);">
               <div class="theme-preview-card preview-dark">
                 <div class="preview-mini-nav"></div>
                 <div class="preview-mini-body">
@@ -10098,9 +10494,9 @@ body.theme-dark .dl-track-quality {
               <div class="theme-choice-info">
                 <div class="theme-choice-name">
                   <span class="theme-color-dot dot-dark"></span>
-                  <span>Simple Black</span>
+                  <span>Simple Black (Dark Mode)</span>
                 </div>
-                <span class="theme-choice-desc">Deep OLED obsidian glass</span>
+                <span class="theme-choice-desc">Deep OLED obsidian glass theme</span>
               </div>
               <div class="theme-check-icon">
                 <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
@@ -10372,6 +10768,7 @@ body.theme-dark .dl-track-quality {
     </footer>
   </div>
 
+  
   
   
   
@@ -11127,7 +11524,7 @@ class REAMusicApp {
     } catch (e) { }
 
     if (showToastFeedback) {
-      const label = targetTheme === 'dark' ? 'Simple Black' : 'Glass White';
+      const label = targetTheme === 'dark' ? 'Simple Black (Dark Mode)' : 'White UI (Light Mode)';
       this.showToast(`Switched to ${label}`);
     }
   }
@@ -11695,13 +12092,22 @@ class REAMusicApp {
 
     // 2. Playback controls
     if (this.playPauseBtn) {
-      this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
+      this.playPauseBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        this.togglePlayPause();
+      });
     }
     if (this.prevBtn) {
-      this.prevBtn.addEventListener('click', () => this.prevTrack());
+      this.prevBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        this.prevTrack();
+      });
     }
     if (this.nextBtn) {
-      this.nextBtn.addEventListener('click', () => this.advanceTrack('manual'));
+      this.nextBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        this.advanceTrack('manual');
+      });
     }
 
     if (this.repeatBtn) {
@@ -12310,6 +12716,26 @@ class REAMusicApp {
     // 19. Maximized / Minimized Player Listeners
     // A. Maximize triggers: clicking mini-player bar, thumbnail container, song title, or fullscreen button
     if (this.playerBar) {
+      let touchStartY = 0;
+      let touchStartX = 0;
+      this.playerBar.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches[0]) {
+          touchStartY = e.touches[0].clientY;
+          touchStartX = e.touches[0].clientX;
+        }
+      }, { passive: true });
+
+      this.playerBar.addEventListener('touchend', (e) => {
+        if (e.changedTouches && e.changedTouches[0]) {
+          const deltaY = touchStartY - e.changedTouches[0].clientY;
+          const deltaX = Math.abs(touchStartX - e.changedTouches[0].clientX);
+          // If swiped up by > 25px
+          if (deltaY > 25 && deltaY > deltaX) {
+            this.maximizePlayer();
+          }
+        }
+      }, { passive: true });
+
       this.playerBar.addEventListener('click', (e) => {
         // Do not maximize if clicking on playback buttons or progress bar
         if (e.target.closest('button') || e.target.closest('.progress-container')) return;

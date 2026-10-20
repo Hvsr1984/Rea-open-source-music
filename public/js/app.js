@@ -689,7 +689,7 @@ class REAMusicApp {
     } catch (e) { }
 
     if (showToastFeedback) {
-      const label = targetTheme === 'dark' ? 'Simple Black' : 'Glass White';
+      const label = targetTheme === 'dark' ? 'Simple Black (Dark Mode)' : 'White UI (Light Mode)';
       this.showToast(`Switched to ${label}`);
     }
   }
@@ -1257,13 +1257,22 @@ class REAMusicApp {
 
     // 2. Playback controls
     if (this.playPauseBtn) {
-      this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
+      this.playPauseBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        this.togglePlayPause();
+      });
     }
     if (this.prevBtn) {
-      this.prevBtn.addEventListener('click', () => this.prevTrack());
+      this.prevBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        this.prevTrack();
+      });
     }
     if (this.nextBtn) {
-      this.nextBtn.addEventListener('click', () => this.advanceTrack('manual'));
+      this.nextBtn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
+        this.advanceTrack('manual');
+      });
     }
 
     if (this.repeatBtn) {
@@ -1872,6 +1881,26 @@ class REAMusicApp {
     // 19. Maximized / Minimized Player Listeners
     // A. Maximize triggers: clicking mini-player bar, thumbnail container, song title, or fullscreen button
     if (this.playerBar) {
+      let touchStartY = 0;
+      let touchStartX = 0;
+      this.playerBar.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches[0]) {
+          touchStartY = e.touches[0].clientY;
+          touchStartX = e.touches[0].clientX;
+        }
+      }, { passive: true });
+
+      this.playerBar.addEventListener('touchend', (e) => {
+        if (e.changedTouches && e.changedTouches[0]) {
+          const deltaY = touchStartY - e.changedTouches[0].clientY;
+          const deltaX = Math.abs(touchStartX - e.changedTouches[0].clientX);
+          // If swiped up by > 25px
+          if (deltaY > 25 && deltaY > deltaX) {
+            this.maximizePlayer();
+          }
+        }
+      }, { passive: true });
+
       this.playerBar.addEventListener('click', (e) => {
         // Do not maximize if clicking on playback buttons or progress bar
         if (e.target.closest('button') || e.target.closest('.progress-container')) return;
