@@ -16,8 +16,10 @@ const MIME_TYPES = {
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
-  '.json': 'application/json',
-  '.webp': 'image/webp'
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon'
 };
 
 /**
@@ -59,8 +61,13 @@ export default async function handler(req, res) {
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
 
-    // High performance device caching headers
-    if (ext === '.html' || cleanUrl === '/index.html') {
+    // High performance device caching & PWA headers
+    if (cleanUrl === '/sw.js') {
+      res.setHeader('Service-Worker-Allowed', '/');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    } else if (ext === '.webmanifest' || cleanUrl === '/manifest.webmanifest' || cleanUrl === '/manifest.json') {
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    } else if (ext === '.html' || cleanUrl === '/index.html') {
       res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
     } else if (['.jpg', '.jpeg', '.png', '.svg', '.webp', '.ico'].includes(ext)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');

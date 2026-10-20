@@ -105,5 +105,14 @@ function copyFolderRecursiveSync(source, target) {
 copyFolderRecursiveSync(path.join(__dirname, 'assets'), path.join(distDir, 'assets'));
 copyFolderRecursiveSync(path.join(__dirname, 'assets'), path.join(publicDir, 'assets'));
 
+// Copy PWA manifest and service worker files to public/ and dist/
+['manifest.webmanifest', 'manifest.json', 'sw.js'].forEach((file) => {
+  const src = path.join(__dirname, file);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, path.join(publicDir, file));
+    fs.copyFileSync(src, path.join(distDir, file));
+  }
+});
+
 console.log('[REA Build] Successfully generated dist/ with all static web assets!');
 console.log(`[REA Build] Bundled HTML size: ${(Buffer.byteLength(bundledHtml) / 1024).toFixed(1)} KB`);

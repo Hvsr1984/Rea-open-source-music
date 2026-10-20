@@ -494,6 +494,8 @@ class REAMusicApp {
     this.loadRecommendations();
     this.loadExploreCatalog();
     this.initRouter();
+    this.initServiceWorker();
+    this.initPwaInstall();
 
     if (this.homeReleasesNextBtn && this.homeReleasesCarousel) {
       this.homeReleasesNextBtn.addEventListener('click', () => {
@@ -664,6 +666,108 @@ class REAMusicApp {
         console.warn('Capacitor MusicService updateState notice:', e);
       }
     }
+  }
+
+  initServiceWorker() {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((reg) => {
+            console.log('[REA PWA] Service Worker registered with scope:', reg.scope);
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[REA PWA] App update ready.');
+                  }
+                });
+              }
+            });
+          })
+          .catch((err) => {
+            console.warn('[REA PWA] Service Worker registration failed:', err);
+          });
+      });
+    }
+  }
+
+  initPwaInstall() {
+    this.deferredInstallPrompt = null;
+    const installBtn = document.getElementById('installPwaBtn');
+    const installBtnText = document.getElementById('installBtnText');
+    const installDesc = document.getElementById('installStatusDesc');
+
+    // Check if already running in standalone PWA mode
+    const isStandalone = (typeof window !== 'undefined') && (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true ||
+      document.referrer.includes('android-app://')
+    );
+
+    if (isStandalone) {
+      if (installBtnText) installBtnText.textContent = 'Installed ✓';
+      if (installBtn) {
+        installBtn.style.opacity = '0.75';
+        installBtn.style.cursor = 'default';
+      }
+      if (installDesc) installDesc.textContent = 'REA Music is installed and running as a standalone app on your device.';
+    }
+
+    // Capture beforeinstallprompt event from browser
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredInstallPrompt = e;
+      console.log('[REA PWA] beforeinstallprompt event captured');
+      if (installBtnText && !isStandalone) installBtnText.textContent = 'Install App';
+      if (installDesc && !isStandalone) installDesc.textContent = 'Install REA Music natively for fullscreen lossless playback and offline caching.';
+    });
+
+    // Handle install button click
+    if (installBtn) {
+      installBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (this.deferredInstallPrompt) {
+          try {
+            await this.deferredInstallPrompt.prompt();
+            const choiceResult = await this.deferredInstallPrompt.userChoice;
+            console.log('[REA PWA] User installation choice:', choiceResult);
+            if (choiceResult && choiceResult.outcome === 'accepted') {
+              this.showToast('Installing REA Music...');
+              if (installBtnText) installBtnText.textContent = 'Installed ✓';
+            }
+            this.deferredInstallPrompt = null;
+          } catch (err) {
+            console.warn('[REA PWA] Install error:', err);
+          }
+        } else {
+          // If already running standalone
+          if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+            this.showToast('REA Music is already installed on your device!');
+            return;
+          }
+
+          // Browser guidance fallback for Android Chrome & iOS Safari
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+          if (isIOS) {
+            this.showToast('To install: Tap the Share button [↑] at the bottom of Safari, then choose "Add to Home Screen"');
+          } else {
+            this.showToast('To install: Tap the Chrome menu (⋮) at top right and choose "Install app"');
+          }
+        }
+      });
+    }
+
+    // Handle appinstalled event
+    window.addEventListener('appinstalled', () => {
+      console.log('[REA PWA] REA Music app installed successfully');
+      this.deferredInstallPrompt = null;
+      if (installBtnText) installBtnText.textContent = 'Installed ✓';
+      if (installDesc) installDesc.textContent = 'REA Music is installed on your device!';
+      this.showToast('🎉 REA Music installed successfully!');
+    });
   }
 
   setTheme(themeName, showToastFeedback = true) {

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "name": "REA Music",
+  "short_name": "REA Music",
+  "description": "Your music, your vibe.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "window-controls-overlay"
+  ],
+  "background_color": "#0a0a0e",
+  "theme_color": "#ff3154",
+  "orientation": "any",
+  "categories": [
+    "music",
+    "entertainment",
+    "audio"
+  ],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Explore Charts",
+      "short_name": "Charts",
+      "description": "Listen to top Indian trending rankings",
+      "url": "/#explore",
+      "icons": [
+        {
+          "src": "/assets/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Search Music",
+      "short_name": "Search",
+      "description": "Search songs, albums, and artists",
+      "url": "/#search",
+      "icons": [
+        {
+          "src": "/assets/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

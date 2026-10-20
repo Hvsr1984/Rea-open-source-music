@@ -9226,3 +9226,18 @@ body.theme-white .max-queue-item-artist {
   color: #6e6e73 !important;
 }
 
+body.theme-white #installStatusTitle {
+  color: #111111 !important;
+}
+
+body.theme-white #installStatusDesc {
+  color: #6e6e73 !important;
+}
+
+body.theme-white #installPwaBtn {
+  background: var(--accent-red, #ff3154) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(255, 49, 84, 0.35) !important;
+}
+
+
