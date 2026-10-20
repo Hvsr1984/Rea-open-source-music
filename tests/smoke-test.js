@@ -212,6 +212,39 @@ async function runTests() {
     }
   });
 
+  // Test 14: Fresh App Launch Empty Player State & Clean Initialization
+  await testCase('Fresh App Launch: Player bar initializes in premium empty state without leaking default songs', async () => {
+    const res = await request('/');
+    if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
+    const body = res.body;
+
+    if (!body.includes('class="player-bar is-empty"') && !body.includes('id="playerBar" class="player-bar is-empty"')) {
+      throw new Error('Bottom player bar is missing .is-empty class in initial HTML');
+    }
+    if (!body.includes('id="playerEmptyContainer"')) {
+      throw new Error('Missing playerEmptyContainer in initial HTML');
+    }
+    if (!body.includes('Nothing playing') || !body.includes('Choose a song to start listening')) {
+      throw new Error('Missing "Nothing playing" or hint text in empty player UI');
+    }
+
+    const playerBarHtml = body.substring(body.indexOf('id="playerBar"'), body.indexOf('</footer>', body.indexOf('id="playerBar"')));
+    if (playerBarHtml.includes('Casa Tupka Anthem') || playerBarHtml.includes('Yo Yo Honey Singh')) {
+      throw new Error('Initial player bar contains hardcoded song title or artist');
+    }
+
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const appJs = fs.readFileSync(path.resolve('./js/app.js'), 'utf8');
+
+    if (!appJs.includes('this.currentTrack = null;')) {
+      throw new Error('REAMusicApp constructor must initialize this.currentTrack to null');
+    }
+    if (!appJs.includes('this.currentTrackIndex = -1;')) {
+      throw new Error('REAMusicApp constructor must initialize this.currentTrackIndex to -1');
+    }
+  });
+
   // Close server
   await new Promise(resolve => server.close(resolve));
   console.log('\n=======================================');

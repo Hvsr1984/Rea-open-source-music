@@ -355,18 +355,8 @@ class REAMusicApp {
       { id: 'chart-12', rank: 12, rankChange: '+1', title: 'Arz Kiya Hai', artist: 'Anuv Jain', album: 'Coke Studio Bharat', cover: 'https://c.saavncdn.com/500/Arz-Kiya-Hai-Hindi-2024-20240618151046-500x500.jpg', duration: 245 }
     ];
     this.queue = [];
-        this.currentTrack = {
-      id: 'chart-1',
-      title: 'Casa Tupka Anthem',
-      artist: 'Yo Yo Honey Singh',
-      album: 'Casa Tupka',
-      cover: 'assets/casa_tupka.jpg',
-      duration: 183,
-      audioUrl: 'https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4',
-      language: 'hindi'
-    };
-    this.queue = [this.currentTrack, ...FALLBACK_TRACKS];
-    this.currentTrackIndex = 0;
+    this.currentTrack = null;
+    this.currentTrackIndex = -1;
     this.isPlaying = false;
     this.isMuted = false;
     this.previousVolume = 0.75;
@@ -505,12 +495,15 @@ class REAMusicApp {
     }
   
 
-    // Atmospheric pointer parallax on desktop
+    this.lastActiveLyricIndex = -1;
+
+    // Atmospheric pointer parallax on desktop (only active on spatial theme)
     window.spatialBgParallaxAttached = true;
     const bgImage = document.getElementById('spatialBgImage');
     if (bgImage && window.matchMedia('(min-width: 769px)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       let rafId = null;
       window.addEventListener('mousemove', (e) => {
+        if (this.currentTheme !== 'spatial') return;
         if (rafId) cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(() => {
           const xNorm = (e.clientX / window.innerWidth) - 0.5;
@@ -521,7 +514,6 @@ class REAMusicApp {
         });
       }, { passive: true });
     }
-  
   }
 
   async initOfflineStorage() {
@@ -1030,6 +1022,9 @@ class REAMusicApp {
     this.playerThumb = document.getElementById('playerThumbImg');
     this.playerTrackTitle = document.getElementById('playerTitle');
     this.playerEmptyLabel = document.getElementById('playerEmptyLabel');
+    this.playerEmptyContainer = document.getElementById('playerEmptyContainer');
+    this.playerMeta = document.getElementById('playerMeta');
+    this.playerActions = document.getElementById('playerActions');
     this.playerArtist = document.getElementById('playerArtist');
     this.playerAlbum = document.getElementById('playerAlbum');
     this.likeBtn = document.getElementById('likeBtn');
@@ -1407,7 +1402,7 @@ class REAMusicApp {
     this.engine.audio.addEventListener('play', () => {
       this.isPlaying = true;
       this.updatePlayPauseUI();
-      this.renderShelves();
+      this.updateShelvesPlayingState();
       if (typeof this.startVisualizerLoop === 'function') {
         this.startVisualizerLoop();
       }
@@ -1416,7 +1411,7 @@ class REAMusicApp {
     this.engine.audio.addEventListener('pause', () => {
       this.isPlaying = false;
       this.updatePlayPauseUI();
-      this.renderShelves();
+      this.updateShelvesPlayingState();
       if (typeof this.stopVisualizerLoop === 'function') {
         this.stopVisualizerLoop();
       }
@@ -3182,6 +3177,19 @@ class REAMusicApp {
   // Explore View Logic
   // ===========================================================================
   async loadExploreCatalog() {
+    // Instant cache hydration from localStorage for 0ms initial load
+    try {
+      const cached = localStorage.getItem('rea_cached_explore_v1');
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data && (data.newReleases || data.topCharts)) {
+          if (data.newReleases && data.newReleases.length > 0) this.exploreReleases = data.newReleases;
+          if (data.topCharts && data.topCharts.length > 0) this.exploreCharts = data.topCharts;
+          this.renderExplore();
+        }
+      }
+    } catch (_) {}
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/explore`);
       if (!res.ok) throw new Error('Explore API offline');
@@ -3189,6 +3197,13 @@ class REAMusicApp {
 
       if (data.newReleases) this.exploreReleases = data.newReleases;
       if (data.topCharts) this.exploreCharts = data.topCharts;
+
+      try {
+        localStorage.setItem('rea_cached_explore_v1', JSON.stringify({
+          newReleases: this.exploreReleases,
+          topCharts: this.exploreCharts
+        }));
+      } catch (_) {}
 
       this.renderExplore();
     } catch (e) {
@@ -3263,7 +3278,7 @@ class REAMusicApp {
 
       chartItems.forEach(track => {
         const card = document.createElement('div');
-        card.className = 'ranked-track-card' + (track.rank === 1 ? ' rank-active' : '');
+        card.dataset.songId = track.id;
 
         let deltaHtml = '';
         let change = String(track.rankChange || '');
@@ -3336,6 +3351,12 @@ class REAMusicApp {
           deltaHtml = `<span class="rank-badge badge-same">—</span>`;
         }
 
+        const isCurrent = Boolean(this.currentTrack && (
+          (this.currentTrack.id && String(this.currentTrack.id) === String(track.id)) ||
+          (this.currentTrack.title && this.currentTrack.title.trim().toLowerCase() === cleanTitle.toLowerCase())
+        ));
+        card.className = 'ranked-track-card' + (isCurrent ? ' rank-active' : '');
+
         card.innerHTML = `
           <div class="rank-number ${track.rank === 1 ? 'top-rank' : ''}">${track.rank}</div>
           ${deltaHtml}
@@ -3355,8 +3376,14 @@ class REAMusicApp {
             this.openSongView(track.id);
             return;
           }
-          this.queue.splice(this.currentTrackIndex + 1, 0, track);
-          this.playTrack(this.currentTrackIndex + 1);
+          const playItem = {
+            ...track,
+            title: cleanTitle,
+            artist: displayArtist,
+            cover: displayCover,
+            duration: displayDuration
+          };
+          this.playActualTrack(playItem, { type: 'chart', id: track.id, rank: track.rank });
         });
         fragment.appendChild(card);
       });
@@ -4180,6 +4207,9 @@ class REAMusicApp {
   }
 
   advanceTrack(source = 'manual') {
+    if (!this.currentTrack && (!this.manualQueue || this.manualQueue.length === 0) && (!this.sequenceQueue || this.sequenceQueue.length === 0)) {
+      return;
+    }
     if (this.isTransitioning) {
       console.log('[Playback] Transition lock active, ignoring advance request');
       return;
@@ -4741,6 +4771,17 @@ class REAMusicApp {
   }
 
   updateProgressBar(cur, dur) {
+    if (!this.currentTrack) {
+      if (this.progressBarFill) this.progressBarFill.style.width = '0%';
+      if (this.scrubHandle) this.scrubHandle.style.left = '0%';
+      if (this.currentTimeDisplay) this.currentTimeDisplay.textContent = '0:00';
+      if (this.totalDurationDisplay) this.totalDurationDisplay.textContent = '0:00';
+      if (this.maxProgressFill) this.maxProgressFill.style.width = '0%';
+      if (this.maxProgressThumb) this.maxProgressThumb.style.left = '0%';
+      if (this.maxTimeCurrent) this.maxTimeCurrent.textContent = '0:00';
+      if (this.maxTimeTotal) this.maxTimeTotal.textContent = '0:00';
+      return;
+    }
     const pct = dur > 0 ? (cur / dur) * 100 : 0;
     if (this.progressBarFill) this.progressBarFill.style.width = `${pct}%`;
     if (this.scrubHandle) this.scrubHandle.style.left = `${pct}%`;
@@ -4765,11 +4806,19 @@ class REAMusicApp {
   // Synced Lyrics Engine
   // ===========================================================================
   renderLyrics() {
-    const track = this.queue[this.currentTrackIndex];
+    const track = this.currentTrack || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex] : null);
     if (this.lyricsBody) {
       this.lyricsBody.innerHTML = '';
 
-      if (!track || !track.lyrics || track.lyrics.length === 0) {
+      if (!track) {
+        this.lyricsBody.innerHTML = `
+          <div class="empty-lyrics">
+            <svg viewBox="0 0 24 24" width="40" height="40" style="opacity:0.35; margin-bottom: 8px;"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            <p style="font-weight:600;font-size:1rem;color:#fff;margin:4px 0;">No song playing</p>
+            <p style="color:#888;font-size:0.85rem;">Play a track to view synchronized lyrics</p>
+          </div>
+        `;
+      } else if (!track.lyrics || track.lyrics.length === 0) {
         this.lyricsBody.innerHTML = `
           <div class="empty-lyrics">
             <p>Searching synchronized lyrics for</p>
@@ -4805,6 +4854,9 @@ class REAMusicApp {
         activeIndex = i;
       }
     }
+
+    if (this.lastActiveLyricIndex === activeIndex) return;
+    this.lastActiveLyricIndex = activeIndex;
 
     // 1. Update Mini Drawer Lyrics
     if (this.lyricsBody) {
@@ -4926,7 +4978,10 @@ class REAMusicApp {
 
     if (!track) {
       if (playerBar) playerBar.classList.add('is-empty');
+      if (this.playerEmptyContainer) this.playerEmptyContainer.style.display = 'flex';
       if (this.playerThumbContainer) this.playerThumbContainer.style.display = 'none';
+      if (this.playerMeta) this.playerMeta.style.display = 'none';
+      if (this.playerActions) this.playerActions.style.display = 'none';
       if (this.playerThumb) this.playerThumb.src = '';
       if (this.playerTrackTitle) this.playerTrackTitle.textContent = '';
       if (this.playerArtist) this.playerArtist.innerHTML = '';
@@ -4943,17 +4998,26 @@ class REAMusicApp {
       const buffered = document.getElementById('progressBuffered');
       const timeCur = document.getElementById('timeCurrent');
       const timeTot = document.getElementById('timeTotal');
+      const thumb = document.getElementById('progressThumb');
       if (fill) fill.style.width = '0%';
       if (buffered) buffered.style.width = '0%';
+      if (thumb) thumb.style.left = '0%';
       if (timeCur) timeCur.textContent = '0:00';
       if (timeTot) timeTot.textContent = '0:00';
 
       // Maximized player clean empty state
-      if (this.maxAlbumArt) this.maxAlbumArt.src = FALLBACK_COVER;
+      if (this.maxAlbumArt) {
+        this.maxAlbumArt.src = '';
+        this.maxAlbumArt.style.display = 'none';
+      }
       if (this.maxAmbientGlow) this.maxAmbientGlow.style.backgroundImage = 'none';
       if (this.maxTrackTitle) this.maxTrackTitle.textContent = 'No track selected';
       if (this.maxTrackArtist) this.maxTrackArtist.innerHTML = 'Select a song to play';
       if (this.maxTrackAlbum) this.maxTrackAlbum.innerHTML = '';
+      if (this.maxProgressFill) this.maxProgressFill.style.width = '0%';
+      if (this.maxProgressThumb) this.maxProgressThumb.style.left = '0%';
+      if (this.maxTimeCurrent) this.maxTimeCurrent.textContent = '0:00';
+      if (this.maxTimeTotal) this.maxTimeTotal.textContent = '0:00';
 
       this.renderMaxLyrics();
       this.renderMaxQueue();
@@ -4962,9 +5026,13 @@ class REAMusicApp {
     }
 
     if (playerBar) playerBar.classList.remove('is-empty');
+    if (this.playerEmptyContainer) this.playerEmptyContainer.style.display = 'none';
     if (this.playerThumbContainer) this.playerThumbContainer.style.display = '';
+    if (this.playerMeta) this.playerMeta.style.display = '';
+    if (this.playerActions) this.playerActions.style.display = '';
     if (this.playerDownloadBtn) this.playerDownloadBtn.style.display = '';
     if (this.dislikeBtn) this.dislikeBtn.style.display = '';
+    if (this.maxAlbumArt) this.maxAlbumArt.style.display = '';
 
     if (this.playerThumb) this.playerThumb.src = track.cover || FALLBACK_COVER;
     if (this.playerTrackTitle) this.playerTrackTitle.textContent = track.title || '';
@@ -5331,6 +5399,7 @@ class REAMusicApp {
   // Maximized / Minimized Player Theater Controls
   // ===========================================================================
   maximizePlayer() {
+    if (!this.currentTrack) return;
     this.isPlayerMaximized = true;
     if (this.maximizedPlayer) {
       this.maximizedPlayer.classList.add('open');
@@ -5741,6 +5810,22 @@ class REAMusicApp {
   }
 
   async loadRecommendations(targetArtist) {
+    if (!targetArtist) {
+      try {
+        const cached = localStorage.getItem('rea_cached_reco_v1');
+        if (cached) {
+          const data = JSON.parse(cached);
+          if (data && data.recommendations && data.recommendations.length > 0) {
+            this.recommendations = data.recommendations;
+            if (data.trendingSearches) this.trendingSearches = data.trendingSearches;
+            this.renderRecommendedShelf();
+            this.renderSearchHub();
+            this.renderRelatedPane();
+          }
+        }
+      } catch (_) {}
+    }
+
     try {
       const currentTrack = this.currentTrack || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex] : null);
       const artistParam = targetArtist || (currentTrack ? currentTrack.artist : 'Arijit Singh');
@@ -5756,6 +5841,16 @@ class REAMusicApp {
       if (data.trendingSearches && data.trendingSearches.length > 0) {
         this.trendingSearches = data.trendingSearches;
       }
+
+      if (!targetArtist) {
+        try {
+          localStorage.setItem('rea_cached_reco_v1', JSON.stringify({
+            recommendations: this.recommendations,
+            trendingSearches: this.trendingSearches
+          }));
+        } catch (_) {}
+      }
+
       this.renderRecommendedShelf();
       this.renderSearchHub();
       this.renderRelatedPane();
@@ -5896,6 +5991,38 @@ class REAMusicApp {
         this.searchRecoList.appendChild(item);
       });
     }
+  }
+
+  updateShelvesPlayingState() {
+    const currentId = this.currentTrack?.id || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex]?.id : null);
+    if (!this.quickPicksGrid) return;
+
+    const cards = this.quickPicksGrid.querySelectorAll('.track-row-card');
+    cards.forEach(card => {
+      const titleEl = card.querySelector('.track-row-title');
+      const songId = titleEl ? titleEl.dataset.songId : null;
+      const isActive = songId && String(songId) === String(currentId);
+      card.classList.toggle('active-track', isActive);
+      const overlay = card.querySelector('.track-play-overlay');
+      if (overlay) {
+        if (isActive && this.isPlaying) {
+          overlay.innerHTML = '<div class="equalizer-icon"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>';
+        } else {
+          overlay.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="#fff" d="M8 5v14l11-7z"/></svg>';
+        }
+      }
+    });
+
+    const rankedCards = document.querySelectorAll('.ranked-track-card');
+    rankedCards.forEach(card => {
+      const titleEl = card.querySelector('.track-row-title');
+      const cardTitle = titleEl ? titleEl.textContent.trim().toLowerCase() : '';
+      const isCur = Boolean(this.currentTrack && (
+        (card.dataset.songId && String(card.dataset.songId) === String(this.currentTrack.id)) ||
+        (this.currentTrack.title && this.currentTrack.title.trim().toLowerCase() === cardTitle)
+      ));
+      card.classList.toggle('rank-active', isCur);
+    });
   }
 
   renderRecommendedShelf() {

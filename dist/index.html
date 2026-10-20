@@ -9,6 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://c.saavncdn.com" crossorigin>
   <link rel="dns-prefetch" href="https://c.saavncdn.com">
+  <link rel="preconnect" href="https://aac.saavncdn.com" crossorigin>
+  <link rel="dns-prefetch" href="https://aac.saavncdn.com">
+  <meta http-equiv="x-dns-prefetch-control" content="on">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#ff3154">
@@ -19,6 +22,10 @@
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/assets/icons/icon-512.png">
+  
+  
+  
+  
   
   
   
@@ -88,6 +95,8 @@ button, .music-card, .song-list-item, .mini-player-dock, .mobile-tab-btn {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
   transform: translateZ(0);
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
 }
 
 .mini-player-dock,
@@ -95,25 +104,32 @@ button, .music-card, .song-list-item, .mini-player-dock, .mobile-tab-btn {
 .top-nav {
   transform: translateZ(0);
   backface-visibility: hidden;
+  will-change: transform;
 }
 
 /* Device rendering optimization: skip off-screen rendering calculations */
 .track-row-card,
-.music-card,
 .ranked-track-card,
+.download-track-row,
 .queue-item {
   content-visibility: auto;
   contain-intrinsic-size: 0 68px;
+  contain: layout style paint;
 }
 
-/* Image rendering acceleration */
+.music-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 190px 240px;
+  contain: layout style paint;
+}
+
+/* Crisp image rendering without wasteful GPU layer promotion */
 .track-thumb-img,
 .music-card-thumb img,
 .queue-item-thumb,
 .artist-avatar-img,
 .singer-avatar-img {
   image-rendering: -webkit-optimize-contrast;
-  transform: translateZ(0);
 }
 
 :root,
@@ -152,8 +168,8 @@ body:not(.theme-dark) {
   --glass-bg-chip: rgba(255, 255, 255, 0.10);
   --glass-bg-chip-hover: rgba(255, 255, 255, 0.18);
 
-  --glass-blur: blur(28px) saturate(190%);
-  --glass-blur-sm: blur(16px) saturate(180%);
+  --glass-blur: blur(14px) saturate(150%);
+  --glass-blur-sm: blur(8px) saturate(140%);
   --glass-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
   --glass-shadow-hover: 0 24px 50px 0 rgba(0, 0, 0, 0.6), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35);
   --glass-shadow-player: 0 24px 60px 0 rgba(0, 0, 0, 0.55), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35);
@@ -232,8 +248,12 @@ body.theme-white {
   --max-bg: linear-gradient(160deg, #FFFFFF 0%, #F5F5F7 50%, #E8EAEF 100%);
 }
 
-body.theme-white .spatial-bg-wrapper {
+.spatial-bg-wrapper {
   display: none;
+}
+
+body.theme-spatial .spatial-bg-wrapper {
+  display: block;
 }
 
 body.theme-dark {
@@ -258,8 +278,8 @@ body.theme-dark {
   --glass-border-subtle: rgba(255, 255, 255, 0.06);
   --glass-border-hover: rgba(255, 255, 255, 0.25);
 
-  --glass-blur: blur(28px) saturate(190%);
-  --glass-blur-sm: blur(16px) saturate(180%);
+  --glass-blur: blur(14px) saturate(150%);
+  --glass-blur-sm: blur(8px) saturate(140%);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
   --glass-shadow-hover: 0 16px 44px 0 rgba(0, 0, 0, 0.75), inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
   --glass-shadow-player: 0 -10px 36px 0 rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.14);
@@ -286,6 +306,25 @@ body.theme-dark {
   --scrubber-bg: rgba(255, 255, 255, 0.15);
 
   --max-bg: #000000;
+}
+
+@media (max-width: 768px) {
+  :root, body.theme-dark, body.theme-white {
+    --glass-blur: blur(10px) saturate(130%);
+    --glass-blur-sm: blur(6px) saturate(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  :root, body.theme-dark, body.theme-white {
+    --glass-blur: none !important;
+    --glass-blur-sm: none !important;
+  }
 }
 
 /* Base Reset */
@@ -1665,12 +1704,10 @@ a {
   padding: 8px 14px;
   border-radius: var(--radius-md);
   background: var(--glass-bg-card);
-  backdrop-filter: var(--glass-blur-sm);
-  -webkit-backdrop-filter: var(--glass-blur-sm);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   position: relative;
 }
 
@@ -1809,13 +1846,11 @@ a {
   display: flex;
   flex-direction: column;
   background: var(--glass-bg-card);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   padding: 12px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .album-card:hover,
@@ -2318,19 +2353,70 @@ a {
   display: none !important;
 }
 
+.player-bar.is-empty .player-meta {
+  display: none !important;
+}
+
 .player-bar.is-empty .player-title-row,
 .player-bar.is-empty .player-artist-row {
   display: none !important;
 }
 
-.player-bar.is-empty .player-empty-label {
-  display: inline-flex;
+.player-empty-container {
+  display: flex;
   align-items: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-tertiary);
-  letter-spacing: -0.01em;
+  gap: 12px;
   user-select: none;
+  min-width: 0;
+}
+
+.player-bar:not(.is-empty) .player-empty-container {
+  display: none !important;
+}
+
+.player-empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.4));
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.player-empty-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.player-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-empty-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-bar.is-empty .player-empty-label {
+  display: none !important;
 }
 
 .player-bar:not(.is-empty) .player-empty-label {
@@ -2342,17 +2428,31 @@ a {
   width: 0% !important;
 }
 
+.player-bar.is-empty .progress-thumb {
+  left: 0% !important;
+  opacity: 0 !important;
+}
+
 .player-bar.is-empty .progress-container {
   pointer-events: none;
+  cursor: default;
 }
 
 .player-bar.is-empty .play-pause-btn {
   opacity: 0.55;
   cursor: default;
+  pointer-events: none;
 }
 
 .player-bar.is-empty #prevBtn,
 .player-bar.is-empty #nextBtn {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.player-bar.is-empty #shuffleBtn,
+.player-bar.is-empty #repeatBtn {
   opacity: 0.35;
   cursor: default;
   pointer-events: none;
@@ -3175,10 +3275,8 @@ a {
   background: var(--glass-bg-card);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: var(--glass-blur-sm);
-  -webkit-backdrop-filter: var(--glass-blur-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .ranked-track-card:hover {
@@ -5515,12 +5613,10 @@ body.theme-dark .downloads-format-badge {
   padding: 10px 16px;
   border-radius: var(--radius-md);
   background: var(--glass-bg-card);
-  backdrop-filter: var(--glass-blur-sm);
-  -webkit-backdrop-filter: var(--glass-blur-sm);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   position: relative;
 }
 
@@ -6149,9 +6245,7 @@ body.theme-dark .dl-track-quality {
   border-radius: var(--radius-lg);
   background: var(--glass-bg-card);
   border: 1px solid var(--glass-border);
-  backdrop-filter: var(--glass-blur-sm);
-  -webkit-backdrop-filter: var(--glass-blur-sm);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
   cursor: pointer;
 }
 
@@ -6246,9 +6340,7 @@ body.theme-dark .dl-track-quality {
   border-radius: var(--radius-xl);
   background: var(--glass-bg-card);
   border: 1px solid var(--glass-border);
-  backdrop-filter: var(--glass-blur-sm);
-  -webkit-backdrop-filter: var(--glass-blur-sm);
-  transition: all var(--transition-normal);
+  transition: transform var(--transition-normal), background-color var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal);
   cursor: pointer;
 }
 
@@ -6462,9 +6554,7 @@ body.theme-dark .dl-track-quality {
   border-radius: var(--radius-lg);
   background: var(--glass-bg-card);
   border: 1px solid var(--glass-border);
-  backdrop-filter: var(--glass-blur-sm);
-  -webkit-backdrop-filter: var(--glass-blur-sm);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
   cursor: pointer;
 }
 
@@ -9188,6 +9278,20 @@ body.theme-white .player-bar .play-pause-btn {
   box-shadow: 0 4px 14px rgba(255, 49, 84, 0.35) !important;
 }
 
+body.theme-white .player-empty-icon {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  color: #86868b !important;
+}
+
+body.theme-white .player-empty-title {
+  color: #1d1d1f !important;
+}
+
+body.theme-white .player-empty-hint {
+  color: #86868b !important;
+}
+
 /* Mobile Bottom Tab Bar in White UI */
 body.theme-white .mobile-tab-bar {
   background: rgba(255, 255, 255, 0.94) !important;
@@ -10384,27 +10488,45 @@ body.theme-white #installPwaBtn {
   </div>
 
   <!-- Persistent Bottom Player Bar (Identical to YouTube Music) -->
-  <footer class="player-bar" id="playerBar">
+  <footer class="player-bar is-empty" id="playerBar">
     <!-- Left: Song Information & Actions -->
     <div class="player-left">
-      <div class="player-thumbnail-container" id="playerThumbContainer">
-        <img src="assets/casa_tupka.jpg" alt="Casa Tupka Anthem" class="player-thumb-img" id="playerThumbImg" referrerpolicy="no-referrer" onerror="this.src='assets/casa_tupka.jpg';">
+      <!-- Empty State UI -->
+      <div class="player-empty-container" id="playerEmptyContainer">
+        <div class="player-empty-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+        </div>
+        <div class="player-empty-text-wrap">
+          <span class="player-empty-title">Nothing playing</span>
+          <span class="player-empty-hint">Choose a song to start listening</span>
+        </div>
+      </div>
+
+      <!-- Active Track Thumbnail -->
+      <div class="player-thumbnail-container" id="playerThumbContainer" style="display:none;">
+        <img src="" alt="" class="player-thumb-img" id="playerThumbImg" referrerpolicy="no-referrer">
         <div class="player-thumb-hover-expand" title="Expand view">
           <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/></svg>
         </div>
       </div>
-      <div class="player-meta">
-        <span class="player-empty-label" id="playerEmptyLabel" style="display:none;">No track selected</span>
+
+      <!-- Active Track Meta -->
+      <div class="player-meta" id="playerMeta" style="display:none;">
+        <span class="player-empty-label" id="playerEmptyLabel" style="display:none;">Nothing playing</span>
         <div class="player-title-row">
-          <span class="player-title" id="playerTitle">Casa Tupka Anthem</span>
+          <span class="player-title" id="playerTitle"></span>
         </div>
         <div class="player-artist-row">
-          <span class="player-artist" id="playerArtist">Yo Yo Honey Singh</span>
+          <span class="player-artist" id="playerArtist"></span>
           <span class="dot-separator">•</span>
-          <span class="player-album" id="playerAlbum">Casa Tupka</span>
+          <span class="player-album" id="playerAlbum"></span>
         </div>
       </div>
-      <div class="player-actions">
+
+      <!-- Active Track Actions -->
+      <div class="player-actions" id="playerActions" style="display:none;">
         <button class="icon-btn action-thumb" id="likeBtn" title="Like">
           <svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
         </button>
@@ -10441,12 +10563,12 @@ body.theme-white #installPwaBtn {
           <div class="progress-bar-bg">
             <div class="progress-bar-hover" id="progressHover"></div>
             <div class="progress-bar-buffered" id="progressBuffered"></div>
-            <div class="progress-bar-fill" id="progressFill" style="width: 25%;"></div>
+            <div class="progress-bar-fill" id="progressFill" style="width: 0%;"></div>
           </div>
-          <div class="progress-thumb" id="progressThumb" style="left: 25%;"></div>
+          <div class="progress-thumb" id="progressThumb" style="left: 0%;"></div>
           <div class="progress-tooltip" id="progressTooltip">0:00</div>
         </div>
-        <span class="time-text" id="timeTotal">3:45</span>
+        <span class="time-text" id="timeTotal">0:00</span>
       </div>
     </div>
 
@@ -10695,7 +10817,7 @@ body.theme-white #installPwaBtn {
       <!-- Left Column: Giant Album Art & Metadata -->
       <section class="max-stage-left" id="maxStageLeft">
         <div class="max-art-wrapper">
-          <img src="assets/casa_tupka.jpg" alt="Album Art" class="max-album-art" id="maxAlbumArt" onerror="this.onerror=null;this.src='assets/casa_tupka.jpg';">
+          <img src="" alt="Album Art" class="max-album-art" id="maxAlbumArt" style="display:none;" onerror="this.onerror=null;this.style.display='none';">
           <div class="max-art-glow-ring"></div>
         </div>
 
@@ -10815,7 +10937,7 @@ body.theme-white #installPwaBtn {
           <div class="max-progress-fill" id="maxProgressFill"></div>
           <div class="max-progress-thumb" id="maxProgressThumb"></div>
         </div>
-        <span class="max-time-label" id="maxTimeTotal">3:45</span>
+        <span class="max-time-label" id="maxTimeTotal">0:00</span>
       </div>
 
       <!-- Main Controls Row -->
@@ -10863,6 +10985,10 @@ body.theme-white #installPwaBtn {
     </footer>
   </div>
 
+  
+  
+  
+  
   
   
   
@@ -11291,18 +11417,8 @@ class REAMusicApp {
       { id: 'chart-12', rank: 12, rankChange: '+1', title: 'Arz Kiya Hai', artist: 'Anuv Jain', album: 'Coke Studio Bharat', cover: 'https://c.saavncdn.com/500/Arz-Kiya-Hai-Hindi-2024-20240618151046-500x500.jpg', duration: 245 }
     ];
     this.queue = [];
-        this.currentTrack = {
-      id: 'chart-1',
-      title: 'Casa Tupka Anthem',
-      artist: 'Yo Yo Honey Singh',
-      album: 'Casa Tupka',
-      cover: 'assets/casa_tupka.jpg',
-      duration: 183,
-      audioUrl: 'https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4',
-      language: 'hindi'
-    };
-    this.queue = [this.currentTrack, ...FALLBACK_TRACKS];
-    this.currentTrackIndex = 0;
+    this.currentTrack = null;
+    this.currentTrackIndex = -1;
     this.isPlaying = false;
     this.isMuted = false;
     this.previousVolume = 0.75;
@@ -11441,12 +11557,15 @@ class REAMusicApp {
     }
   
 
-    // Atmospheric pointer parallax on desktop
+    this.lastActiveLyricIndex = -1;
+
+    // Atmospheric pointer parallax on desktop (only active on spatial theme)
     window.spatialBgParallaxAttached = true;
     const bgImage = document.getElementById('spatialBgImage');
     if (bgImage && window.matchMedia('(min-width: 769px)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       let rafId = null;
       window.addEventListener('mousemove', (e) => {
+        if (this.currentTheme !== 'spatial') return;
         if (rafId) cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(() => {
           const xNorm = (e.clientX / window.innerWidth) - 0.5;
@@ -11457,7 +11576,6 @@ class REAMusicApp {
         });
       }, { passive: true });
     }
-  
   }
 
   async initOfflineStorage() {
@@ -11966,6 +12084,9 @@ class REAMusicApp {
     this.playerThumb = document.getElementById('playerThumbImg');
     this.playerTrackTitle = document.getElementById('playerTitle');
     this.playerEmptyLabel = document.getElementById('playerEmptyLabel');
+    this.playerEmptyContainer = document.getElementById('playerEmptyContainer');
+    this.playerMeta = document.getElementById('playerMeta');
+    this.playerActions = document.getElementById('playerActions');
     this.playerArtist = document.getElementById('playerArtist');
     this.playerAlbum = document.getElementById('playerAlbum');
     this.likeBtn = document.getElementById('likeBtn');
@@ -12343,7 +12464,7 @@ class REAMusicApp {
     this.engine.audio.addEventListener('play', () => {
       this.isPlaying = true;
       this.updatePlayPauseUI();
-      this.renderShelves();
+      this.updateShelvesPlayingState();
       if (typeof this.startVisualizerLoop === 'function') {
         this.startVisualizerLoop();
       }
@@ -12352,7 +12473,7 @@ class REAMusicApp {
     this.engine.audio.addEventListener('pause', () => {
       this.isPlaying = false;
       this.updatePlayPauseUI();
-      this.renderShelves();
+      this.updateShelvesPlayingState();
       if (typeof this.stopVisualizerLoop === 'function') {
         this.stopVisualizerLoop();
       }
@@ -14118,6 +14239,19 @@ class REAMusicApp {
   // Explore View Logic
   // ===========================================================================
   async loadExploreCatalog() {
+    // Instant cache hydration from localStorage for 0ms initial load
+    try {
+      const cached = localStorage.getItem('rea_cached_explore_v1');
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data && (data.newReleases || data.topCharts)) {
+          if (data.newReleases && data.newReleases.length > 0) this.exploreReleases = data.newReleases;
+          if (data.topCharts && data.topCharts.length > 0) this.exploreCharts = data.topCharts;
+          this.renderExplore();
+        }
+      }
+    } catch (_) {}
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/explore`);
       if (!res.ok) throw new Error('Explore API offline');
@@ -14125,6 +14259,13 @@ class REAMusicApp {
 
       if (data.newReleases) this.exploreReleases = data.newReleases;
       if (data.topCharts) this.exploreCharts = data.topCharts;
+
+      try {
+        localStorage.setItem('rea_cached_explore_v1', JSON.stringify({
+          newReleases: this.exploreReleases,
+          topCharts: this.exploreCharts
+        }));
+      } catch (_) {}
 
       this.renderExplore();
     } catch (e) {
@@ -14199,7 +14340,7 @@ class REAMusicApp {
 
       chartItems.forEach(track => {
         const card = document.createElement('div');
-        card.className = 'ranked-track-card' + (track.rank === 1 ? ' rank-active' : '');
+        card.dataset.songId = track.id;
 
         let deltaHtml = '';
         let change = String(track.rankChange || '');
@@ -14272,6 +14413,12 @@ class REAMusicApp {
           deltaHtml = `<span class="rank-badge badge-same">—</span>`;
         }
 
+        const isCurrent = Boolean(this.currentTrack && (
+          (this.currentTrack.id && String(this.currentTrack.id) === String(track.id)) ||
+          (this.currentTrack.title && this.currentTrack.title.trim().toLowerCase() === cleanTitle.toLowerCase())
+        ));
+        card.className = 'ranked-track-card' + (isCurrent ? ' rank-active' : '');
+
         card.innerHTML = `
           <div class="rank-number ${track.rank === 1 ? 'top-rank' : ''}">${track.rank}</div>
           ${deltaHtml}
@@ -14291,8 +14438,14 @@ class REAMusicApp {
             this.openSongView(track.id);
             return;
           }
-          this.queue.splice(this.currentTrackIndex + 1, 0, track);
-          this.playTrack(this.currentTrackIndex + 1);
+          const playItem = {
+            ...track,
+            title: cleanTitle,
+            artist: displayArtist,
+            cover: displayCover,
+            duration: displayDuration
+          };
+          this.playActualTrack(playItem, { type: 'chart', id: track.id, rank: track.rank });
         });
         fragment.appendChild(card);
       });
@@ -15116,6 +15269,9 @@ class REAMusicApp {
   }
 
   advanceTrack(source = 'manual') {
+    if (!this.currentTrack && (!this.manualQueue || this.manualQueue.length === 0) && (!this.sequenceQueue || this.sequenceQueue.length === 0)) {
+      return;
+    }
     if (this.isTransitioning) {
       console.log('[Playback] Transition lock active, ignoring advance request');
       return;
@@ -15677,6 +15833,17 @@ class REAMusicApp {
   }
 
   updateProgressBar(cur, dur) {
+    if (!this.currentTrack) {
+      if (this.progressBarFill) this.progressBarFill.style.width = '0%';
+      if (this.scrubHandle) this.scrubHandle.style.left = '0%';
+      if (this.currentTimeDisplay) this.currentTimeDisplay.textContent = '0:00';
+      if (this.totalDurationDisplay) this.totalDurationDisplay.textContent = '0:00';
+      if (this.maxProgressFill) this.maxProgressFill.style.width = '0%';
+      if (this.maxProgressThumb) this.maxProgressThumb.style.left = '0%';
+      if (this.maxTimeCurrent) this.maxTimeCurrent.textContent = '0:00';
+      if (this.maxTimeTotal) this.maxTimeTotal.textContent = '0:00';
+      return;
+    }
     const pct = dur > 0 ? (cur / dur) * 100 : 0;
     if (this.progressBarFill) this.progressBarFill.style.width = `${pct}%`;
     if (this.scrubHandle) this.scrubHandle.style.left = `${pct}%`;
@@ -15701,11 +15868,19 @@ class REAMusicApp {
   // Synced Lyrics Engine
   // ===========================================================================
   renderLyrics() {
-    const track = this.queue[this.currentTrackIndex];
+    const track = this.currentTrack || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex] : null);
     if (this.lyricsBody) {
       this.lyricsBody.innerHTML = '';
 
-      if (!track || !track.lyrics || track.lyrics.length === 0) {
+      if (!track) {
+        this.lyricsBody.innerHTML = `
+          <div class="empty-lyrics">
+            <svg viewBox="0 0 24 24" width="40" height="40" style="opacity:0.35; margin-bottom: 8px;"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            <p style="font-weight:600;font-size:1rem;color:#fff;margin:4px 0;">No song playing</p>
+            <p style="color:#888;font-size:0.85rem;">Play a track to view synchronized lyrics</p>
+          </div>
+        `;
+      } else if (!track.lyrics || track.lyrics.length === 0) {
         this.lyricsBody.innerHTML = `
           <div class="empty-lyrics">
             <p>Searching synchronized lyrics for</p>
@@ -15741,6 +15916,9 @@ class REAMusicApp {
         activeIndex = i;
       }
     }
+
+    if (this.lastActiveLyricIndex === activeIndex) return;
+    this.lastActiveLyricIndex = activeIndex;
 
     // 1. Update Mini Drawer Lyrics
     if (this.lyricsBody) {
@@ -15862,7 +16040,10 @@ class REAMusicApp {
 
     if (!track) {
       if (playerBar) playerBar.classList.add('is-empty');
+      if (this.playerEmptyContainer) this.playerEmptyContainer.style.display = 'flex';
       if (this.playerThumbContainer) this.playerThumbContainer.style.display = 'none';
+      if (this.playerMeta) this.playerMeta.style.display = 'none';
+      if (this.playerActions) this.playerActions.style.display = 'none';
       if (this.playerThumb) this.playerThumb.src = '';
       if (this.playerTrackTitle) this.playerTrackTitle.textContent = '';
       if (this.playerArtist) this.playerArtist.innerHTML = '';
@@ -15879,17 +16060,26 @@ class REAMusicApp {
       const buffered = document.getElementById('progressBuffered');
       const timeCur = document.getElementById('timeCurrent');
       const timeTot = document.getElementById('timeTotal');
+      const thumb = document.getElementById('progressThumb');
       if (fill) fill.style.width = '0%';
       if (buffered) buffered.style.width = '0%';
+      if (thumb) thumb.style.left = '0%';
       if (timeCur) timeCur.textContent = '0:00';
       if (timeTot) timeTot.textContent = '0:00';
 
       // Maximized player clean empty state
-      if (this.maxAlbumArt) this.maxAlbumArt.src = FALLBACK_COVER;
+      if (this.maxAlbumArt) {
+        this.maxAlbumArt.src = '';
+        this.maxAlbumArt.style.display = 'none';
+      }
       if (this.maxAmbientGlow) this.maxAmbientGlow.style.backgroundImage = 'none';
       if (this.maxTrackTitle) this.maxTrackTitle.textContent = 'No track selected';
       if (this.maxTrackArtist) this.maxTrackArtist.innerHTML = 'Select a song to play';
       if (this.maxTrackAlbum) this.maxTrackAlbum.innerHTML = '';
+      if (this.maxProgressFill) this.maxProgressFill.style.width = '0%';
+      if (this.maxProgressThumb) this.maxProgressThumb.style.left = '0%';
+      if (this.maxTimeCurrent) this.maxTimeCurrent.textContent = '0:00';
+      if (this.maxTimeTotal) this.maxTimeTotal.textContent = '0:00';
 
       this.renderMaxLyrics();
       this.renderMaxQueue();
@@ -15898,9 +16088,13 @@ class REAMusicApp {
     }
 
     if (playerBar) playerBar.classList.remove('is-empty');
+    if (this.playerEmptyContainer) this.playerEmptyContainer.style.display = 'none';
     if (this.playerThumbContainer) this.playerThumbContainer.style.display = '';
+    if (this.playerMeta) this.playerMeta.style.display = '';
+    if (this.playerActions) this.playerActions.style.display = '';
     if (this.playerDownloadBtn) this.playerDownloadBtn.style.display = '';
     if (this.dislikeBtn) this.dislikeBtn.style.display = '';
+    if (this.maxAlbumArt) this.maxAlbumArt.style.display = '';
 
     if (this.playerThumb) this.playerThumb.src = track.cover || FALLBACK_COVER;
     if (this.playerTrackTitle) this.playerTrackTitle.textContent = track.title || '';
@@ -16267,6 +16461,7 @@ class REAMusicApp {
   // Maximized / Minimized Player Theater Controls
   // ===========================================================================
   maximizePlayer() {
+    if (!this.currentTrack) return;
     this.isPlayerMaximized = true;
     if (this.maximizedPlayer) {
       this.maximizedPlayer.classList.add('open');
@@ -16677,6 +16872,22 @@ class REAMusicApp {
   }
 
   async loadRecommendations(targetArtist) {
+    if (!targetArtist) {
+      try {
+        const cached = localStorage.getItem('rea_cached_reco_v1');
+        if (cached) {
+          const data = JSON.parse(cached);
+          if (data && data.recommendations && data.recommendations.length > 0) {
+            this.recommendations = data.recommendations;
+            if (data.trendingSearches) this.trendingSearches = data.trendingSearches;
+            this.renderRecommendedShelf();
+            this.renderSearchHub();
+            this.renderRelatedPane();
+          }
+        }
+      } catch (_) {}
+    }
+
     try {
       const currentTrack = this.currentTrack || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex] : null);
       const artistParam = targetArtist || (currentTrack ? currentTrack.artist : 'Arijit Singh');
@@ -16692,6 +16903,16 @@ class REAMusicApp {
       if (data.trendingSearches && data.trendingSearches.length > 0) {
         this.trendingSearches = data.trendingSearches;
       }
+
+      if (!targetArtist) {
+        try {
+          localStorage.setItem('rea_cached_reco_v1', JSON.stringify({
+            recommendations: this.recommendations,
+            trendingSearches: this.trendingSearches
+          }));
+        } catch (_) {}
+      }
+
       this.renderRecommendedShelf();
       this.renderSearchHub();
       this.renderRelatedPane();
@@ -16832,6 +17053,38 @@ class REAMusicApp {
         this.searchRecoList.appendChild(item);
       });
     }
+  }
+
+  updateShelvesPlayingState() {
+    const currentId = this.currentTrack?.id || (this.currentTrackIndex >= 0 ? this.queue[this.currentTrackIndex]?.id : null);
+    if (!this.quickPicksGrid) return;
+
+    const cards = this.quickPicksGrid.querySelectorAll('.track-row-card');
+    cards.forEach(card => {
+      const titleEl = card.querySelector('.track-row-title');
+      const songId = titleEl ? titleEl.dataset.songId : null;
+      const isActive = songId && String(songId) === String(currentId);
+      card.classList.toggle('active-track', isActive);
+      const overlay = card.querySelector('.track-play-overlay');
+      if (overlay) {
+        if (isActive && this.isPlaying) {
+          overlay.innerHTML = '<div class="equalizer-icon"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>';
+        } else {
+          overlay.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="#fff" d="M8 5v14l11-7z"/></svg>';
+        }
+      }
+    });
+
+    const rankedCards = document.querySelectorAll('.ranked-track-card');
+    rankedCards.forEach(card => {
+      const titleEl = card.querySelector('.track-row-title');
+      const cardTitle = titleEl ? titleEl.textContent.trim().toLowerCase() : '';
+      const isCur = Boolean(this.currentTrack && (
+        (card.dataset.songId && String(card.dataset.songId) === String(this.currentTrack.id)) ||
+        (this.currentTrack.title && this.currentTrack.title.trim().toLowerCase() === cardTitle)
+      ));
+      card.classList.toggle('rank-active', isCur);
+    });
   }
 
   renderRecommendedShelf() {

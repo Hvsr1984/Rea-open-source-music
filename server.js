@@ -1,6 +1,8 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import apiHandler from './api/index.js';
 
@@ -21,6 +23,8 @@ const MIME_TYPES = {
   '.webp': 'image/webp',
   '.ico': 'image/x-icon'
 };
+
+const COMPRESSIBLE_EXTS = new Set(['.html', '.css', '.js', '.json', '.webmanifest', '.svg']);
 
 /**
  * Universal Request Handler for both Vercel Serverless and local Node.js
@@ -61,6 +65,16 @@ export default async function handler(req, res) {
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
 
+    // ETag & Conditional 304 validation for instant reloads
+    const hash = crypto.createHash('md5').update(content).digest('hex').slice(0, 16);
+    const etag = `W/"${content.length.toString(16)}-${hash}"`;
+    res.setHeader('ETag', etag);
+
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304);
+      return res.end();
+    }
+
     // High performance device caching & PWA headers
     if (cleanUrl === '/sw.js') {
       res.setHeader('Service-Worker-Allowed', '/');
@@ -75,11 +89,30 @@ export default async function handler(req, res) {
       res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     }
 
+    // Device & network compression (gzip / brotli) for text payloads
+    const acceptEncoding = (req.headers['accept-encoding'] || '').toLowerCase();
+    let finalPayload = content;
+
+    if (COMPRESSIBLE_EXTS.has(ext) && content.length > 512) {
+      res.setHeader('Vary', 'Accept-Encoding');
+      if (acceptEncoding.includes('br') && typeof zlib.brotliCompressSync === 'function') {
+        res.setHeader('Content-Encoding', 'br');
+        finalPayload = zlib.brotliCompressSync(content, {
+          params: {
+            [zlib.constants.BROTLI_PARAM_QUALITY]: 4
+          }
+        });
+      } else if (acceptEncoding.includes('gzip')) {
+        res.setHeader('Content-Encoding', 'gzip');
+        finalPayload = zlib.gzipSync(content, { level: 6 });
+      }
+    }
+
     if (res.status && res.send) {
-      return res.status(200).send(content);
+      return res.status(200).send(finalPayload);
     }
     res.writeHead(200);
-    res.end(content);
+    res.end(finalPayload);
   } catch (err) {
     res.writeHead(500, { 'Content-Type': 'text/plain' });
     res.end('Server Error');
