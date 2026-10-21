@@ -1398,15 +1398,29 @@ class REAMusicApp {
     // Persistent User Data from LocalStorage
     this.likedTracks = this.loadLocalStorage('rea_liked_tracks', FALLBACK_TRACKS.slice(0, 2));
     this.history = this.loadLocalStorage('rea_history', []);
-    this.customPlaylists = this.loadLocalStorage('rea_custom_playlists', [
-      {
-        id: 'pl-bollywood-romance',
-        title: 'Bollywood Romance Favorites',
-        desc: 'Soulful melodies and romantic hits',
-        cover: 'https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg',
-        tracks: [FALLBACK_TRACKS[0], FALLBACK_TRACKS[1]]
-      }
-    ]);
+    // Feature 1: Personal Playlists without dummy or fabricated data
+    const existingPlaylistsV2 = this.loadLocalStorage('rea_custom_playlists_v2', null);
+    if (Array.isArray(existingPlaylistsV2)) {
+      this.customPlaylists = existingPlaylistsV2;
+    } else {
+      const legacyPlaylists = this.loadLocalStorage('rea_custom_playlists', []);
+      // Filter out legacy dummy playlist so fresh libraries have a clean empty slate
+      const sanitized = Array.isArray(legacyPlaylists)
+        ? legacyPlaylists.filter(p => p && p.id !== 'pl-bollywood-romance' && p.title !== 'Bollywood Romance Favorites')
+        : [];
+      this.customPlaylists = sanitized;
+      this.saveLocalStorage('rea_custom_playlists_v2', this.customPlaylists);
+    }
+
+    // Playback navigation history stack for consistent Previous track behavior
+    this.playbackHistoryStack = [];
+    this._isNavigatingBack = false;
+    this.currentPlaylistId = null;
+    this.selectedCoverPreset = 'gradient-1';
+    this.selectedEditCoverPreset = 'gradient-1';
+    this.targetAddToPlaylistTrack = null;
+    this.pendingAddToPlaylistTrack = null;
+    this._deleteTargetPlaylistId = null;
 
     this.likedTrackIds = new Set(this.likedTracks.map(t => t.id));
     this.searchDebounceTimer = null;
@@ -1827,14 +1841,18 @@ class REAMusicApp {
     this.navHome = document.getElementById('navHome');
     this.navExplore = document.getElementById('navExplore');
     this.navLibrary = document.getElementById('navLibrary');
+    this.navPlaylists = document.getElementById('navPlaylists');
     this.navDownloads = document.getElementById('navDownloads');
     this.navDonate = document.getElementById('navDonate');
     this.sidebarDownloadsBadge = document.getElementById('sidebarDownloadsBadge');
+    this.mobileTabPlaylists = document.getElementById('mobileTabPlaylists');
 
     // Views
     this.viewHome = document.getElementById('viewHome');
     this.viewExplore = document.getElementById('viewExplore');
     this.viewLibrary = document.getElementById('viewLibrary');
+    this.viewPlaylists = document.getElementById('viewPlaylists');
+    this.viewPlaylist = document.getElementById('viewPlaylist');
     this.viewDownloads = document.getElementById('viewDownloads');
     this.viewSearch = document.getElementById('viewSearch');
     this.viewArtist = document.getElementById('viewArtist');
@@ -2219,13 +2237,73 @@ class REAMusicApp {
     this.maxRefreshRecommendationsBtn = document.getElementById('maxRefreshRecommendationsBtn');
     this.maxQueueRecommendedList = document.getElementById('maxQueueRecommendedList');
 
-    // Modal
+    // Playlists & Custom Playlist Modals (Feature 1)
+    this.createPlaylistViewBtn = document.getElementById('createPlaylistViewBtn');
+    this.emptyCreatePlaylistBtn = document.getElementById('emptyCreatePlaylistBtn');
+    this.myPlaylistsGrid = document.getElementById('myPlaylistsGrid');
+    this.playlistsEmptyState = document.getElementById('playlistsEmptyState');
+
+    // Create Playlist Modal Elements
     this.playlistModal = document.getElementById('playlistModal');
     this.closePlaylistModalBtn = document.getElementById('closePlaylistModalBtn');
     this.cancelPlaylistModalBtn = document.getElementById('cancelPlaylistModalBtn');
     this.confirmCreatePlaylistBtn = document.getElementById('confirmCreatePlaylistBtn');
     this.playlistTitleInput = document.getElementById('playlistTitleInput');
+    this.playlistTitleError = document.getElementById('playlistTitleError');
     this.playlistDescInput = document.getElementById('playlistDescInput');
+    this.playlistCoverPresets = document.querySelectorAll('#playlistCoverPresets .cover-preset-btn');
+
+    // Playlist Detail View Elements
+    this.playlistBackBtn = document.getElementById('playlistBackBtn');
+    this.playlistBreadcrumbName = document.getElementById('playlistBreadcrumbName');
+    this.playlistHeroCard = document.getElementById('playlistHeroCard');
+    this.playlistHeroCover = document.getElementById('playlistHeroCover');
+    this.playlistHeroTitle = document.getElementById('playlistHeroTitle');
+    this.playlistHeroDesc = document.getElementById('playlistHeroDesc');
+    this.playlistHeroMeta = document.getElementById('playlistHeroMeta');
+    this.playlistPlayAllBtn = document.getElementById('playlistPlayAllBtn');
+    this.playlistShuffleBtn = document.getElementById('playlistShuffleBtn');
+    this.playlistAddSongsBtn = document.getElementById('playlistAddSongsBtn');
+    this.playlistEditBtn = document.getElementById('playlistEditBtn');
+    this.playlistDeleteBtn = document.getElementById('playlistDeleteBtn');
+    this.playlistTracksCount = document.getElementById('playlistTracksCount');
+    this.playlistTracksList = document.getElementById('playlistTracksList');
+    this.playlistEmptyTracks = document.getElementById('playlistEmptyTracks');
+    this.playlistBrowseSongsBtn = document.getElementById('playlistBrowseSongsBtn');
+
+    // Edit Playlist Modal
+    this.editPlaylistModal = document.getElementById('editPlaylistModal');
+    this.editPlaylistId = document.getElementById('editPlaylistId');
+    this.editPlaylistTitleInput = document.getElementById('editPlaylistTitleInput');
+    this.editPlaylistTitleError = document.getElementById('editPlaylistTitleError');
+    this.editPlaylistDescInput = document.getElementById('editPlaylistDescInput');
+    this.editPlaylistCoverPresets = document.querySelectorAll('#editPlaylistCoverPresets .cover-preset-btn');
+    this.closeEditPlaylistModalBtn = document.getElementById('closeEditPlaylistModalBtn');
+    this.cancelEditPlaylistModalBtn = document.getElementById('cancelEditPlaylistModalBtn');
+    this.confirmEditPlaylistBtn = document.getElementById('confirmEditPlaylistBtn');
+
+    // Add to Playlist Modal
+    this.addToPlaylistModal = document.getElementById('addToPlaylistModal');
+    this.addPlaylistTrackThumb = document.getElementById('addPlaylistTrackThumb');
+    this.addPlaylistTrackTitle = document.getElementById('addPlaylistTrackTitle');
+    this.addPlaylistTrackArtist = document.getElementById('addPlaylistTrackArtist');
+    this.addPlaylistCreateNewBtn = document.getElementById('addPlaylistCreateNewBtn');
+    this.addToPlaylistList = document.getElementById('addToPlaylistList');
+    this.closeAddToPlaylistModalBtn = document.getElementById('closeAddToPlaylistModalBtn');
+    this.cancelAddToPlaylistModalBtn = document.getElementById('cancelAddToPlaylistModalBtn');
+
+    // Delete Playlist Modal
+    this.deletePlaylistModal = document.getElementById('deletePlaylistModal');
+    this.deletePlaylistConfirmText = document.getElementById('deletePlaylistConfirmText');
+    this.closeDeletePlaylistModalBtn = document.getElementById('closeDeletePlaylistModalBtn');
+    this.cancelDeletePlaylistBtn = document.getElementById('cancelDeletePlaylistBtn');
+    this.confirmDeletePlaylistBtn = document.getElementById('confirmDeletePlaylistBtn');
+
+    // Player bar & options triggers
+    this.playerAddPlaylistBtn = document.getElementById('playerAddPlaylistBtn');
+    this.maxAddToPlaylistBtn = document.getElementById('maxAddToPlaylistBtn');
+    this.optAddToPlaylist = document.getElementById('optAddToPlaylist');
+
     this.toast = document.getElementById('toast');
     this.toastMessage = document.getElementById('toastMessage');
   }
@@ -2380,6 +2458,18 @@ class REAMusicApp {
       this.navLibrary.addEventListener('click', (e) => {
         e.preventDefault();
         this.switchView('library');
+      });
+    }
+    if (this.navPlaylists) {
+      this.navPlaylists.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.switchView('playlists');
+      });
+    }
+    if (this.mobileTabPlaylists) {
+      this.mobileTabPlaylists.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.switchView('playlists');
       });
     }
     if (this.navDownloads) {
@@ -3044,43 +3134,153 @@ class REAMusicApp {
       });
     });
 
-    // 15. Create Playlist Modal
-    const openModal = () => {
-      if (this.playlistModal) {
-        this.playlistModal.classList.remove('hidden');
-        if (this.playlistTitleInput) {
-          this.playlistTitleInput.value = '';
-          this.playlistTitleInput.focus();
-        }
-        if (this.playlistDescInput) this.playlistDescInput.value = '';
-      }
-    };
-    const closeModal = () => {
-      if (this.playlistModal) this.playlistModal.classList.add('hidden');
-    };
+    // 15. Personal Playlists Modal & Action Listeners (Feature 1)
+    if (this.newPlaylistBtn) this.newPlaylistBtn.addEventListener('click', () => this.openCreatePlaylistModal());
+    if (this.createPlaylistLibBtn) this.createPlaylistLibBtn.addEventListener('click', () => this.openCreatePlaylistModal());
+    if (this.createPlaylistViewBtn) this.createPlaylistViewBtn.addEventListener('click', () => this.openCreatePlaylistModal());
+    if (this.emptyCreatePlaylistBtn) this.emptyCreatePlaylistBtn.addEventListener('click', () => this.openCreatePlaylistModal());
 
-    if (this.newPlaylistBtn) this.newPlaylistBtn.addEventListener('click', openModal);
-    if (this.createPlaylistLibBtn) this.createPlaylistLibBtn.addEventListener('click', openModal);
-    if (this.closePlaylistModalBtn) this.closePlaylistModalBtn.addEventListener('click', closeModal);
-    if (this.cancelPlaylistModalBtn) this.cancelPlaylistModalBtn.addEventListener('click', closeModal);
-
+    if (this.closePlaylistModalBtn) {
+      this.closePlaylistModalBtn.addEventListener('click', () => {
+        if (this.playlistModal) this.playlistModal.classList.add('hidden');
+      });
+    }
+    if (this.cancelPlaylistModalBtn) {
+      this.cancelPlaylistModalBtn.addEventListener('click', () => {
+        if (this.playlistModal) this.playlistModal.classList.add('hidden');
+      });
+    }
     if (this.confirmCreatePlaylistBtn) {
-      this.confirmCreatePlaylistBtn.addEventListener('click', () => {
-        const title = this.playlistTitleInput.value.trim();
-        if (!title) return;
-        const desc = this.playlistDescInput.value.trim();
-        const newPl = {
-          id: `pl-${Date.now()}`,
-          title,
-          desc: desc || 'Custom Playlist',
-          cover: this.queue[this.currentTrackIndex]?.cover || 'assets/midnight_vibes.jpg',
-          tracks: []
-        };
-        this.customPlaylists.push(newPl);
-        this.saveLocalStorage('rea_custom_playlists', this.customPlaylists);
-        closeModal();
-        this.renderLibrary();
-        this.showToast(`Playlist "${title}" created!`);
+      this.confirmCreatePlaylistBtn.addEventListener('click', () => this.createPlaylist());
+    }
+    if (this.playlistTitleInput) {
+      this.playlistTitleInput.addEventListener('input', () => {
+        if (this.playlistTitleError) this.playlistTitleError.classList.add('hidden');
+      });
+      this.playlistTitleInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.createPlaylist();
+        }
+      });
+    }
+    if (this.playlistCoverPresets) {
+      this.playlistCoverPresets.forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.playlistCoverPresets.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.selectedCoverPreset = btn.dataset.coverGradient || 'gradient-1';
+        });
+      });
+    }
+
+    // Edit Playlist Modal Listeners
+    if (this.closeEditPlaylistModalBtn) {
+      this.closeEditPlaylistModalBtn.addEventListener('click', () => {
+        if (this.editPlaylistModal) this.editPlaylistModal.classList.add('hidden');
+      });
+    }
+    if (this.cancelEditPlaylistModalBtn) {
+      this.cancelEditPlaylistModalBtn.addEventListener('click', () => {
+        if (this.editPlaylistModal) this.editPlaylistModal.classList.add('hidden');
+      });
+    }
+    if (this.confirmEditPlaylistBtn) {
+      this.confirmEditPlaylistBtn.addEventListener('click', () => this.savePlaylistDetails());
+    }
+    if (this.editPlaylistTitleInput) {
+      this.editPlaylistTitleInput.addEventListener('input', () => {
+        if (this.editPlaylistTitleError) this.editPlaylistTitleError.classList.add('hidden');
+      });
+      this.editPlaylistTitleInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.savePlaylistDetails();
+        }
+      });
+    }
+    if (this.editPlaylistCoverPresets) {
+      this.editPlaylistCoverPresets.forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.editPlaylistCoverPresets.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.selectedEditCoverPreset = btn.dataset.coverGradient || 'gradient-1';
+        });
+      });
+    }
+
+    // Add To Playlist Modal Listeners
+    if (this.closeAddToPlaylistModalBtn) {
+      this.closeAddToPlaylistModalBtn.addEventListener('click', () => {
+        if (this.addToPlaylistModal) this.addToPlaylistModal.classList.add('hidden');
+      });
+    }
+    if (this.cancelAddToPlaylistModalBtn) {
+      this.cancelAddToPlaylistModalBtn.addEventListener('click', () => {
+        if (this.addToPlaylistModal) this.addToPlaylistModal.classList.add('hidden');
+      });
+    }
+    if (this.addPlaylistCreateNewBtn) {
+      this.addPlaylistCreateNewBtn.addEventListener('click', () => {
+        if (this.addToPlaylistModal) this.addToPlaylistModal.classList.add('hidden');
+        this.pendingAddToPlaylistTrack = this.targetAddToPlaylistTrack;
+        this.openCreatePlaylistModal();
+      });
+    }
+
+    // Delete Playlist Modal Listeners
+    if (this.closeDeletePlaylistModalBtn) {
+      this.closeDeletePlaylistModalBtn.addEventListener('click', () => {
+        if (this.deletePlaylistModal) this.deletePlaylistModal.classList.add('hidden');
+      });
+    }
+    if (this.cancelDeletePlaylistBtn) {
+      this.cancelDeletePlaylistBtn.addEventListener('click', () => {
+        if (this.deletePlaylistModal) this.deletePlaylistModal.classList.add('hidden');
+      });
+    }
+    if (this.confirmDeletePlaylistBtn) {
+      this.confirmDeletePlaylistBtn.addEventListener('click', () => this.confirmDeletePlaylist());
+    }
+
+    // Playlist Detail View Action Listeners
+    if (this.playlistBackBtn) {
+      this.playlistBackBtn.addEventListener('click', () => this.switchView('playlists'));
+    }
+    if (this.playlistPlayAllBtn) {
+      this.playlistPlayAllBtn.addEventListener('click', () => {
+        if (this.currentPlaylistId) this.playPlaylist(this.currentPlaylistId, 0, false);
+      });
+    }
+    if (this.playlistShuffleBtn) {
+      this.playlistShuffleBtn.addEventListener('click', () => {
+        if (this.currentPlaylistId) this.playPlaylist(this.currentPlaylistId, 0, true);
+      });
+    }
+    if (this.playlistAddSongsBtn) {
+      this.playlistAddSongsBtn.addEventListener('click', () => {
+        this.switchView('search');
+        if (this.searchInput) {
+          this.searchInput.focus();
+        }
+      });
+    }
+    if (this.playlistEditBtn) {
+      this.playlistEditBtn.addEventListener('click', () => {
+        if (this.currentPlaylistId) this.openEditPlaylistModal(this.currentPlaylistId);
+      });
+    }
+    if (this.playlistDeleteBtn) {
+      this.playlistDeleteBtn.addEventListener('click', () => {
+        if (this.currentPlaylistId) this.openDeletePlaylistModal(this.currentPlaylistId);
+      });
+    }
+    if (this.playlistBrowseSongsBtn) {
+      this.playlistBrowseSongsBtn.addEventListener('click', () => {
+        this.switchView('search');
+        if (this.searchInput) {
+          this.searchInput.focus();
+        }
       });
     }
 
@@ -3225,6 +3425,38 @@ class REAMusicApp {
       });
     }
 
+    if (this.optAddToPlaylist) {
+      this.optAddToPlaylist.addEventListener('click', () => {
+        if (this.selectedMenuTrack) {
+          const track = this.selectedMenuTrack;
+          this.closeTrackOptionsMenu();
+          this.openAddToPlaylistModal(track);
+        }
+      });
+    }
+
+    if (this.playerAddPlaylistBtn) {
+      this.playerAddPlaylistBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.currentTrack) {
+          this.openAddToPlaylistModal(this.currentTrack);
+        } else {
+          this.showToast('No song currently playing');
+        }
+      });
+    }
+
+    if (this.maxAddToPlaylistBtn) {
+      this.maxAddToPlaylistBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.currentTrack) {
+          this.openAddToPlaylistModal(this.currentTrack);
+        } else {
+          this.showToast('No song currently playing');
+        }
+      });
+    }
+
     // 19. Maximized / Minimized Player Listeners
     // A. Maximize triggers: clicking mini-player bar, thumbnail container, song title, or fullscreen button
     if (this.playerBar) {
@@ -3298,6 +3530,12 @@ class REAMusicApp {
       } else if ((e.key === 'f' || e.key === 'F') && !isInput) {
         e.preventDefault();
         this.toggleMaximizePlayer();
+      } else if ((e.key === 'j' || e.key === 'J') && !isInput) {
+        e.preventDefault();
+        this.prevTrack();
+      } else if ((e.key === 'k' || e.key === 'K') && !isInput) {
+        e.preventDefault();
+        this.advanceTrack('manual');
       }
     });
 
@@ -3636,13 +3874,14 @@ class REAMusicApp {
     if (this.navHome) this.navHome.classList.toggle('active', viewName === 'home');
     if (this.navExplore) this.navExplore.classList.toggle('active', viewName === 'explore');
     if (this.navLibrary) this.navLibrary.classList.toggle('active', viewName === 'library');
+    if (this.navPlaylists) this.navPlaylists.classList.toggle('active', viewName === 'playlists' || viewName === 'playlist');
     if (this.navDownloads) this.navDownloads.classList.toggle('active', viewName === 'downloads');
     if (this.navDonate) this.navDonate.classList.toggle('active', viewName === 'donate');
 
     // Update Apple Music Mobile Tab Bar state
     if (this.mobileTabBtns) {
       this.mobileTabBtns.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === viewName);
+        btn.classList.toggle('active', btn.dataset.view === viewName || (viewName === 'playlist' && btn.dataset.view === 'playlists'));
       });
     }
 
@@ -3650,6 +3889,8 @@ class REAMusicApp {
     if (this.viewHome) this.viewHome.classList.toggle('hidden', viewName !== 'home');
     if (this.viewExplore) this.viewExplore.classList.toggle('hidden', viewName !== 'explore');
     if (this.viewLibrary) this.viewLibrary.classList.toggle('hidden', viewName !== 'library');
+    if (this.viewPlaylists) this.viewPlaylists.classList.toggle('hidden', viewName !== 'playlists');
+    if (this.viewPlaylist) this.viewPlaylist.classList.toggle('hidden', viewName !== 'playlist');
     if (this.viewDownloads) this.viewDownloads.classList.toggle('hidden', viewName !== 'downloads');
     if (this.viewSearch) this.viewSearch.classList.toggle('hidden', viewName !== 'search');
     if (this.viewArtist) this.viewArtist.classList.toggle('hidden', viewName !== 'artist');
@@ -3666,6 +3907,7 @@ class REAMusicApp {
       if (viewName === 'home') this.updateUrl('/');
       else if (viewName === 'explore') this.updateUrl('/explore');
       else if (viewName === 'library') this.updateUrl('/library');
+      else if (viewName === 'playlists') this.updateUrl('/playlists');
       else if (viewName === 'downloads') this.updateUrl('/downloads');
       else if (viewName === 'donate') this.updateUrl('/donate');
     }
@@ -3674,6 +3916,8 @@ class REAMusicApp {
       this.loadExploreCatalog();
     } else if (viewName === 'library') {
       this.renderLibrary();
+    } else if (viewName === 'playlists') {
+      this.renderMyPlaylistsView();
     } else if (viewName === 'downloads') {
       this.renderDownloads();
     } else if (viewName === 'donate') {
@@ -3709,6 +3953,15 @@ class REAMusicApp {
       this.switchView('explore', pushState);
     } else if (cleanPath === '/library') {
       this.switchView('library', pushState);
+    } else if (cleanPath === '/playlists') {
+      this.switchView('playlists', pushState);
+    } else if (cleanPath.startsWith('/playlist/')) {
+      const plId = decodeURIComponent(cleanPath.substring('/playlist/'.length));
+      if (plId) {
+        this.openPlaylistView(plId, pushState);
+      } else {
+        this.switchView('playlists', pushState);
+      }
     } else if (cleanPath === '/downloads') {
       this.switchView('downloads', pushState);
     } else if (cleanPath === '/donate') {
@@ -4347,6 +4600,19 @@ class REAMusicApp {
   playTrackItem(track) {
     if (!track) return;
     // Context-sensitive playback:
+    // If in playlist view and track is in custom playlist
+    if (this.currentView === 'playlist' && this.currentPlaylistId) {
+      const pl = this.customPlaylists.find(p => p.id === this.currentPlaylistId);
+      if (pl && pl.tracks && pl.tracks.length > 0) {
+        const idx = pl.tracks.findIndex(t => String(t.id) === String(track.id));
+        if (idx !== -1) {
+          this.sequenceQueue = [...pl.tracks];
+          this.sequenceIndex = idx;
+          this.playActualTrack(track, { type: 'playlist', id: pl.id, title: pl.title });
+          return;
+        }
+      }
+    }
     // If in album view and track is in album songs
     if (this.currentView === 'album' && this.currentAlbumSongs && this.currentAlbumSongs.length > 0) {
       const idx = this.currentAlbumSongs.findIndex(t => String(t.id) === String(track.id));
@@ -4813,25 +5079,596 @@ class REAMusicApp {
     if (!this.libPlaylistsGrid) return;
     this.libPlaylistsGrid.innerHTML = '';
 
+    if (!this.customPlaylists || this.customPlaylists.length === 0) {
+      this.libPlaylistsGrid.innerHTML = `
+        <div style="padding:32px 16px;text-align:center;color:var(--text-secondary);grid-column:1/-1;">
+          <p style="margin-bottom:12px;font-size:15px;">No playlists created yet.</p>
+          <button class="btn-create-playlist-primary" id="libTabCreatePlBtn" style="display:inline-flex;margin:0 auto;">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            <span>Create Playlist</span>
+          </button>
+        </div>
+      `;
+      const btn = this.libPlaylistsGrid.querySelector('#libTabCreatePlBtn');
+      if (btn) btn.addEventListener('click', () => this.openCreatePlaylistModal());
+      return;
+    }
+
     this.customPlaylists.forEach(pl => {
       const card = document.createElement('div');
       card.className = 'playlist-card';
+      const count = pl.tracks ? pl.tracks.length : 0;
+      const coverUrl = pl.cover || this.generateDefaultCoverSvg('gradient-1', pl.title);
       card.innerHTML = `
-        <img src="${pl.cover}" alt="${pl.title}" class="playlist-card-cover">
-        <div class="playlist-card-title">${pl.title}</div>
-        <div class="playlist-card-meta">${pl.tracks?.length || 0} tracks • ${pl.desc}</div>
+        <img src="${coverUrl}" alt="${escapeHtml(pl.title)}" class="playlist-card-cover" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+        <div class="playlist-card-title">${escapeHtml(pl.title)}</div>
+        <div class="playlist-card-meta">${count} ${count === 1 ? 'song' : 'songs'}${pl.desc ? ' • ' + escapeHtml(pl.desc) : ''}</div>
       `;
       card.addEventListener('click', () => {
-        if (pl.tracks && pl.tracks.length > 0) {
-          this.queue = [...pl.tracks];
-          this.playTrack(0);
-          this.showToast(`Playing playlist "${pl.title}"`);
-        } else {
-          this.showToast(`Playlist "${pl.title}" is empty`);
-        }
+        this.openPlaylistView(pl.id);
       });
       this.libPlaylistsGrid.appendChild(card);
     });
+  }
+
+  // ===========================================================================
+  // Feature 1: Personal Playlists Engine & UI Controller
+  // ===========================================================================
+  generateDefaultCoverSvg(preset = 'gradient-1', title = 'Playlist') {
+    const gradients = {
+      'gradient-1': { c1: '#ff3154', c2: '#7928ca' },
+      'gradient-2': { c1: '#0071e3', c2: '#42a5f5' },
+      'gradient-3': { c1: '#ff9500', c2: '#ff2d55' },
+      'gradient-4': { c1: '#30d158', c2: '#0071e3' },
+      'gradient-5': { c1: '#bf5af2', c2: '#ff375f' },
+      'gradient-6': { c1: '#1c1c1e', c2: '#3a3a3c' },
+    };
+    const g = gradients[preset] || gradients['gradient-1'];
+    const initial = (title || 'P').trim().charAt(0).toUpperCase() || 'P';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+      <defs>
+        <linearGradient id="plGrad_${preset}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${g.c1}"/>
+          <stop offset="100%" stop-color="${g.c2}"/>
+        </linearGradient>
+      </defs>
+      <rect width="300" height="300" fill="url(#plGrad_${preset})"/>
+      <circle cx="150" cy="150" r="75" fill="rgba(255,255,255,0.14)"/>
+      <path d="M135 110v50.5c-2.4-1.4-5.2-2.3-8.2-2.3-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5V125h25v-15H135z" fill="#ffffff" opacity="0.95"/>
+      <circle cx="178" cy="120" r="14" fill="rgba(255,255,255,0.25)"/>
+      <text x="178" y="125" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${escapeHtml(initial)}</text>
+    </svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+
+  renderMyPlaylistsView() {
+    if (!this.myPlaylistsGrid) return;
+    this.myPlaylistsGrid.innerHTML = '';
+
+    const hasPlaylists = this.customPlaylists && this.customPlaylists.length > 0;
+    if (this.playlistsEmptyState) {
+      this.playlistsEmptyState.classList.toggle('hidden', hasPlaylists);
+    }
+    this.myPlaylistsGrid.classList.toggle('hidden', !hasPlaylists);
+
+    if (!hasPlaylists) return;
+
+    this.customPlaylists.forEach(pl => {
+      const card = document.createElement('div');
+      card.className = 'my-playlist-card';
+      const count = pl.tracks ? pl.tracks.length : 0;
+      const totalSec = (pl.tracks || []).reduce((acc, t) => acc + (Number(t.duration) || 0), 0);
+      const mins = Math.floor(totalSec / 60);
+      const durationStr = totalSec > 0 ? ` • ${mins} min` : '';
+      const coverUrl = pl.cover || (pl.tracks && pl.tracks[0]?.cover) || this.generateDefaultCoverSvg('gradient-1', pl.title);
+
+      card.innerHTML = `
+        <div class="my-playlist-cover-wrap">
+          <img src="${coverUrl}" alt="${escapeHtml(pl.title)}" class="my-playlist-cover" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" loading="lazy" decoding="async">
+          <button class="my-playlist-play-btn" title="Play ${escapeHtml(pl.title)}" aria-label="Play ${escapeHtml(pl.title)}">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+        <div class="my-playlist-content">
+          <div class="my-playlist-header-row">
+            <h3 class="my-playlist-name" title="${escapeHtml(pl.title)}">${escapeHtml(pl.title)}</h3>
+            <button class="my-playlist-overflow-btn" title="Options" aria-label="Playlist options">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+            </button>
+          </div>
+          <p class="my-playlist-desc">${escapeHtml(pl.desc || 'Personal collection')}</p>
+          <div class="my-playlist-stats">${count} ${count === 1 ? 'song' : 'songs'}${durationStr}</div>
+        </div>
+      `;
+
+      // Play button click
+      const playBtn = card.querySelector('.my-playlist-play-btn');
+      if (playBtn) {
+        playBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.playPlaylist(pl.id, 0, false);
+        });
+      }
+
+      // Overflow menu click
+      const moreBtn = card.querySelector('.my-playlist-overflow-btn');
+      if (moreBtn) {
+        moreBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.openEditPlaylistModal(pl.id);
+        });
+      }
+
+      // Card body click
+      card.addEventListener('click', () => {
+        this.openPlaylistView(pl.id);
+      });
+
+      this.myPlaylistsGrid.appendChild(card);
+    });
+  }
+
+  openPlaylistView(playlistId, pushState = true) {
+    if (!playlistId) return;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl) {
+      this.showToast('Playlist not found');
+      this.switchView('playlists');
+      return;
+    }
+
+    this.currentPlaylistId = playlistId;
+    this.switchView('playlist', false);
+    if (pushState) {
+      this.updateUrl(`/playlist/${encodeURIComponent(playlistId)}`);
+    }
+
+    // Hero info
+    const count = pl.tracks ? pl.tracks.length : 0;
+    const totalSec = (pl.tracks || []).reduce((acc, t) => acc + (Number(t.duration) || 0), 0);
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    const durationLabel = totalSec > 0 ? ` • ${mins} min${secs > 0 ? ' ' + secs + ' sec' : ''}` : '';
+
+    if (this.playlistBreadcrumbName) this.playlistBreadcrumbName.textContent = pl.title;
+    if (this.playlistHeroTitle) this.playlistHeroTitle.textContent = pl.title;
+    if (this.playlistHeroDesc) this.playlistHeroDesc.textContent = pl.desc || 'Personal music collection';
+    if (this.playlistHeroMeta) this.playlistHeroMeta.textContent = `${count} ${count === 1 ? 'song' : 'songs'}${durationLabel}`;
+    if (this.playlistTracksCount) this.playlistTracksCount.textContent = `${count} ${count === 1 ? 'song' : 'songs'}`;
+
+    const coverUrl = pl.cover || (pl.tracks && pl.tracks[0]?.cover) || this.generateDefaultCoverSvg('gradient-1', pl.title);
+    if (this.playlistHeroCover) {
+      this.playlistHeroCover.src = coverUrl;
+      this.playlistHeroCover.onerror = () => { this.playlistHeroCover.src = FALLBACK_COVER; };
+    }
+
+    // Render tracks
+    if (!this.playlistTracksList) return;
+    this.playlistTracksList.innerHTML = '';
+
+    if (!pl.tracks || pl.tracks.length === 0) {
+      if (this.playlistEmptyTracks) this.playlistEmptyTracks.classList.remove('hidden');
+      this.playlistTracksList.classList.add('hidden');
+      return;
+    }
+
+    if (this.playlistEmptyTracks) this.playlistEmptyTracks.classList.add('hidden');
+    this.playlistTracksList.classList.remove('hidden');
+
+    const currentId = this.currentTrack ? this.currentTrack.id : null;
+
+    pl.tracks.forEach((track, idx) => {
+      const isCurrent = currentId && String(currentId) === String(track.id);
+      const isPlayingThis = isCurrent && this.isPlaying;
+      const row = document.createElement('div');
+      row.className = `ranked-track-row playlist-track-row ${isCurrent ? 'is-active' : ''}`;
+      row.dataset.songId = track.id;
+      row.dataset.trackIndex = idx;
+
+      row.innerHTML = `
+        <div class="track-rank-num">${idx + 1}</div>
+        <img src="${track.cover || FALLBACK_COVER}" alt="${escapeHtml(track.title)}" class="track-row-thumb" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" loading="lazy" decoding="async">
+        <div class="track-row-info">
+          <div class="track-row-title song-link" data-song-id="${track.id}">${escapeHtml(track.title)}</div>
+          <div class="track-row-meta">
+            ${this.renderClickableArtists(track)} • ${track.album ? `<span class="album-link" data-album-id="${track.albumId || ''}">${escapeHtml(track.album)}</span>` : 'Single'}
+          </div>
+        </div>
+        ${track.duration ? `<div class="track-row-duration">${this.formatTime(track.duration)}</div>` : ''}
+        <div class="playlist-track-actions">
+          ${idx > 0 ? `
+            <button class="icon-btn btn-track-reorder btn-move-up" title="Move up" aria-label="Move track up">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+            </button>
+          ` : ''}
+          ${idx < pl.tracks.length - 1 ? `
+            <button class="icon-btn btn-track-reorder btn-move-down" title="Move down" aria-label="Move track down">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+            </button>
+          ` : ''}
+          <button class="icon-btn btn-track-remove" title="Remove from playlist" aria-label="Remove ${escapeHtml(track.title)} from playlist">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+          <button class="icon-btn track-card-more-btn" title="More options" aria-label="More options">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </button>
+        </div>
+      `;
+
+      // Click handling
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-move-up')) {
+          e.stopPropagation();
+          this.reorderTrackInPlaylist(playlistId, idx, idx - 1);
+          return;
+        }
+        if (e.target.closest('.btn-move-down')) {
+          e.stopPropagation();
+          this.reorderTrackInPlaylist(playlistId, idx, idx + 1);
+          return;
+        }
+        if (e.target.closest('.btn-track-remove')) {
+          e.stopPropagation();
+          this.removeTrackFromPlaylist(playlistId, track.id);
+          return;
+        }
+        if (e.target.closest('.track-card-more-btn')) {
+          e.stopPropagation();
+          this.openTrackOptionsMenu(track, e);
+          return;
+        }
+        if (e.target.closest('.artist-link') || e.target.closest('.album-link')) {
+          return;
+        }
+        // Play selected track in playlist sequence
+        this.playPlaylist(playlistId, idx, false);
+      });
+
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        this.openTrackOptionsMenu(track, e);
+      });
+
+      this.playlistTracksList.appendChild(row);
+    });
+  }
+
+  playPlaylist(playlistId, startIndex = 0, shuffle = false) {
+    if (!playlistId) return;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl || !pl.tracks || pl.tracks.length === 0) {
+      this.showToast('This playlist is empty. Add songs first!');
+      return;
+    }
+
+    let tracks = [...pl.tracks];
+    if (shuffle) {
+      // Fisher-Yates shuffle on copy
+      for (let i = tracks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+      }
+      this.sequenceQueue = tracks;
+      this.sequenceIndex = 0;
+      this.playbackContext = { type: 'playlist', id: playlistId, title: pl.title, isShuffle: true };
+      this.playActualTrack(tracks[0], this.playbackContext);
+      this.showToast(`Shuffling "${pl.title}"`);
+    } else {
+      this.sequenceQueue = tracks;
+      this.sequenceIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
+      this.playbackContext = { type: 'playlist', id: playlistId, title: pl.title, isShuffle: false };
+      this.playActualTrack(tracks[this.sequenceIndex], this.playbackContext);
+      this.showToast(`Playing "${pl.title}"`);
+    }
+  }
+
+  openCreatePlaylistModal() {
+    if (!this.playlistModal) return;
+    this.playlistModal.classList.remove('hidden');
+    if (this.playlistTitleInput) {
+      this.playlistTitleInput.value = '';
+      this.playlistTitleInput.focus();
+    }
+    if (this.playlistTitleError) {
+      this.playlistTitleError.classList.add('hidden');
+    }
+    if (this.playlistDescInput) {
+      this.playlistDescInput.value = '';
+    }
+    this.selectedCoverPreset = 'gradient-1';
+    if (this.playlistCoverPresets) {
+      this.playlistCoverPresets.forEach((b, idx) => {
+        b.classList.toggle('active', idx === 0);
+      });
+    }
+  }
+
+  createPlaylist() {
+    if (!this.playlistTitleInput) return;
+    const title = this.playlistTitleInput.value.trim();
+    if (!title) {
+      if (this.playlistTitleError) {
+        this.playlistTitleError.classList.remove('hidden');
+        this.playlistTitleError.textContent = 'Please enter a valid playlist name';
+      }
+      this.playlistTitleInput.focus();
+      return;
+    }
+
+    const desc = this.playlistDescInput ? this.playlistDescInput.value.trim() : '';
+    const preset = this.selectedCoverPreset || 'gradient-1';
+    const cover = this.generateDefaultCoverSvg(preset, title);
+    const id = `pl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    const newPl = {
+      id,
+      title,
+      desc: desc || 'Personal Playlist',
+      cover,
+      coverPreset: preset,
+      createdAt: Date.now(),
+      tracks: []
+    };
+
+    if (this.pendingAddToPlaylistTrack) {
+      newPl.tracks.push({
+        id: this.pendingAddToPlaylistTrack.id,
+        title: this.pendingAddToPlaylistTrack.title,
+        artist: this.pendingAddToPlaylistTrack.artist,
+        album: this.pendingAddToPlaylistTrack.album || '',
+        cover: this.pendingAddToPlaylistTrack.cover || FALLBACK_COVER,
+        duration: this.pendingAddToPlaylistTrack.duration || 0,
+        audioUrl: this.pendingAddToPlaylistTrack.audioUrl || '',
+        localBlobUrl: this.pendingAddToPlaylistTrack.localBlobUrl || ''
+      });
+      this.pendingAddToPlaylistTrack = null;
+    }
+
+    this.customPlaylists.unshift(newPl);
+    this.saveLocalStorage('rea_custom_playlists_v2', this.customPlaylists);
+    this.saveLocalStorage('rea_custom_playlists', this.customPlaylists);
+
+    if (this.playlistModal) {
+      this.playlistModal.classList.add('hidden');
+    }
+
+    if (this.currentView === 'playlists') {
+      this.renderMyPlaylistsView();
+    }
+    this.renderLibraryPlaylists();
+    this.openPlaylistView(id);
+    this.showToast(`Playlist "${title}" created!`);
+  }
+
+  openEditPlaylistModal(playlistId) {
+    if (!playlistId || !this.editPlaylistModal) return;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl) return;
+
+    if (this.editPlaylistId) this.editPlaylistId.value = pl.id;
+    if (this.editPlaylistTitleInput) {
+      this.editPlaylistTitleInput.value = pl.title;
+      this.editPlaylistTitleInput.focus();
+    }
+    if (this.editPlaylistTitleError) this.editPlaylistTitleError.classList.add('hidden');
+    if (this.editPlaylistDescInput) this.editPlaylistDescInput.value = pl.desc || '';
+
+    const currentPreset = pl.coverPreset || 'gradient-1';
+    this.selectedEditCoverPreset = currentPreset;
+    if (this.editPlaylistCoverPresets) {
+      this.editPlaylistCoverPresets.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.coverGradient === currentPreset);
+      });
+    }
+
+    this.editPlaylistModal.classList.remove('hidden');
+  }
+
+  savePlaylistDetails() {
+    if (!this.editPlaylistTitleInput) return;
+    const title = this.editPlaylistTitleInput.value.trim();
+    if (!title) {
+      if (this.editPlaylistTitleError) {
+        this.editPlaylistTitleError.classList.remove('hidden');
+        this.editPlaylistTitleError.textContent = 'Please enter a valid playlist name';
+      }
+      this.editPlaylistTitleInput.focus();
+      return;
+    }
+
+    const playlistId = this.editPlaylistId ? this.editPlaylistId.value : this.currentPlaylistId;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl) return;
+
+    pl.title = title;
+    pl.desc = this.editPlaylistDescInput ? this.editPlaylistDescInput.value.trim() : '';
+
+    const preset = this.selectedEditCoverPreset || pl.coverPreset || 'gradient-1';
+    pl.coverPreset = preset;
+    // If cover is SVG preset, regenerate with updated initial/gradient
+    if (!pl.cover || pl.cover.startsWith('data:image/svg+xml')) {
+      pl.cover = this.generateDefaultCoverSvg(preset, title);
+    }
+
+    this.saveLocalStorage('rea_custom_playlists_v2', this.customPlaylists);
+    this.saveLocalStorage('rea_custom_playlists', this.customPlaylists);
+
+    if (this.editPlaylistModal) this.editPlaylistModal.classList.add('hidden');
+
+    if (this.currentPlaylistId === playlistId && this.currentView === 'playlist') {
+      this.openPlaylistView(playlistId, false);
+    }
+    if (this.currentView === 'playlists') {
+      this.renderMyPlaylistsView();
+    }
+    this.renderLibraryPlaylists();
+    this.showToast('Playlist updated');
+  }
+
+  openDeletePlaylistModal(playlistId) {
+    if (!playlistId || !this.deletePlaylistModal) return;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl) return;
+
+    this._deleteTargetPlaylistId = playlistId;
+    if (this.deletePlaylistConfirmText) {
+      this.deletePlaylistConfirmText.textContent = `Are you sure you want to permanently delete "${pl.title}"? Your songs will remain safely in your music library.`;
+    }
+    this.deletePlaylistModal.classList.remove('hidden');
+  }
+
+  confirmDeletePlaylist() {
+    if (!this._deleteTargetPlaylistId) return;
+    const idToDelete = this._deleteTargetPlaylistId;
+    this.customPlaylists = this.customPlaylists.filter(p => p.id !== idToDelete);
+    this.saveLocalStorage('rea_custom_playlists_v2', this.customPlaylists);
+    this.saveLocalStorage('rea_custom_playlists', this.customPlaylists);
+
+    if (this.deletePlaylistModal) this.deletePlaylistModal.classList.add('hidden');
+    this._deleteTargetPlaylistId = null;
+
+    this.switchView('playlists');
+    this.renderMyPlaylistsView();
+    this.renderLibraryPlaylists();
+    this.showToast('Playlist deleted');
+  }
+
+  openAddToPlaylistModal(track) {
+    if (!track || !this.addToPlaylistModal) return;
+    this.targetAddToPlaylistTrack = track;
+
+    if (this.addPlaylistTrackThumb) {
+      this.addPlaylistTrackThumb.src = track.cover || FALLBACK_COVER;
+      this.addPlaylistTrackThumb.onerror = () => { this.addPlaylistTrackThumb.src = FALLBACK_COVER; };
+    }
+    if (this.addPlaylistTrackTitle) {
+      this.addPlaylistTrackTitle.textContent = track.title || 'Untitled Track';
+    }
+    if (this.addPlaylistTrackArtist) {
+      this.addPlaylistTrackArtist.textContent = track.artist || 'Unknown Artist';
+    }
+
+    if (this.addToPlaylistList) {
+      this.addToPlaylistList.innerHTML = '';
+      if (!this.customPlaylists || this.customPlaylists.length === 0) {
+        this.addToPlaylistList.innerHTML = `
+          <div style="padding:20px 12px;text-align:center;color:var(--text-secondary);font-size:13px;">
+            No playlists yet. Tap "+ New playlist" to create your first collection!
+          </div>
+        `;
+      } else {
+        this.customPlaylists.forEach(pl => {
+          const isAlreadyIn = pl.tracks && pl.tracks.some(t => String(t.id) === String(track.id));
+          const count = pl.tracks ? pl.tracks.length : 0;
+          const coverUrl = pl.cover || (pl.tracks && pl.tracks[0]?.cover) || this.generateDefaultCoverSvg('gradient-1', pl.title);
+
+          const item = document.createElement('div');
+          item.className = 'add-playlist-item';
+          item.innerHTML = `
+            <img src="${coverUrl}" alt="${escapeHtml(pl.title)}" class="add-pl-item-cover" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+            <div class="add-pl-item-info">
+              <div class="add-pl-item-name">${escapeHtml(pl.title)}</div>
+              <div class="add-pl-item-count">${count} ${count === 1 ? 'song' : 'songs'}</div>
+            </div>
+            ${isAlreadyIn 
+              ? `<span class="add-pl-item-badge">Added</span>` 
+              : `<button class="add-pl-item-btn">Add</button>`
+            }
+          `;
+
+          item.addEventListener('click', () => {
+            if (isAlreadyIn) {
+              this.showToast(`"${track.title}" is already in "${pl.title}"`);
+            } else {
+              this.addTrackToPlaylist(pl.id, track);
+              this.addToPlaylistModal.classList.add('hidden');
+            }
+          });
+
+          this.addToPlaylistList.appendChild(item);
+        });
+      }
+    }
+
+    this.addToPlaylistModal.classList.remove('hidden');
+  }
+
+  addTrackToPlaylist(playlistId, track) {
+    if (!playlistId || !track) return;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl) return;
+
+    if (!pl.tracks) pl.tracks = [];
+
+    const isDuplicate = pl.tracks.some(t => String(t.id) === String(track.id));
+    if (isDuplicate) {
+      this.showToast(`"${track.title}" is already in "${pl.title}"`);
+      return;
+    }
+
+    const cleanTrack = {
+      id: track.id,
+      title: track.title,
+      artist: track.artist || 'Unknown Artist',
+      album: track.album || '',
+      cover: track.cover || FALLBACK_COVER,
+      duration: Number(track.duration) || 0,
+      audioUrl: track.audioUrl || '',
+      localBlobUrl: track.localBlobUrl || ''
+    };
+
+    pl.tracks.push(cleanTrack);
+    this.saveLocalStorage('rea_custom_playlists_v2', this.customPlaylists);
+    this.saveLocalStorage('rea_custom_playlists', this.customPlaylists);
+
+    if (this.currentPlaylistId === playlistId && this.currentView === 'playlist') {
+      this.openPlaylistView(playlistId, false);
+    }
+    if (this.currentView === 'playlists') {
+      this.renderMyPlaylistsView();
+    }
+    this.renderLibraryPlaylists();
+    this.showToast(`Added "${track.title}" to "${pl.title}"`);
+  }
+
+  removeTrackFromPlaylist(playlistId, trackId) {
+    if (!playlistId || !trackId) return;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl || !pl.tracks) return;
+
+    const trackToRemove = pl.tracks.find(t => String(t.id) === String(trackId));
+    const title = trackToRemove ? trackToRemove.title : 'song';
+
+    pl.tracks = pl.tracks.filter(t => String(t.id) !== String(trackId));
+    this.saveLocalStorage('rea_custom_playlists_v2', this.customPlaylists);
+    this.saveLocalStorage('rea_custom_playlists', this.customPlaylists);
+
+    if (this.currentPlaylistId === playlistId && this.currentView === 'playlist') {
+      this.openPlaylistView(playlistId, false);
+    }
+    if (this.currentView === 'playlists') {
+      this.renderMyPlaylistsView();
+    }
+    this.renderLibraryPlaylists();
+    this.showToast(`Removed "${title}" from "${pl.title}"`);
+  }
+
+  reorderTrackInPlaylist(playlistId, fromIndex, toIndex) {
+    if (!playlistId) return;
+    const pl = this.customPlaylists.find(p => p.id === playlistId);
+    if (!pl || !pl.tracks) return;
+
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= pl.tracks.length || toIndex >= pl.tracks.length) return;
+
+    const [moved] = pl.tracks.splice(fromIndex, 1);
+    pl.tracks.splice(toIndex, 0, moved);
+
+    this.saveLocalStorage('rea_custom_playlists_v2', this.customPlaylists);
+    this.saveLocalStorage('rea_custom_playlists', this.customPlaylists);
+
+    if (this.currentPlaylistId === playlistId && this.currentView === 'playlist') {
+      this.openPlaylistView(playlistId, false);
+    }
   }
 
   renderLibraryHistory() {
@@ -5300,6 +6137,9 @@ class REAMusicApp {
               <div class="search-item-meta">${this.renderClickableArtists(track)} • ${track.album || 'Single'}</div>
             </div>
             <div class="search-item-actions">
+              <button class="icon-btn search-item-action-btn search-item-add-pl-btn" data-track-id="${track.id}" title="Add to Playlist" aria-label="Add ${track.title} to playlist">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
+              </button>
               <button class="icon-btn search-item-action-btn search-item-dl-btn ${isDl ? 'downloaded' : ''}" data-track-id="${track.id}" title="${isDl ? 'Downloaded' : 'Download Lossless'}" aria-label="Download ${track.title}">
                 <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
               </button>
@@ -5315,6 +6155,11 @@ class REAMusicApp {
               e.stopPropagation();
               const aName = e.target.closest('.artist-link').dataset.artist;
               if (aName) this.openArtistView(aName, aName);
+              return;
+            }
+            if (e.target.closest('.search-item-add-pl-btn')) {
+              e.stopPropagation();
+              this.openAddToPlaylistModal(track);
               return;
             }
             if (e.target.closest('.search-item-dl-btn')) {
@@ -5467,6 +6312,21 @@ class REAMusicApp {
   // ===========================================================================
   playActualTrack(track, context = null) {
     if (!track) return;
+
+    // Track playback history stack for Previous song navigation (Feature 2)
+    if (this._isNavigatingBack) {
+      this._isNavigatingBack = false;
+    } else if (this.currentTrack && track && String(this.currentTrack.id) !== String(track.id)) {
+      this.playbackHistoryStack.push({
+        track: this.currentTrack,
+        context: this.playbackContext,
+        sequenceIndex: this.sequenceIndex
+      });
+      if (this.playbackHistoryStack.length > 50) {
+        this.playbackHistoryStack.shift();
+      }
+    }
+
     this.currentTrack = track;
     if (context) {
       this.playbackContext = context;
@@ -5713,15 +6573,67 @@ class REAMusicApp {
 
   prevTrack() {
     if (!this.currentTrack) return;
-    if (this.engine.audio.currentTime > 3) {
+    if (this.isTransitioning) {
+      console.log('[Playback] Transition lock active, ignoring prev request');
+      return;
+    }
+    this.isTransitioning = true;
+    setTimeout(() => { this.isTransitioning = false; }, 350);
+
+    // 1. If played > 3 seconds, restart current track from the beginning
+    const currentTime = this.engine?.audio?.currentTime || 0;
+    if (currentTime > 3) {
       this.engine.seek(0);
+      if (!this.isPlaying) {
+        this.engine.play();
+        this.isPlaying = true;
+      }
+      this.updatePlayPauseUI();
       return;
     }
-    if (this.sequenceQueue && this.sequenceIndex > 0) {
-      this.sequenceIndex--;
-      this.playActualTrack(this.sequenceQueue[this.sequenceIndex], this.playbackContext);
-      return;
+
+    // 2. Played <= 3 seconds: Navigate to previous track
+    // A. If Shuffle is active and history exists: pop actual playback history
+    if (this.isShuffle && this.playbackHistoryStack && this.playbackHistoryStack.length > 0) {
+      const prevEntry = this.playbackHistoryStack.pop();
+      if (prevEntry && prevEntry.track) {
+        this._isNavigatingBack = true;
+        if (typeof prevEntry.sequenceIndex === 'number' && prevEntry.sequenceIndex >= 0) {
+          this.sequenceIndex = prevEntry.sequenceIndex;
+        }
+        this.playActualTrack(prevEntry.track, prevEntry.context);
+        return;
+      }
     }
+
+    // B. If in a sequence queue (Personal Playlist, Album, Singer catalog):
+    if (this.sequenceQueue && this.sequenceQueue.length > 0) {
+      if (this.sequenceIndex > 0) {
+        this.sequenceIndex--;
+        this._isNavigatingBack = true;
+        this.playActualTrack(this.sequenceQueue[this.sequenceIndex], this.playbackContext);
+        return;
+      } else if (this.sequenceIndex === 0) {
+        // First track in playlist/album: boundary behavior restarts current song
+        this.engine.seek(0);
+        return;
+      }
+    }
+
+    // C. Non-sequence playback (Search, Recommendations, Card clicks) with history stack
+    if (this.playbackHistoryStack && this.playbackHistoryStack.length > 0) {
+      const prevEntry = this.playbackHistoryStack.pop();
+      if (prevEntry && prevEntry.track) {
+        this._isNavigatingBack = true;
+        if (typeof prevEntry.sequenceIndex === 'number' && prevEntry.sequenceIndex >= 0) {
+          this.sequenceIndex = prevEntry.sequenceIndex;
+        }
+        this.playActualTrack(prevEntry.track, prevEntry.context);
+        return;
+      }
+    }
+
+    // D. Boundary case: no valid history exists, queue has only 1 track, or start of queue
     this.engine.seek(0);
   }
 
