@@ -30,6 +30,27 @@ const IS_CAPACITOR_APP = typeof window !== 'undefined' && Boolean(
 
 const API_BASE_URL = (typeof window !== 'undefined' && window.__API_BASE_URL__) ? window.__API_BASE_URL__ : (IS_CAPACITOR_APP ? 'https://reamusic.vercel.app' : '');
 
+// =============================================================================
+// REA Music Centralized Donation Configuration
+// =============================================================================
+const DONATION_CONFIG = Object.freeze({
+  appName: 'REA Music',
+  upiId: '950878807@fam',
+  payeeName: 'REA Music Developer',
+  currency: 'INR',
+  route: '/donate',
+  qrAssetPath: '/assets/rea-donation-qr.png',
+  suggestedAmounts: [29, 51, 101, 251],
+  defaultAmount: 51,
+  minAmount: 1,
+  maxAmount: 100000,
+  copyFeedbackDurationMs: 2500,
+});
+
+if (typeof window !== 'undefined') {
+  window.DONATION_CONFIG = DONATION_CONFIG;
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -1464,6 +1485,14 @@ class REAMusicApp {
     this.initServiceWorker();
     this.initPwaInstall();
 
+    // Donation System State
+    this.donationConfig = DONATION_CONFIG;
+    this.selectedDonationAmount = DONATION_CONFIG.defaultAmount;
+    this.isCustomDonationAmount = false;
+    this.donationPopupDismissed = false;
+    this.isCopyingUpi = false;
+    this.initDonationPopup();
+
     if (this.homeReleasesNextBtn && this.homeReleasesCarousel) {
       this.homeReleasesNextBtn.addEventListener('click', () => {
         this.homeReleasesCarousel.scrollBy({ left: 360, behavior: 'smooth' });
@@ -1799,6 +1828,7 @@ class REAMusicApp {
     this.navExplore = document.getElementById('navExplore');
     this.navLibrary = document.getElementById('navLibrary');
     this.navDownloads = document.getElementById('navDownloads');
+    this.navDonate = document.getElementById('navDonate');
     this.sidebarDownloadsBadge = document.getElementById('sidebarDownloadsBadge');
 
     // Views
@@ -1810,6 +1840,32 @@ class REAMusicApp {
     this.viewArtist = document.getElementById('viewArtist');
     this.viewSong = document.getElementById('viewSong');
     this.viewAlbum = document.getElementById('viewAlbum');
+    this.viewDonate = document.getElementById('viewDonate');
+
+    // Donation Elements
+    this.donateBackBtn = document.getElementById('donateBackBtn');
+    this.donationModal = document.getElementById('donationModal');
+    this.donationPopupSupportBtn = document.getElementById('donationPopupSupportBtn');
+    this.donationPopupLaterBtn = document.getElementById('donationPopupLaterBtn');
+    this.donationPopupCloseBtn = document.getElementById('donationPopupCloseBtn');
+    this.donationQrImg = document.getElementById('donationQrImg');
+    this.donationQrFallback = document.getElementById('donationQrFallback');
+    this.enlargeQrBtn = document.getElementById('enlargeQrBtn');
+    this.qrLightboxModal = document.getElementById('qrLightboxModal');
+    this.closeQrLightboxBtn = document.getElementById('closeQrLightboxBtn');
+    this.donationCopyUpiBtn = document.getElementById('donationCopyUpiBtn');
+    this.copyUpiBtnText = document.getElementById('copyUpiBtnText');
+    this.copyFeedbackMsg = document.getElementById('copyFeedbackMsg');
+    this.donationUpiId = document.getElementById('donationUpiId');
+    this.amountPills = document.querySelectorAll('.amount-pill');
+    this.customAmountWrap = document.getElementById('customAmountWrap');
+    this.donationCustomAmountInput = document.getElementById('donationCustomAmountInput');
+    this.donationAmountError = document.getElementById('donationAmountError');
+    this.donationAmountSummary = document.getElementById('donationAmountSummary');
+    this.donationPayUpiBtn = document.getElementById('donationPayUpiBtn');
+    this.donationAcknowledgeBtn = document.getElementById('donationAcknowledgeBtn');
+    this.donationThankYouBox = document.getElementById('donationThankYouBox');
+    this.settingsSupportBtn = document.getElementById('settingsSupportBtn');
 
     // Unified Search View Elements
     this.searchBackBtn = document.getElementById('searchBackBtn');
@@ -2222,6 +2278,8 @@ class REAMusicApp {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         this.closeSettingsModal();
+        this.closeDonationPopup();
+        this.closeQrLightbox();
       }
     });
 
@@ -2330,6 +2388,15 @@ class REAMusicApp {
         this.switchView('downloads');
       });
     }
+
+    if (this.navDonate) {
+      this.navDonate.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.switchView('donate');
+      });
+    }
+
+    this.bindDonationEvents();
 
     // Downloads View & Player Actions
     if (this.viewAllDownloadsBtn) {
@@ -3570,6 +3637,7 @@ class REAMusicApp {
     if (this.navExplore) this.navExplore.classList.toggle('active', viewName === 'explore');
     if (this.navLibrary) this.navLibrary.classList.toggle('active', viewName === 'library');
     if (this.navDownloads) this.navDownloads.classList.toggle('active', viewName === 'downloads');
+    if (this.navDonate) this.navDonate.classList.toggle('active', viewName === 'donate');
 
     // Update Apple Music Mobile Tab Bar state
     if (this.mobileTabBtns) {
@@ -3587,6 +3655,7 @@ class REAMusicApp {
     if (this.viewArtist) this.viewArtist.classList.toggle('hidden', viewName !== 'artist');
     if (this.viewSong) this.viewSong.classList.toggle('hidden', viewName !== 'song');
     if (this.viewAlbum) this.viewAlbum.classList.toggle('hidden', viewName !== 'album');
+    if (this.viewDonate) this.viewDonate.classList.toggle('hidden', viewName !== 'donate');
 
     // Scroll main content to top
     const mainContent = document.getElementById('mainContent');
@@ -3598,6 +3667,7 @@ class REAMusicApp {
       else if (viewName === 'explore') this.updateUrl('/explore');
       else if (viewName === 'library') this.updateUrl('/library');
       else if (viewName === 'downloads') this.updateUrl('/downloads');
+      else if (viewName === 'donate') this.updateUrl('/donate');
     }
 
     if (viewName === 'explore') {
@@ -3606,6 +3676,8 @@ class REAMusicApp {
       this.renderLibrary();
     } else if (viewName === 'downloads') {
       this.renderDownloads();
+    } else if (viewName === 'donate') {
+      this.initDonationPage();
     }
   }
 
@@ -3639,6 +3711,8 @@ class REAMusicApp {
       this.switchView('library', pushState);
     } else if (cleanPath === '/downloads') {
       this.switchView('downloads', pushState);
+    } else if (cleanPath === '/donate') {
+      this.switchView('donate', pushState);
     } else if (cleanPath === '/search') {
       const q = params.get('q') || '';
       if (q) {
@@ -7995,6 +8069,386 @@ class REAMusicApp {
 
       this.downloadsTracksList.appendChild(row);
     });
+  }
+
+  // ===========================================================================
+  // REA MUSIC — DONATION SYSTEM & UPI PAYMENT INTEGRATION
+  // ===========================================================================
+
+  initDonationPopup() {
+    const pathname = (typeof window !== 'undefined' && window.location) ? window.location.pathname.replace(/\/$/, '') : '';
+    if (pathname === '/donate' || this.currentView === 'donate') {
+      this.donationPopupDismissed = true;
+      return;
+    }
+
+    if (window.__REA_DONATION_POPUP_SESSION_SHOWN__ || this.donationPopupDismissed) {
+      return;
+    }
+
+    window.__REA_DONATION_POPUP_SESSION_SHOWN__ = true;
+
+    // Small delay after app initialization so that initial shell renders smoothly
+    setTimeout(() => {
+      if (!this.donationPopupDismissed && this.currentView !== 'donate') {
+        this.openDonationPopup();
+      }
+    }, 700);
+  }
+
+  openDonationPopup() {
+    if (!this.donationModal) return;
+    this.lastFocusedElementBeforeDonation = document.activeElement;
+    this.donationModal.classList.remove('hidden');
+    this.donationModal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+    if (this.donationPopupSupportBtn) {
+      try { this.donationPopupSupportBtn.focus(); } catch (e) {}
+    }
+  }
+
+  closeDonationPopup() {
+    if (!this.donationModal) return;
+    this.donationPopupDismissed = true;
+    this.donationModal.classList.add('hidden');
+    this.donationModal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    if (this.lastFocusedElementBeforeDonation && typeof this.lastFocusedElementBeforeDonation.focus === 'function') {
+      try { this.lastFocusedElementBeforeDonation.focus(); } catch (e) {}
+    }
+  }
+
+  initDonationPage() {
+    try {
+      document.title = 'Support REA Music — Keep the Music Alive';
+    } catch (e) {}
+
+    if (this.donationUpiId) {
+      this.donationUpiId.textContent = DONATION_CONFIG.upiId;
+    }
+
+    if (this.donationThankYouBox) {
+      this.donationThankYouBox.classList.add('hidden');
+    }
+
+    if (this.copyFeedbackMsg) {
+      this.copyFeedbackMsg.classList.add('hidden');
+    }
+
+    if (this.donationQrImg && !this.donationQrImg.getAttribute('src')) {
+      this.donationQrImg.src = DONATION_CONFIG.qrAssetPath;
+    }
+
+    this.selectDonationAmount(this.selectedDonationAmount || DONATION_CONFIG.defaultAmount);
+  }
+
+  selectDonationAmount(amount) {
+    if (amount === 'custom') {
+      this.isCustomDonationAmount = true;
+      if (this.amountPills) {
+        this.amountPills.forEach(pill => {
+          pill.classList.toggle('active', pill.dataset.amount === 'custom');
+        });
+      }
+      if (this.customAmountWrap) {
+        this.customAmountWrap.classList.remove('hidden');
+      }
+      if (this.donationCustomAmountInput) {
+        this.donationCustomAmountInput.focus();
+        this.onCustomAmountChange(this.donationCustomAmountInput.value);
+      }
+    } else {
+      this.isCustomDonationAmount = false;
+      const numAmount = Number(amount);
+      this.selectedDonationAmount = numAmount;
+      if (this.amountPills) {
+        this.amountPills.forEach(pill => {
+          pill.classList.toggle('active', Number(pill.dataset.amount) === numAmount);
+        });
+      }
+      if (this.customAmountWrap) {
+        this.customAmountWrap.classList.add('hidden');
+      }
+      if (this.donationAmountError) {
+        this.donationAmountError.classList.add('hidden');
+      }
+      if (this.donationAmountSummary) {
+        this.donationAmountSummary.textContent = `₹${numAmount}`;
+      }
+      if (this.donationPayUpiBtn) {
+        this.donationPayUpiBtn.removeAttribute('disabled');
+      }
+    }
+  }
+
+  validateDonationAmount(val) {
+    if (typeof val === 'number') {
+      if (isNaN(val) || !isFinite(val)) return { valid: false, error: 'Invalid contribution amount.' };
+      if (val <= 0) return { valid: false, error: 'Contribution amount must be greater than zero.' };
+      if (val > DONATION_CONFIG.maxAmount) return { valid: false, error: `Maximum contribution amount is ₹${DONATION_CONFIG.maxAmount.toLocaleString('en-IN')}.` };
+      const parts = String(val).split('.');
+      if (parts[1] && parts[1].length > 2) return { valid: false, error: 'Amount cannot have more than 2 decimal places.' };
+      return { valid: true, amount: val };
+    }
+
+    const trimmed = String(val || '').trim();
+    if (!trimmed) {
+      return { valid: false, error: 'Please enter a contribution amount.' };
+    }
+
+    if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+      return { valid: false, error: 'Please enter a valid positive amount with up to 2 decimal places.' };
+    }
+
+    const num = parseFloat(trimmed);
+    if (isNaN(num) || num <= 0) {
+      return { valid: false, error: 'Contribution amount must be greater than zero.' };
+    }
+    if (num > DONATION_CONFIG.maxAmount) {
+      return { valid: false, error: `Maximum contribution amount is ₹${DONATION_CONFIG.maxAmount.toLocaleString('en-IN')}.` };
+    }
+    return { valid: true, amount: num };
+  }
+
+  onCustomAmountChange(val) {
+    const result = this.validateDonationAmount(val);
+    if (result.valid) {
+      this.selectedDonationAmount = result.amount;
+      if (this.donationAmountError) {
+        this.donationAmountError.classList.add('hidden');
+      }
+      if (this.donationAmountSummary) {
+        this.donationAmountSummary.textContent = `₹${result.amount.toLocaleString('en-IN')}`;
+      }
+      if (this.donationPayUpiBtn) {
+        this.donationPayUpiBtn.removeAttribute('disabled');
+      }
+    } else {
+      this.selectedDonationAmount = 0;
+      if (this.donationAmountError) {
+        this.donationAmountError.textContent = result.error;
+        this.donationAmountError.classList.remove('hidden');
+      }
+      if (this.donationAmountSummary) {
+        this.donationAmountSummary.innerHTML = '<span style="color:#ff453a;">Invalid</span>';
+      }
+      if (this.donationPayUpiBtn) {
+        this.donationPayUpiBtn.setAttribute('disabled', 'true');
+      }
+    }
+  }
+
+  generateUpiUri(amount) {
+    const pa = encodeURIComponent(DONATION_CONFIG.upiId);
+    const pn = encodeURIComponent(DONATION_CONFIG.payeeName);
+    const cu = DONATION_CONFIG.currency;
+    let uri = `upi://pay?pa=${pa}&pn=${pn}&cu=${cu}`;
+    if (amount !== undefined && amount !== null && amount > 0) {
+      const amtStr = Number(amount) % 1 === 0 ? String(amount) : Number(amount).toFixed(2);
+      uri += `&am=${encodeURIComponent(amtStr)}`;
+    }
+    return uri;
+  }
+
+  executeUpiPayment() {
+    const valResult = this.validateDonationAmount(this.selectedDonationAmount);
+    if (!valResult.valid) {
+      if (this.donationAmountError) {
+        this.donationAmountError.textContent = valResult.error;
+        this.donationAmountError.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const upiUri = this.generateUpiUri(valResult.amount);
+
+    try {
+      window.location.href = upiUri;
+    } catch (err) {
+      console.warn('[REA Donate] Direct window.location navigation error:', err);
+    }
+  }
+
+  async copyUpiId() {
+    if (this.isCopyingUpi) return;
+    this.isCopyingUpi = true;
+
+    const upiText = DONATION_CONFIG.upiId;
+    let success = false;
+
+    if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(upiText);
+        success = true;
+      } catch (err) {
+        console.warn('[REA Donate] Clipboard API error, falling back:', err);
+      }
+    }
+
+    if (!success) {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = upiText;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch (err) {
+        console.error('[REA Donate] Fallback copy failed:', err);
+      }
+    }
+
+    if (success) {
+      if (this.copyUpiBtnText) this.copyUpiBtnText.textContent = 'Copied!';
+      if (this.donationCopyUpiBtn) this.donationCopyUpiBtn.classList.add('copied');
+      if (this.copyFeedbackMsg) {
+        this.copyFeedbackMsg.textContent = 'UPI ID copied to clipboard!';
+        this.copyFeedbackMsg.classList.remove('hidden');
+      }
+      setTimeout(() => {
+        if (this.copyUpiBtnText) this.copyUpiBtnText.textContent = 'Copy UPI ID';
+        if (this.donationCopyUpiBtn) this.donationCopyUpiBtn.classList.remove('copied');
+        if (this.copyFeedbackMsg) this.copyFeedbackMsg.classList.add('hidden');
+        this.isCopyingUpi = false;
+      }, DONATION_CONFIG.copyFeedbackDurationMs);
+    } else {
+      if (this.copyFeedbackMsg) {
+        this.copyFeedbackMsg.textContent = 'Could not copy automatically. Please copy 950878807@fam manually.';
+        this.copyFeedbackMsg.classList.remove('hidden');
+      }
+      setTimeout(() => {
+        if (this.copyFeedbackMsg) this.copyFeedbackMsg.classList.add('hidden');
+        this.isCopyingUpi = false;
+      }, DONATION_CONFIG.copyFeedbackDurationMs);
+    }
+  }
+
+  openQrLightbox() {
+    if (!this.qrLightboxModal) return;
+    this.qrLightboxModal.classList.remove('hidden');
+    this.qrLightboxModal.style.display = 'flex';
+  }
+
+  closeQrLightbox() {
+    if (!this.qrLightboxModal) return;
+    this.qrLightboxModal.classList.add('hidden');
+    this.qrLightboxModal.style.display = 'none';
+  }
+
+  bindDonationEvents() {
+    if (this.donateBackBtn) {
+      this.donateBackBtn.addEventListener('click', () => {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          this.switchView('home');
+        }
+      });
+    }
+
+    if (this.settingsSupportBtn) {
+      this.settingsSupportBtn.addEventListener('click', () => {
+        this.closeSettingsModal();
+        this.switchView('donate');
+      });
+    }
+
+    if (this.donationPopupSupportBtn) {
+      this.donationPopupSupportBtn.addEventListener('click', () => {
+        this.closeDonationPopup();
+        this.switchView('donate');
+      });
+    }
+
+    if (this.donationPopupLaterBtn) {
+      this.donationPopupLaterBtn.addEventListener('click', () => {
+        this.closeDonationPopup();
+      });
+    }
+
+    if (this.donationPopupCloseBtn) {
+      this.donationPopupCloseBtn.addEventListener('click', () => {
+        this.closeDonationPopup();
+      });
+    }
+
+    if (this.donationModal) {
+      this.donationModal.addEventListener('click', (e) => {
+        if (e.target === this.donationModal) {
+          this.closeDonationPopup();
+        }
+      });
+    }
+
+    if (this.enlargeQrBtn) {
+      this.enlargeQrBtn.addEventListener('click', () => {
+        this.openQrLightbox();
+      });
+    }
+
+    if (this.closeQrLightboxBtn) {
+      this.closeQrLightboxBtn.addEventListener('click', () => {
+        this.closeQrLightbox();
+      });
+    }
+
+    if (this.qrLightboxModal) {
+      this.qrLightboxModal.addEventListener('click', (e) => {
+        if (e.target === this.qrLightboxModal) {
+          this.closeQrLightbox();
+        }
+      });
+    }
+
+    if (this.donationCopyUpiBtn) {
+      this.donationCopyUpiBtn.addEventListener('click', () => {
+        this.copyUpiId();
+      });
+    }
+
+    if (this.amountPills) {
+      this.amountPills.forEach(pill => {
+        pill.addEventListener('click', (e) => {
+          e.preventDefault();
+          const amt = pill.dataset.amount;
+          this.selectDonationAmount(amt);
+        });
+      });
+    }
+
+    if (this.donationCustomAmountInput) {
+      this.donationCustomAmountInput.addEventListener('input', (e) => {
+        this.onCustomAmountChange(e.target.value);
+      });
+    }
+
+    if (this.donationPayUpiBtn) {
+      this.donationPayUpiBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.executeUpiPayment();
+      });
+    }
+
+    if (this.donationAcknowledgeBtn) {
+      this.donationAcknowledgeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (this.donationThankYouBox) {
+          this.donationThankYouBox.classList.toggle('hidden');
+        }
+      });
+    }
+
+    if (this.donationQrImg) {
+      this.donationQrImg.addEventListener('error', () => {
+        this.donationQrImg.style.display = 'none';
+        if (this.donationQrFallback) {
+          this.donationQrFallback.classList.remove('hidden');
+        }
+      });
+    }
   }
 }
 

@@ -14,7 +14,8 @@
     "test": "node tests/smoke-test.js",
     "test:personalization": "node tests/test-personalization-engine.mjs",
     "test:autoplay": "node tests/test-smart-autoplay.mjs",
-    "test:all": "node tests/smoke-test.js && node tests/test-personalization-engine.mjs && node tests/test-fresh-launch.mjs && node tests/test-queue-scroll.mjs && node tests/test-search-perf.mjs && node tests/test-smart-autoplay.mjs"
+    "test:donation": "node tests/test-donation-system.mjs",
+    "test:all": "node tests/smoke-test.js && node tests/test-personalization-engine.mjs && node tests/test-fresh-launch.mjs && node tests/test-queue-scroll.mjs && node tests/test-search-perf.mjs && node tests/test-smart-autoplay.mjs && node tests/test-donation-system.mjs"
   },
   "keywords": [
     "music-player",

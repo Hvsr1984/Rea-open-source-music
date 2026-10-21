@@ -14,7 +14,8 @@ const PRECACHE_ASSETS = [
   '/assets/icons/icon-192.png',
   '/assets/icons/icon-512.png',
   '/assets/icons/icon-maskable-512.png',
-  '/assets/icons/apple-touch-icon.png'
+  '/assets/icons/apple-touch-icon.png',
+  '/assets/rea-donation-qr.png'
 ];
 
 // Install: Cache essential app shell assets
