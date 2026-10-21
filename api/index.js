@@ -1,14 +1,82 @@
 import { decryptSaavnUrl } from './des.js';
+import { Readable } from 'node:stream';
 
-// In-memory cache for fast response times in serverless execution
+/**
+ * High-performance Bounded Cache with LRU eviction and TTL expiration.
+ * Eliminates memory leaks in long-running Node.js processes and serverless functions.
+ */
+class BoundedCache {
+  constructor(maxSize = 150, defaultTtlMs = 600000) {
+    this.maxSize = maxSize;
+    this.defaultTtlMs = defaultTtlMs;
+    this.store = new Map();
+  }
+
+  get(key) {
+    const entry = this.store.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    // Refresh for LRU eviction order
+    this.store.delete(key);
+    this.store.set(key, entry);
+    return entry.value;
+  }
+
+  set(key, value, ttlMs = this.defaultTtlMs) {
+    if (this.store.has(key)) {
+      this.store.delete(key);
+    } else if (this.store.size >= this.maxSize) {
+      const oldestKey = this.store.keys().next().value;
+      this.store.delete(oldestKey);
+    }
+    this.store.set(key, { value, expiresAt: Date.now() + (ttlMs || this.defaultTtlMs) });
+  }
+
+  has(key) {
+    return this.get(key) !== null;
+  }
+
+  clear() {
+    this.store.clear();
+  }
+}
+
+// Bounded in-memory caches with individual capacity limits and TTLs
 const CACHE = {
-  trending: {},
-  search: {},
-  lyrics: {},
-  artist: {},
-  album: {},
-  song: {}
+  trending: new BoundedCache(50, 600000),      // 10 minutes
+  search: new BoundedCache(150, 300000),       // 5 minutes
+  lyrics: new BoundedCache(150, 86400000),     // 24 hours
+  artist: new BoundedCache(100, 600000),       // 10 minutes
+  album: new BoundedCache(100, 600000),        // 10 minutes
+  song: new BoundedCache(150, 600000)          // 10 minutes
 };
+
+/**
+ * Robust fetch wrapper with timeout, abort handling, and standard User-Agent.
+ */
+async function safeFetch(url, options = {}) {
+  const timeoutMs = options.timeoutMs || 8000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  const defaultHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+  };
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: { ...defaultHeaders, ...(options.headers || {}) },
+      signal: options.signal || controller.signal
+    });
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function decodeEntities(str) {
   if (!str) return '';
@@ -80,7 +148,7 @@ const CHARTS = {
 async function fetchPlaylistSongs(listId) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&_format=json&listid=${listId}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     if (!res.ok) return [];
     const text = await res.text();
     if (!text || !text.trim()) return [];
@@ -100,7 +168,7 @@ async function fetchPlaylistSongs(listId) {
 async function searchSongs(query) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=20&p=1&q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
     const data = JSON.parse(clean);
@@ -117,7 +185,7 @@ async function searchSongs(query) {
 async function searchArtists(query) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=8&p=1&q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
     const data = JSON.parse(clean);
@@ -130,7 +198,7 @@ async function searchArtists(query) {
         img = img.replace('50x50.jpg', '150x150.jpg')
                  .replace('50x50.png', '150x150.png')
                  .replace('500x500.jpg', '150x150.jpg')
-                 .replace('500x500.png', '150x150.png');
+                 .replace('500x500.png', '150x150.jpg');
       }
       return {
         id: a.id || a.artistId,
@@ -149,7 +217,7 @@ async function searchArtists(query) {
 async function searchAlbums(query) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=12&p=1&q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     const text = await res.text();
     const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
     const data = JSON.parse(clean);
@@ -172,7 +240,7 @@ async function searchAlbums(query) {
 async function fetchArtistDetails(artistId) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&artistId=${artistId}&n_song=30&n_album=20`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     const text = await res.text();
     const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
     const data = JSON.parse(clean);
@@ -221,7 +289,7 @@ async function fetchArtistDetails(artistId) {
 async function fetchSongDetails(songId) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0&_format=json&pids=${encodeURIComponent(songId)}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     const text = await res.text();
     const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
     const data = JSON.parse(clean);
@@ -255,7 +323,7 @@ async function fetchSongDetails(songId) {
 async function fetchAlbumDetails(albumId) {
   try {
     const url = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&_format=json&albumid=${albumId}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     const text = await res.text();
     const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
     const data = JSON.parse(clean);
@@ -280,15 +348,16 @@ async function fetchAlbumDetails(albumId) {
 
 async function fetchLyrics(track, artist) {
   const cacheKey = `${track}__${artist}`.toLowerCase();
-  if (CACHE.lyrics[cacheKey]) return CACHE.lyrics[cacheKey];
+  const cached = CACHE.lyrics.get(cacheKey);
+  if (cached) return cached;
 
   try {
     const cleanTrack = track.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
     const cleanArtist = (artist || '').split(',')[0].trim();
     const url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTrack)}&artist_name=${encodeURIComponent(cleanArtist)}`;
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: { 'User-Agent': 'REAMusic/1.0' },
-      signal: AbortSignal.timeout(4000)
+      timeoutMs: 4000
     });
 
     if (res.ok) {
@@ -296,7 +365,7 @@ async function fetchLyrics(track, artist) {
       if (data.syncedLyrics) {
         const parsed = parseLRC(data.syncedLyrics);
         const result = { synced: true, lines: parsed };
-        CACHE.lyrics[cacheKey] = result;
+        CACHE.lyrics.set(cacheKey, result, 86400000);
         return result;
       } else if (data.plainLyrics) {
         const lines = data.plainLyrics
@@ -305,7 +374,7 @@ async function fetchLyrics(track, artist) {
           .filter(Boolean)
           .map((text, i) => ({ time: i * 5, text }));
         const result = { synced: false, lines };
-        CACHE.lyrics[cacheKey] = result;
+        CACHE.lyrics.set(cacheKey, result, 86400000);
         return result;
       }
     }
@@ -318,7 +387,7 @@ async function fetchLyrics(track, artist) {
 async function fetchNewReleases() {
   try {
     const url = 'https://www.jiosaavn.com/api.php?__call=content.getAlbums&_format=json&n=16&p=1&api_version=4';
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await safeFetch(url);
     const text = await res.text();
     const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
     const data = JSON.parse(clean);
@@ -334,6 +403,24 @@ async function fetchNewReleases() {
     console.error('Error fetching new releases:', e.message);
     return [];
   }
+}
+
+// Regional & Genre Search Queries for Indian Catalogue Discovery
+const GENRE_QUERIES = {
+  haryanvi: 'Haryanvi Hits',
+  punjabi: 'Punjabi Hits',
+  bollywood: 'Bollywood Hits',
+  hindi: 'Hindi Top Songs',
+  indie: 'Indie India',
+  chill: 'Hindi Acoustic',
+  romantic: 'Love Songs Hindi',
+  workout: 'Workout Hindi',
+  party: 'Bollywood Dance'
+};
+
+async function fetchGenreSongs(genreKey) {
+  const q = GENRE_QUERIES[genreKey] || `${genreKey} Indian Hits`;
+  return searchSongs(q);
 }
 
 /**
@@ -378,7 +465,7 @@ export default async function handler(req, res) {
   };
 
   try {
-    // 0. Audio Download Proxy (attachment or streaming)
+    // 0. Audio Download Proxy (attachment with memory-efficient stream piping)
     if (isDownload) {
       const audioUrl = parsedUrl.searchParams.get('url');
       const filename = parsedUrl.searchParams.get('filename') || 'track.m4a';
@@ -387,9 +474,7 @@ export default async function handler(req, res) {
       }
 
       try {
-        const audioRes = await fetch(audioUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
+        const audioRes = await safeFetch(audioUrl, { timeoutMs: 15000 });
         if (!audioRes.ok) {
           return sendJson(audioRes.status, { error: 'Failed to retrieve audio stream from CDN' });
         }
@@ -398,6 +483,12 @@ export default async function handler(req, res) {
         res.setHeader('Content-Type', cType);
         res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
         if (cLength) res.setHeader('Content-Length', cLength);
+
+        // Stream via Readable.fromWeb to eliminate heap buffer allocation
+        if (audioRes.body && typeof Readable.fromWeb === 'function' && res.write) {
+          Readable.fromWeb(audioRes.body).pipe(res);
+          return;
+        }
 
         const arrayBuffer = await audioRes.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
@@ -419,8 +510,9 @@ export default async function handler(req, res) {
       }
 
       const cacheKey = q.trim().toLowerCase();
-      if (CACHE.search[cacheKey] && Date.now() - CACHE.search[cacheKey].time < 300000) {
-        return sendJson(200, CACHE.search[cacheKey].data, 300);
+      const cached = CACHE.search.get(cacheKey);
+      if (cached) {
+        return sendJson(200, cached, 300);
       }
 
       const [songs, artists, albums] = await Promise.all([
@@ -463,7 +555,7 @@ export default async function handler(req, res) {
         topResult
       };
 
-      CACHE.search[cacheKey] = { time: Date.now(), data: payload };
+      CACHE.search.set(cacheKey, payload, 300000);
       return sendJson(200, payload, 300);
     }
 
@@ -475,8 +567,9 @@ export default async function handler(req, res) {
       }
 
       const cacheKey = id.trim();
-      if (CACHE.song[cacheKey] && Date.now() - CACHE.song[cacheKey].time < 600000) {
-        return sendJson(200, CACHE.song[cacheKey].data, 300);
+      const cached = CACHE.song.get(cacheKey);
+      if (cached) {
+        return sendJson(200, cached, 300);
       }
 
       const songData = await fetchSongDetails(id);
@@ -484,7 +577,7 @@ export default async function handler(req, res) {
         return sendJson(404, { error: 'Song not found' });
       }
 
-      CACHE.song[cacheKey] = { time: Date.now(), data: songData };
+      CACHE.song.set(cacheKey, songData, 600000);
       return sendJson(200, songData, 300);
     }
 
@@ -496,8 +589,9 @@ export default async function handler(req, res) {
       }
 
       const cacheKey = id.trim();
-      if (CACHE.album[cacheKey] && Date.now() - CACHE.album[cacheKey].time < 600000) {
-        return sendJson(200, CACHE.album[cacheKey].data, 300);
+      const cached = CACHE.album.get(cacheKey);
+      if (cached) {
+        return sendJson(200, cached, 300);
       }
 
       const albumData = await fetchAlbumDetails(id);
@@ -505,7 +599,7 @@ export default async function handler(req, res) {
         return sendJson(404, { error: 'Album not found', songs: [] });
       }
 
-      CACHE.album[cacheKey] = { time: Date.now(), data: albumData };
+      CACHE.album.set(cacheKey, albumData, 600000);
       return sendJson(200, albumData, 300);
     }
 
@@ -515,14 +609,17 @@ export default async function handler(req, res) {
       const name = parsedUrl.searchParams.get('name');
       const cacheKey = (id || name || '').trim().toLowerCase();
 
-      if (cacheKey && CACHE.artist[cacheKey] && Date.now() - CACHE.artist[cacheKey].time < 600000) {
-        return sendJson(200, CACHE.artist[cacheKey].data, 300);
+      if (cacheKey) {
+        const cached = CACHE.artist.get(cacheKey);
+        if (cached) {
+          return sendJson(200, cached, 300);
+        }
       }
 
       if (id && !id.startsWith('artist-')) {
         const details = await fetchArtistDetails(id);
         if (details) {
-          CACHE.artist[cacheKey] = { time: Date.now(), data: details };
+          CACHE.artist.set(cacheKey, details, 600000);
           return sendJson(200, details, 300);
         }
       }
@@ -549,37 +646,20 @@ export default async function handler(req, res) {
           similarArtists: artists.filter(a => a.name.toLowerCase() !== name.toLowerCase())
         };
 
-        CACHE.artist[cacheKey] = { time: Date.now(), data: payload };
+        CACHE.artist.set(cacheKey, payload, 600000);
         return sendJson(200, payload, 300);
       }
 
       return sendJson(400, { error: 'Missing artist id or name' });
     }
 
-// Regional & Genre Search Queries for Indian Catalogue Discovery
-const GENRE_QUERIES = {
-  haryanvi: 'Haryanvi Hits',
-  punjabi: 'Punjabi Hits',
-  bollywood: 'Bollywood Hits',
-  hindi: 'Hindi Top Songs',
-  indie: 'Indie India',
-  chill: 'Hindi Acoustic',
-  romantic: 'Love Songs Hindi',
-  workout: 'Workout Hindi',
-  party: 'Bollywood Dance'
-};
-
-async function fetchGenreSongs(genreKey) {
-  const q = GENRE_QUERIES[genreKey] || `${genreKey} Indian Hits`;
-  return searchSongs(q);
-}
-
     // 5. Indian Trending & Curated Shelves
     if (isTrending) {
       const category = (parsedUrl.searchParams.get('category') || 'all').toLowerCase();
 
-      if (CACHE.trending[category] && Date.now() - CACHE.trending[category].time < 600000) {
-        return sendJson(200, CACHE.trending[category].data);
+      const cached = CACHE.trending.get(category);
+      if (cached) {
+        return sendJson(200, cached);
       }
 
       if (category === 'all') {
@@ -605,7 +685,7 @@ async function fetchGenreSongs(genreKey) {
           indieHits: indie.slice(0, 12)
         };
 
-        CACHE.trending['all'] = { time: Date.now(), data: payload };
+        CACHE.trending.set('all', payload, 600000);
         return sendJson(200, payload);
       }
 
@@ -622,8 +702,9 @@ async function fetchGenreSongs(genreKey) {
         songs = await fetchPlaylistSongs(CHARTS.superhits);
       }
 
-      CACHE.trending[category] = { time: Date.now(), data: { songs } };
-      return sendJson(200, { songs });
+      const payload = { songs };
+      CACHE.trending.set(category, payload, 600000);
+      return sendJson(200, payload);
     }
 
     // 6. Synced Lyrics
@@ -636,8 +717,9 @@ async function fetchGenreSongs(genreKey) {
 
     // 7. Explore (New Releases, Charts, Moods)
     if (isExplore) {
-      if (CACHE.trending['explore'] && Date.now() - CACHE.trending['explore'].time < 600000) {
-        return sendJson(200, CACHE.trending['explore'].data);
+      const cachedExplore = CACHE.trending.get('explore');
+      if (cachedExplore) {
+        return sendJson(200, cachedExplore);
       }
 
       const [newReleases, superhits] = await Promise.all([
@@ -678,7 +760,7 @@ async function fetchGenreSongs(genreKey) {
         topCharts: [...canonicalCharts, ...remaining]
       };
 
-      CACHE.trending['explore'] = { time: Date.now(), data: exploreData };
+      CACHE.trending.set('explore', exploreData, 600000);
       return sendJson(200, exploreData);
     }
 
@@ -707,8 +789,9 @@ async function fetchGenreSongs(genreKey) {
       ];
 
       const cacheKey = ('reco__' + (artist || genre || qParam || 'all')).toLowerCase();
-      if (CACHE.trending[cacheKey] && Date.now() - CACHE.trending[cacheKey].time < 300000) {
-        return sendJson(200, CACHE.trending[cacheKey].data);
+      const cachedReco = CACHE.trending.get(cacheKey);
+      if (cachedReco) {
+        return sendJson(200, cachedReco);
       }
 
       let recommendedTracks = [];
@@ -752,7 +835,7 @@ async function fetchGenreSongs(genreKey) {
         count: recommendedTracks.length
       };
 
-      CACHE.trending[cacheKey] = { time: Date.now(), data: payload };
+      CACHE.trending.set(cacheKey, payload, 300000);
       return sendJson(200, payload);
     }
 

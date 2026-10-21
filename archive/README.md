@@ -17,11 +17,10 @@ Per project architecture decisions, REA Music has transitioned to a **100% web-o
 
 ---
 
-## 🔍 External Artifacts Flagged for User Review
+## 📜 Archived Migration Scripts
 
-The following companion items exist on the desktop outside the `rea-music` repository:
+The following obsolete migration and prototyping scripts have been safely moved to `archive/scripts/`:
 
-| Item | Location | Size | Recommendation |
-| :--- | :--- | :--- | :--- |
-| **`rea-music-apk/`** | `c:\Users\harsh\OneDrive\Desktop\rea\rea-music-apk\` | ~25 MB | External folder containing duplicate APK builds. Safe to delete or move to cold storage. |
-| **`rea-music-production.zip`** | `c:\Users\harsh\OneDrive\Desktop\rea\rea-music-production.zip` | 6.15 MB | Legacy pre-Android zip snapshot. Safe to delete. |
+1. **`archive/scripts/append-spatial-css.mjs`**: Initial migration script used to append the spatial CSS block into `css/index.css`.
+2. **`archive/scripts/complete-spatial-redesign.mjs`**: Prototype script used during the initial spatial UI redesign.
+3. **`archive/scripts/test-spatial-experience.mjs`**: Prototype testing script requiring an active Chrome CDP debugger on port 9333.

@@ -79,6 +79,9 @@ bundledHtml = bundledHtml.replace('</head>', `${styleBlock}</head>`);
 const scriptBlock = `  <script id="rea-embedded-script">\n${jsContent}\n  </script>\n`;
 bundledHtml = bundledHtml.replace('</body>', `${scriptBlock}</body>`);
 
+// Normalize excessive blank lines
+bundledHtml = bundledHtml.replace(/\n\s*\n\s*\n+/g, '\n\n');
+
 // Write out index.html, public/index.html, and dist/index.html
 fs.writeFileSync(path.join(__dirname, 'index.html'), bundledHtml, 'utf8');
 fs.writeFileSync(path.join(publicDir, 'index.html'), bundledHtml, 'utf8');

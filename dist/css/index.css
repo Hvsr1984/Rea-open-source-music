@@ -4105,9 +4105,9 @@ a {
 }
 
 .maximized-player.open {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
+  transform: translateY(0) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 /* Dynamic Ambient Canvas Backdrop */
@@ -6803,6 +6803,16 @@ body.theme-dark .dl-track-quality {
 .queue-reason-badge.badge-artist {
   background: rgba(175, 82, 222, 0.15);
   color: #bf5af2;
+}
+
+.queue-reason-badge.badge-related {
+  background: rgba(48, 209, 88, 0.15);
+  color: #30d158;
+}
+
+.queue-reason-badge.badge-discovery {
+  background: rgba(10, 132, 255, 0.15);
+  color: #64d2ff;
 }
 
 .queue-reason-badge.badge-liked {
@@ -9873,6 +9883,18 @@ body.theme-white .btn-taste-action {
 
 body.theme-white .btn-taste-action:hover {
   background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Accessibility: Respect user reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 

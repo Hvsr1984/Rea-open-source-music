@@ -28,7 +28,17 @@ const IS_CAPACITOR_APP = typeof window !== 'undefined' && Boolean(
   (location.hostname === 'localhost' && (!location.port || location.port === '80' || location.port === '443'))
 );
 
-const API_BASE_URL = IS_CAPACITOR_APP ? 'https://reamusic.vercel.app' : '';
+const API_BASE_URL = (typeof window !== 'undefined' && window.__API_BASE_URL__) ? window.__API_BASE_URL__ : (IS_CAPACITOR_APP ? 'https://reamusic.vercel.app' : '');
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 // =============================================================================
 // 1. Initial Fallback Indian Tracks
@@ -214,6 +224,7 @@ class HybridAudioEngine {
     this.ctx = null;
     this.analyser = null;
     this.onError = null;
+    this.onAutoplayBlocked = null;
 
     // Listen for native playback errors (network failure, 403, decode error)
     this.audio.addEventListener('error', (e) => {
@@ -262,6 +273,12 @@ class HybridAudioEngine {
         }).catch(e => {
           this.isPlaying = false;
           console.warn('[REA Audio Engine] Audio play rejected:', e);
+          if (e && (e.name === 'NotAllowedError' || e.code === 20)) {
+            if (typeof this.onAutoplayBlocked === 'function') {
+              this.onAutoplayBlocked(e, track);
+            }
+            return;
+          }
           if (typeof this.onError === 'function') {
             this.onError(e, track);
           }
@@ -289,7 +306,15 @@ class HybridAudioEngine {
       this.audio.volume = this.volume;
       const promise = this.audio.play();
       if (promise !== undefined) {
-        promise.catch(e => console.warn('Resume notice:', e));
+        promise.catch(e => {
+          this.isPlaying = false;
+          console.warn('Resume notice:', e);
+          if (e && (e.name === 'NotAllowedError' || e.code === 20)) {
+            if (typeof this.onAutoplayBlocked === 'function') {
+              this.onAutoplayBlocked(e, this.currentTrack);
+            }
+          }
+        });
       }
       this.isPlaying = true;
     } else if (this.currentTrack) {
@@ -435,8 +460,10 @@ class ListeningHistoryService {
   constructor(preferenceService) {
     this.preferenceService = preferenceService;
     this.storageKey = 'rea_listening_events_v2';
+    this.skippedStorageKey = 'rea_recently_skipped_ids';
     this.activeSession = null;
     this.events = this.loadEvents();
+    this.recentlySkippedTrackIds = this.loadSkippedTrackIds();
   }
 
   loadEvents() {
@@ -455,6 +482,29 @@ class ListeningHistoryService {
       }
       localStorage.setItem(this.storageKey, JSON.stringify(this.events));
     } catch (_) {}
+  }
+
+  loadSkippedTrackIds() {
+    try {
+      const data = localStorage.getItem(this.skippedStorageKey);
+      return data ? JSON.parse(data) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  saveSkippedTrackIds() {
+    try {
+      if (this.recentlySkippedTrackIds.length > 20) {
+        this.recentlySkippedTrackIds = this.recentlySkippedTrackIds.slice(0, 20);
+      }
+      localStorage.setItem(this.skippedStorageKey, JSON.stringify(this.recentlySkippedTrackIds));
+    } catch (_) {}
+  }
+
+  isRecentlySkipped(trackId) {
+    if (!trackId) return false;
+    return this.recentlySkippedTrackIds.includes(String(trackId));
   }
 
   recordEvent(eventType, track, metadata = {}) {
@@ -511,6 +561,13 @@ class ListeningHistoryService {
 
   onTrackCompleted(track) {
     if (!track) return;
+    if (track.id) {
+      const sId = String(track.id);
+      if (this.recentlySkippedTrackIds.includes(sId)) {
+        this.recentlySkippedTrackIds = this.recentlySkippedTrackIds.filter(id => id !== sId);
+        this.saveSkippedTrackIds();
+      }
+    }
     this.recordEvent('song_completed', track, {
       durationListened: this.activeSession ? this.activeSession.durationListened : track.duration,
       completionPct: 1.0
@@ -526,6 +583,13 @@ class ListeningHistoryService {
     const totalDuration = (this.activeSession && this.activeSession.totalDuration) || track.duration || 180;
     const pct = durationListened / (totalDuration || 1);
     const isHardSkip = durationListened < 25 || pct < 0.30;
+
+    if (track.id) {
+      const sId = String(track.id);
+      this.recentlySkippedTrackIds = this.recentlySkippedTrackIds.filter(id => id !== sId);
+      this.recentlySkippedTrackIds.unshift(sId);
+      this.saveSkippedTrackIds();
+    }
 
     this.recordEvent('song_skipped', track, {
       durationListened,
@@ -549,6 +613,13 @@ class ListeningHistoryService {
 
   onTrackLiked(track, isLiked) {
     if (!track) return;
+    if (isLiked && track.id) {
+      const sId = String(track.id);
+      if (this.recentlySkippedTrackIds.includes(sId)) {
+        this.recentlySkippedTrackIds = this.recentlySkippedTrackIds.filter(id => id !== sId);
+        this.saveSkippedTrackIds();
+      }
+    }
     this.recordEvent(isLiked ? 'song_favourited' : 'song_unfavourited', track);
     if (this.preferenceService) {
       this.preferenceService.recordTrackLiked(track, isLiked);
@@ -586,9 +657,11 @@ class ListeningHistoryService {
 
   clearHistory() {
     this.events = [];
+    this.recentlySkippedTrackIds = [];
     this.activeSession = null;
     try {
       localStorage.removeItem(this.storageKey);
+      localStorage.removeItem(this.skippedStorageKey);
     } catch (_) {}
   }
 }
@@ -1020,6 +1093,11 @@ class RecommendationEngine {
       totalScore *= 0.5;
     }
 
+    const skippedIds = JSON.parse(localStorage.getItem('rea_recently_skipped_ids') || '[]');
+    if (skippedIds.slice(0, 15).includes(String(track.id))) {
+      totalScore *= 0.15;
+    }
+
     tags.artistTokens.forEach(a => {
       const entry = this.preferenceService.profile.artistAffinities[a];
       if (entry && entry.skips > 2 && entry.skips > (entry.completions || 0)) {
@@ -1275,9 +1353,13 @@ class REAMusicApp {
     this.recommendationCache = new Map();
     this.isPrefetchingRecommendations = false;
 
-    // Wire audio error recovery
+    // Wire audio error recovery & autoplay gesture protection
     this.engine.onError = (err, track) => {
       this.handlePlaybackError(err, track);
+    };
+    this.engine.onAutoplayBlocked = (err, track) => {
+      this.isPlaying = false;
+      this.updatePlayPauseUI();
     };
 
     this.activeTab = 'up-next';
@@ -3112,15 +3194,30 @@ class REAMusicApp {
       this.playerTrackTitle.addEventListener('click', () => this.maximizePlayer());
     }
     if (this.fullscreenBtn) {
-      this.fullscreenBtn.addEventListener('click', () => this.maximizePlayer());
+      this.fullscreenBtn.title = 'Expand player';
+      this.fullscreenBtn.setAttribute('aria-label', 'Expand player');
+      this.fullscreenBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleMaximizePlayer();
+      });
     }
+
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
+      document.addEventListener(evt, () => this.updateFullscreenWindowIcons());
+    });
 
     // B. Minimize triggers: clicking down chevron button, iOS grab handle, or Escape key
     if (this.minimizePlayerBtn) {
-      this.minimizePlayerBtn.addEventListener('click', () => this.minimizePlayer());
+      this.minimizePlayerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.minimizePlayer();
+      });
     }
     if (this.maxGrabHandle) {
-      this.maxGrabHandle.addEventListener('click', () => this.minimizePlayer());
+      this.maxGrabHandle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.minimizePlayer();
+      });
     }
 
     document.addEventListener('keydown', (e) => {
@@ -3131,6 +3228,9 @@ class REAMusicApp {
         this.togglePlayPause();
       } else if (e.key === 'Escape' && this.isPlayerMaximized) {
         this.minimizePlayer();
+      } else if ((e.key === 'f' || e.key === 'F') && !isInput) {
+        e.preventDefault();
+        this.toggleMaximizePlayer();
       }
     });
 
@@ -3193,7 +3293,10 @@ class REAMusicApp {
       });
     }
     if (this.maxFullscreenToggleBtn) {
-      this.maxFullscreenToggleBtn.addEventListener('click', () => this.toggleFullscreenWindow());
+      this.maxFullscreenToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleFullscreenWindow();
+      });
     }
 
     // E. Maximized Scrubber scrubbing
@@ -3572,7 +3675,7 @@ class REAMusicApp {
     const map = (song && typeof song === 'object' && song.artistMap) ? song.artistMap : {};
     return artistNames.map((name, idx) => {
       const id = map[name.toLowerCase()] || map[name] || (idx === 0 && song.primaryArtistId ? song.primaryArtistId : '') || '';
-      return `<span class="artist-link" data-artist-id="${id}" data-artist-name="${name}">${name}</span>`;
+      return `<span class="artist-link" data-artist-id="${escapeHtml(id)}" data-artist-name="${escapeHtml(name)}">${escapeHtml(name)}</span>`;
     }).join(', ');
   }
 
@@ -3641,7 +3744,13 @@ class REAMusicApp {
     const songs = data.results || [];
     const artists = data.artists || [];
     const albums = data.albums || [];
-    const topResult = data.topResult || null;
+    let topResult = data.topResult || null;
+    if (topResult && topResult.data) {
+      topResult = {
+        type: topResult.type || 'artist',
+        ...topResult.data
+      };
+    }
 
     this.currentSearchSongs = songs;
     this.currentSearchArtists = artists;
@@ -3875,6 +3984,10 @@ class REAMusicApp {
         if (!res.ok) throw new Error('Artist fetch failed');
         data = await res.json();
         if (this.clientArtistCache) {
+          if (this.clientArtistCache.size >= 50) {
+            const oldestKey = this.clientArtistCache.keys().next().value;
+            this.clientArtistCache.delete(oldestKey);
+          }
           this.clientArtistCache.set(cacheKey, data);
         }
       } catch (err) {
@@ -4009,6 +4122,10 @@ class REAMusicApp {
         if (!res.ok) throw new Error('Song fetch failed');
         data = await res.json();
         if (this.clientSongCache) {
+          if (this.clientSongCache.size >= 50) {
+            const oldestKey = this.clientSongCache.keys().next().value;
+            this.clientSongCache.delete(oldestKey);
+          }
           this.clientSongCache.set(cacheKey, data);
         }
       } catch (err) {
@@ -4095,6 +4212,10 @@ class REAMusicApp {
         if (!res.ok) throw new Error('Album fetch failed');
         data = await res.json();
         if (this.clientAlbumCache) {
+          if (this.clientAlbumCache.size >= 50) {
+            const oldestKey = this.clientAlbumCache.keys().next().value;
+            this.clientAlbumCache.delete(oldestKey);
+          }
           this.clientAlbumCache.set(cacheKey, data);
         }
       } catch (err) {
@@ -4172,15 +4293,12 @@ class REAMusicApp {
         return;
       }
     }
-    // If in search view and track is in search songs
-    if (this.currentView === 'search' && this.currentSearchSongs && this.currentSearchSongs.length > 0) {
-      const idx = this.currentSearchSongs.findIndex(t => String(t.id) === String(track.id));
-      if (idx !== -1) {
-        this.sequenceQueue = [...this.currentSearchSongs];
-        this.sequenceIndex = idx;
-        this.playActualTrack(track, { type: 'search', id: track.id, query: this.lastSearchQuery || '' });
-        return;
-      }
+    // If in search view, play as seed track so Smart Autoplay continues with this artist
+    if (this.currentView === 'search') {
+      this.sequenceQueue = [track];
+      this.sequenceIndex = 0;
+      this.playActualTrack(track, { type: 'search', id: track.id, query: this.lastSearchQuery || '' });
+      return;
     }
     // Single song mode
     this.sequenceQueue = [track];
@@ -4199,12 +4317,9 @@ class REAMusicApp {
       return;
     }
 
-    // Context sequence from search results list
-    const list = (allTracks && allTracks.length > 0) ? allTracks : (this.currentSearchSongs || [track]);
-    this.currentSearchSongs = list;
-    const trackIndex = list.findIndex(t => String(t.id) === String(track.id));
-    this.sequenceQueue = [...list];
-    this.sequenceIndex = trackIndex !== -1 ? trackIndex : 0;
+    // Play selected search song with single track sequence so Smart Autoplay seeds from this artist
+    this.sequenceQueue = [track];
+    this.sequenceIndex = 0;
 
     if (track.title) {
       this.addSearchHistory(track.title);
@@ -5326,9 +5441,15 @@ class REAMusicApp {
     this.fetchTrackLyrics(track);
     this.renderRelatedPane();
 
-    // Background prefetch smart recommendations if queue is running low
-    if (this.autoplayEnabled && this.recommendationQueue.length < 5) {
-      this.prefetchSmartRecommendations(track);
+    // Background smart recommendations: refresh when new seed artist is played or queue runs low
+    const pArtist = (track.artist || '').split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)[0].replace(/\([^)]*\)/g, '').trim().toLowerCase();
+    const isNewArtistSeed = !this.currentSeedArtist || this.currentSeedArtist !== pArtist;
+
+    if (this.autoplayEnabled) {
+      if (context?.type !== 'autoplay' || isNewArtistSeed || this.recommendationQueue.length < 5) {
+        this.currentSeedArtist = pArtist;
+        this.prefetchSmartRecommendations(track, isNewArtistSeed);
+      }
     }
   }
 
@@ -5392,7 +5513,9 @@ class REAMusicApp {
       if (this.recommendationQueue.length > 0) {
         const nextReco = this.recommendationQueue.shift();
         this.playActualTrack(nextReco, { type: 'autoplay', seedTrack: this.currentTrack });
-        this.prefetchSmartRecommendations(nextReco);
+        if (this.recommendationQueue.length < 5) {
+          this.prefetchSmartRecommendations(nextReco);
+        }
         return;
       }
 
@@ -5407,7 +5530,9 @@ class REAMusicApp {
         if (recs && recs.length > 0) {
           const nextReco = this.recommendationQueue.shift();
           this.playActualTrack(nextReco, { type: 'autoplay', seedTrack: seed });
-          this.prefetchSmartRecommendations(nextReco);
+          if (this.recommendationQueue.length < 5) {
+            this.prefetchSmartRecommendations(nextReco);
+          }
         } else {
           this.stopPlaybackGracefully('Queue finished');
         }
@@ -5433,6 +5558,12 @@ class REAMusicApp {
   }
 
   handlePlaybackError(err, track) {
+    if (err && (err.name === 'NotAllowedError' || err.code === 20)) {
+      console.info('[PlaybackController] Browser autoplay deferred until user interaction');
+      this.isPlaying = false;
+      this.updatePlayPauseUI();
+      return;
+    }
     console.warn('[PlaybackController] Audio stream error encountered:', err, track);
     this.playbackRetryCount = (this.playbackRetryCount || 0) + 1;
 
@@ -5655,171 +5786,382 @@ class REAMusicApp {
   }
 
   // ===========================================================================
-  // Recommendation Engine: Multi-Signal Client Scoring
+  // Smart Autoplay & Artist-Based Recommendation Priority Engine
+  // Default Target Allocation: 60% Same Artist, 25% Related Artists, 15% Discovery
   // ===========================================================================
   async generateSmartRecommendations(seedTrack, options = {}) {
     if (!seedTrack) return [];
     const seedId = seedTrack.id || '';
+
+    // Race condition prevention: track request ID to cancel/ignore stale fetches
+    this.currentRecommendationRequestId = (this.currentRecommendationRequestId || 0) + 1;
+    const currentRequestId = this.currentRecommendationRequestId;
+
+    if (this.recoAbortController) {
+      try { this.recoAbortController.abort(); } catch (_) {}
+    }
+    this.recoAbortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const signal = this.recoAbortController?.signal;
+
+    // Fast-path: Check in-memory recommendation cache for this seed
     if (!options.force && seedId && this.recommendationCache.has(seedId)) {
       const cached = this.recommendationCache.get(seedId);
       if (cached && cached.length > 0) {
-        this.recommendationQueue = cached.filter(t => !this.dismissedTrackIds.has(String(t.id)));
-        return this.recommendationQueue;
+        const validCached = cached.filter(t => 
+          !this.dismissedTrackIds.has(String(t.id)) && 
+          String(t.id) !== String(this.currentTrack?.id)
+        );
+        if (validCached.length >= 4) {
+          this.recommendationQueue = validCached;
+          this.renderQueue();
+          return this.recommendationQueue;
+        }
       }
     }
 
-    const artistName = seedTrack.artist || 'Arijit Singh';
-    const primaryArtist = artistName.split(',')[0].replace(/\([^)]*\)/g, '').trim();
-    const songLang = (seedTrack.language || 'hindi').toLowerCase();
+    const rawArtistName = seedTrack.artist || 'Arijit Singh';
+    const artistTokens = rawArtistName
+      .split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)
+      .map(a => a.replace(/\([^)]*\)/g, '').trim())
+      .filter(Boolean);
 
-    // 1. Fetch Candidate Pools in Parallel
+    // Primary artist resolution: match current search query or active artist context if applicable
+    let primaryArtist = artistTokens[0] || rawArtistName;
+    if (this.lastSearchQuery) {
+      const qLower = this.lastSearchQuery.toLowerCase();
+      const matched = artistTokens.find(t => qLower.includes(t.toLowerCase()) || t.toLowerCase().includes(qLower));
+      if (matched) primaryArtist = matched;
+    }
+    const primaryArtistLower = primaryArtist.toLowerCase();
+
+    const seedTags = detectTrackTags(seedTrack);
+    const primaryGenre = seedTags.genres[0] || 
+      (seedTrack.language === 'punjabi' ? 'punjabi' : 
+       seedTrack.language === 'haryanvi' ? 'haryanvi' : 'bollywood');
+    const songLang = (seedTrack.language || seedTags.languages[0] || 'hindi').toLowerCase();
+
+    // 1. Concurrently fetch Candidate Pools
     const candidatePromises = [];
 
-    // Source A: Recommendations endpoint (artist search + curated)
+    // Source A: Dedicated Artist Page API (returns full discography 20+ tracks and similar artists)
     candidatePromises.push(
-      fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(primaryArtist)}&trackId=${encodeURIComponent(seedId)}`)
+      fetch(`${API_BASE_URL}/api/artist?name=${encodeURIComponent(primaryArtist)}`, { signal })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    );
+
+    // Source B: Recommendations endpoint (artist search & curated recommendations)
+    candidatePromises.push(
+      fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(primaryArtist)}&trackId=${encodeURIComponent(seedId)}&limit=20`, { signal })
         .then(r => r.ok ? r.json() : null)
         .then(d => (d && d.recommendations) ? d.recommendations : [])
         .catch(() => [])
     );
 
-    // Source B: Song detail related tracks (if valid ID)
-    if (seedId && !seedId.startsWith('track-')) {
+    // Source C: Song detail related tracks (if authentic JioSaavn song ID)
+    if (seedId && !seedId.startsWith('track-') && !seedId.startsWith('chart-')) {
       candidatePromises.push(
-        fetch(`${API_BASE_URL}/api/song?id=${encodeURIComponent(seedId)}`)
+        fetch(`${API_BASE_URL}/api/song?id=${encodeURIComponent(seedId)}`, { signal })
           .then(r => r.ok ? r.json() : null)
           .then(d => (d && d.related) ? d.related : [])
           .catch(() => [])
       );
+    } else {
+      candidatePromises.push(Promise.resolve([]));
     }
 
-    // Source C: Trending pool in matching language/category
+    // Source D: Trending hits for regional scene/language
+    const trendingCategory = primaryGenre === 'punjabi' ? 'punjabi' : 
+                             primaryGenre === 'haryanvi' ? 'all' : 
+                             primaryGenre === 'indie' ? 'all' : 'superhits';
     candidatePromises.push(
-      fetch(`${API_BASE_URL}/api/trending?category=${encodeURIComponent(songLang === 'punjabi' ? 'punjabi' : 'superhits')}`)
+      fetch(`${API_BASE_URL}/api/trending?category=${encodeURIComponent(trendingCategory)}`, { signal })
         .then(r => r.ok ? r.json() : null)
-        .then(d => {
-          if (!d) return [];
-          return d.quickPicks || d.trendingHits || d.punjabiHits || [];
-        })
+        .catch(() => null)
+    );
+
+    const [artistData, recoSongs, songRelated, trendingData] = await Promise.all(candidatePromises);
+
+    // Verify if this async response has been superseded by a newer track selection
+    if (currentRequestId !== this.currentRecommendationRequestId) {
+      console.log(`[Autoplay] Ignoring superseded recommendation request #${currentRequestId}`);
+      return [];
+    }
+
+    // 2. Identify Related Scene Artists for Pool 2 (25% quota)
+    const relatedArtistNames = new Set();
+    if (artistData && Array.isArray(artistData.similarArtists)) {
+      artistData.similarArtists.forEach(a => {
+        const aName = (a.name || a.title || '').trim();
+        if (aName && aName.toLowerCase() !== primaryArtistLower) {
+          relatedArtistNames.add(aName);
+        }
+      });
+    }
+    if (REGIONAL_ARTISTS[primaryGenre]) {
+      REGIONAL_ARTISTS[primaryGenre].forEach(a => {
+        if (a && a.toLowerCase() !== primaryArtistLower) {
+          const cap = a.replace(/\b\w/g, c => c.toUpperCase());
+          relatedArtistNames.add(cap);
+        }
+      });
+    }
+
+    // Fetch related artist tracks in parallel (top 2-3 related artists)
+    const topRelatedArtists = Array.from(relatedArtistNames).slice(0, 3);
+    const relatedArtistPromises = topRelatedArtists.map(relName =>
+      fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(relName)}&limit=6`, { signal })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => (d && d.recommendations) ? d.recommendations : [])
         .catch(() => [])
     );
 
-    const pools = await Promise.all(candidatePromises);
-    const rawCandidates = [
-      ...pools.flat(),
-      ...(this.quickPicks || []),
-      ...(FALLBACK_TRACKS || [])
-    ];
+    const relatedPools = await Promise.all(relatedArtistPromises);
 
-    // 2. Score Candidates with Normalized Multi-Signal Model
-    const scoredCandidates = [];
+    // Re-check request ID after secondary promises
+    if (currentRequestId !== this.currentRecommendationRequestId) {
+      return [];
+    }
+
+    // 3. Build Exclusion Sets
     const seenIds = new Set();
     const seenTitles = new Set();
 
-    // Track seed exclusions
     if (seedId) seenIds.add(String(seedId));
     if (this.currentTrack?.id) seenIds.add(String(this.currentTrack.id));
     if (seedTrack.title) seenTitles.add(seedTrack.title.toLowerCase().trim());
 
-    // Exclude manual queue and sequence queue upcoming items
+    // Exclude manual queue and remaining album sequence items
     this.manualQueue.forEach(t => t?.id && seenIds.add(String(t.id)));
-    if (this.sequenceQueue) {
-      for (let i = this.sequenceIndex; i < this.sequenceQueue.length; i++) {
+    if (this.sequenceQueue && this.playbackContext?.type === 'album') {
+      for (let i = this.sequenceIndex + 1; i < this.sequenceQueue.length; i++) {
         if (this.sequenceQueue[i]?.id) seenIds.add(String(this.sequenceQueue[i].id));
       }
     }
 
-    rawCandidates.forEach(cand => {
-      if (!cand || !cand.id || !cand.title) return;
+    // Exclude user dismissed tracks
+    this.dismissedTrackIds.forEach(id => seenIds.add(String(id)));
+
+    // Track recently skipped and recently played for penalty / diversity filtering
+    const skippedIds = new Set(this.listeningHistoryService?.recentlySkippedTrackIds || []);
+    const recentPlayedIds = new Set(this.recentlyPlayedIds || []);
+
+    const isAvailableCandidate = (cand) => {
+      if (!cand || !cand.id || !cand.title) return false;
       const cId = String(cand.id);
-      const cTitle = cand.title.toLowerCase().trim();
+      const cTitle = (cand.title || '').toLowerCase().trim();
+      if (seenIds.has(cId) || seenTitles.has(cTitle)) return false;
+      return true;
+    };
 
-      // Hard exclusions
-      if (seenIds.has(cId)) return;
-      if (seenTitles.has(cTitle)) return;
-      if (this.dismissedTrackIds.has(cId)) return;
+    // 4. Partition Candidates into Pools (60% Same Artist, 25% Related Artists, 15% Discovery)
+    const TARGET_QUEUE_SIZE = 12;
+    const TARGET_SAME_ARTIST = 7;     // ~60%
+    const TARGET_RELATED_ARTISTS = 3; // ~25%
+    const TARGET_DISCOVERY = 2;       // ~15%
 
-      seenIds.add(cId);
-      seenTitles.add(cTitle);
+    // --- POOL 1: Same Artist Candidates ---
+    const artistRawSongs = [
+      ...(artistData?.songs || []),
+      ...(recoSongs || [])
+    ];
 
-      let score = 50;
-      let reason = 'Recommended for you';
-      let reasonBadge = 'badge-trending';
+    const sameArtistPool = [];
+    artistRawSongs.forEach(cand => {
+      if (!isAvailableCandidate(cand)) return;
+      const cArtist = (cand.artist || '').toLowerCase();
+      // Match primary artist or any seed artist tokens
+      const matchesArtist = cArtist.includes(primaryArtistLower) || primaryArtistLower.includes(cArtist) ||
+        artistTokens.some(tok => {
+          const tokLower = tok.toLowerCase();
+          return tokLower.length >= 3 && (cArtist.includes(tokLower) || tokLower.includes(cArtist));
+        });
 
-      const candArtist = (cand.artist || '').toLowerCase();
-      const pArtistLower = primaryArtist.toLowerCase();
+      if (matchesArtist) {
+        const isSkipped = skippedIds.has(String(cand.id));
+        const isRecent = recentPlayedIds.has(String(cand.id));
+        if (isSkipped && sameArtistPool.length >= TARGET_SAME_ARTIST) return;
 
-      // Signal 1: Artist affinity
-      if (candArtist.includes(pArtistLower)) {
-        score += 35;
-        reason = `More from ${primaryArtist}`;
-        reasonBadge = 'badge-artist';
-      } else if (this.likedTracks.some(l => l.artist && candArtist.includes(l.artist.split(',')[0].trim().toLowerCase()))) {
-        score += 25;
-        const matchedLikedArtist = cand.artist.split(',')[0].trim();
-        reason = `Because you like ${matchedLikedArtist}`;
-        reasonBadge = 'badge-liked';
+        cand._reason = `More from ${primaryArtist}`;
+        cand._reasonBadge = 'badge-artist';
+        cand._isSameArtist = true;
+        cand._isSkipped = isSkipped;
+        cand._isRecent = isRecent;
+
+        cand._score = this.recommendationEngine ? this.recommendationEngine.scoreCandidate(cand, [seedTrack]) : 50;
+        if (isSkipped) cand._score -= 50;
+        if (isRecent) cand._score -= 30;
+
+        sameArtistPool.push(cand);
       }
-
-      // Signal 2: Language cohesion (prevent jarring Punjabi <-> Tamil switches unless user history supports it)
-      const candLang = (cand.language || 'hindi').toLowerCase();
-      if (candLang === songLang) {
-        score += 20;
-      } else {
-        score -= 25;
-      }
-
-      // Signal 3: Liked songs affinity
-      if (this.likedTrackIds.has(cand.id)) {
-        score += 30;
-        reason = 'From your Liked Songs';
-        reasonBadge = 'badge-liked';
-      }
-
-      // Signal 4: Listening history recency penalty
-      const recentIdx = this.recentlyPlayedIds.indexOf(cand.id);
-      if (recentIdx !== -1) {
-        if (recentIdx < 5) score -= 70;
-        else if (recentIdx < 15) score -= 35;
-      }
-
-      cand._score = score;
-      cand._reason = reason;
-      cand._reasonBadge = reasonBadge;
-      scoredCandidates.push(cand);
     });
 
-    // 3. Sort by score descending
-    scoredCandidates.sort((a, b) => b._score - a._score);
+    sameArtistPool.sort((a, b) => (b._score || 0) - (a._score || 0));
 
-    // 4. Artist Diversity Dampener (limit max 2 per artist in upcoming recommendations)
-    const finalCandidates = [];
-    const artistCounts = new Map();
+    // --- POOL 2: Related Artists Candidates ---
+    const relatedArtistRawSongs = [
+      ...relatedPools.flat(),
+      ...(songRelated || []),
+      ...(trendingData?.haryanviHits && primaryGenre === 'haryanvi' ? trendingData.haryanviHits : []),
+      ...(trendingData?.punjabiHits && primaryGenre === 'punjabi' ? trendingData.punjabiHits : []),
+      ...(trendingData?.bollywoodHits && primaryGenre === 'bollywood' ? trendingData.bollywoodHits : []),
+      ...(trendingData?.indieHits && primaryGenre === 'indie' ? trendingData.indieHits : [])
+    ];
 
-    for (const cand of scoredCandidates) {
-      const art = (cand.artist || 'various').split(',')[0].trim().toLowerCase();
-      const count = artistCounts.get(art) || 0;
-      if (count >= 2 && finalCandidates.length >= 6) {
-        continue;
+    const relatedArtistPool = [];
+    relatedArtistRawSongs.forEach(cand => {
+      if (!isAvailableCandidate(cand)) return;
+      const cArtist = (cand.artist || '').toLowerCase();
+      if (cArtist.includes(primaryArtistLower)) return;
+
+      const matchedRelArtist = topRelatedArtists.find(r => cArtist.includes(r.toLowerCase())) ||
+                               cand.artist.split(',')[0].trim();
+
+      const isSkipped = skippedIds.has(String(cand.id));
+      const isRecent = recentPlayedIds.has(String(cand.id));
+      if (isSkipped && relatedArtistPool.length >= TARGET_RELATED_ARTISTS) return;
+
+      cand._reason = `Similar artist: ${matchedRelArtist}`;
+      cand._reasonBadge = 'badge-related';
+      cand._isRelatedArtist = true;
+      cand._score = this.recommendationEngine ? this.recommendationEngine.scoreCandidate(cand, [seedTrack]) : 40;
+      if (isSkipped) cand._score -= 50;
+      if (isRecent) cand._score -= 30;
+
+      relatedArtistPool.push(cand);
+    });
+
+    relatedArtistPool.sort((a, b) => (b._score || 0) - (a._score || 0));
+
+    // --- POOL 3: Personalized Discoveries & Taste Matching ---
+    const topUserArtists = this.artistAffinityService ? this.artistAffinityService.getTopArtists(5) : [];
+    const hasListeningHistory = topUserArtists.length > 0 || (this.likedTracks && this.likedTracks.length > 0);
+
+    const discoveryRawSongs = [
+      ...(this.likedTracks || []),
+      ...(trendingData?.trendingHits || []),
+      ...(trendingData?.quickPicks || []),
+      ...(this.quickPicks || []),
+      ...(FALLBACK_TRACKS || [])
+    ];
+
+    const discoveryPool = [];
+    discoveryRawSongs.forEach(cand => {
+      if (!isAvailableCandidate(cand)) return;
+      const cArtist = (cand.artist || '').toLowerCase();
+      if (cArtist.includes(primaryArtistLower)) return;
+
+      const isLiked = this.likedTrackIds?.has(cand.id);
+      const isAffinity = topUserArtists.some(a => cArtist.includes(a.artist.toLowerCase()));
+
+      let reason = 'Trending discovery';
+      let reasonBadge = 'badge-discovery';
+
+      if (isLiked) {
+        reason = 'From your Liked Songs';
+        reasonBadge = 'badge-liked';
+      } else if (isAffinity || hasListeningHistory) {
+        reason = 'Based on your listening';
+        reasonBadge = 'badge-discovery';
       }
-      artistCounts.set(art, count + 1);
-      finalCandidates.push(cand);
-      if (finalCandidates.length >= 12) break;
+
+      cand._reason = reason;
+      cand._reasonBadge = reasonBadge;
+      cand._score = this.recommendationEngine ? this.recommendationEngine.scoreCandidate(cand, [seedTrack]) : 30;
+
+      discoveryPool.push(cand);
+    });
+
+    discoveryPool.sort((a, b) => (b._score || 0) - (a._score || 0));
+
+    // 5. Select Quotas and Handle Artist Exhaustion (Graceful Fallback)
+    const selectedSameArtist = sameArtistPool.slice(0, TARGET_SAME_ARTIST);
+    const sameArtistDeficit = TARGET_SAME_ARTIST - selectedSameArtist.length;
+
+    const neededRelated = TARGET_RELATED_ARTISTS + Math.ceil(sameArtistDeficit * 0.7);
+    const selectedRelated = [];
+    const relatedArtistCounts = new Map();
+
+    for (const cand of relatedArtistPool) {
+      if (selectedSameArtist.some(s => s.id === cand.id)) continue;
+      const art = (cand.artist || 'various').split(',')[0].trim().toLowerCase();
+      const count = relatedArtistCounts.get(art) || 0;
+      if (count < 2) {
+        relatedArtistCounts.set(art, count + 1);
+        selectedRelated.push(cand);
+        if (selectedRelated.length >= neededRelated) break;
+      }
     }
 
-    this.recommendationQueue = finalCandidates;
+    const neededDiscovery = TARGET_DISCOVERY + Math.floor(sameArtistDeficit * 0.3);
+    const selectedDiscovery = [];
+    for (const cand of discoveryPool) {
+      if (selectedSameArtist.some(s => s.id === cand.id)) continue;
+      if (selectedRelated.some(r => r.id === cand.id)) continue;
+      selectedDiscovery.push(cand);
+      if (selectedDiscovery.length >= neededDiscovery) break;
+    }
+
+    // 6. Intelligent Queue Interleaving
+    // The immediate next tracks prioritize the same artist first (slots 1, 2, 3),
+    // followed by related artists and discoveries.
+    const finalQueue = [];
+    const usedIds = new Set();
+
+    const pushTrack = (t) => {
+      if (!t || !t.id || usedIds.has(String(t.id))) return;
+      usedIds.add(String(t.id));
+      finalQueue.push(t);
+    };
+
+    // Immediate tracks: Same artist (up to 3 tracks immediately)
+    for (let i = 0; i < 3 && i < selectedSameArtist.length; i++) {
+      pushTrack(selectedSameArtist[i]);
+    }
+
+    let saIdx = 3;
+    let relIdx = 0;
+    let discIdx = 0;
+
+    // Interleave remaining: Same Artist, Related Artist, Same Artist, Related Artist, Discovery, etc.
+    while (finalQueue.length < TARGET_QUEUE_SIZE && (saIdx < selectedSameArtist.length || relIdx < selectedRelated.length || discIdx < selectedDiscovery.length)) {
+      if (relIdx < selectedRelated.length) pushTrack(selectedRelated[relIdx++]);
+      if (saIdx < selectedSameArtist.length) pushTrack(selectedSameArtist[saIdx++]);
+      if (discIdx < selectedDiscovery.length) pushTrack(selectedDiscovery[discIdx++]);
+      if (relIdx < selectedRelated.length) pushTrack(selectedRelated[relIdx++]);
+      if (saIdx < selectedSameArtist.length) pushTrack(selectedSameArtist[saIdx++]);
+    }
+
+    // Fallback fill to reach at least 10 items if still short
+    if (finalQueue.length < 10) {
+      const fallbackPool = [...relatedArtistPool, ...discoveryPool, ...(this.quickPicks || [])];
+      for (const cand of fallbackPool) {
+        if (!usedIds.has(String(cand.id))) {
+          pushTrack(cand);
+          if (finalQueue.length >= TARGET_QUEUE_SIZE) break;
+        }
+      }
+    }
+
+    // Final race check before updating state
+    if (currentRequestId !== this.currentRecommendationRequestId) {
+      return [];
+    }
+
+    this.recommendationQueue = finalQueue;
     if (seedId) {
-      this.recommendationCache.set(seedId, finalCandidates);
+      this.recommendationCache.set(seedId, finalQueue);
     }
     this.renderQueue();
-    return finalCandidates;
+    return finalQueue;
   }
 
-  async prefetchSmartRecommendations(seedTrack) {
-    if (!seedTrack || this.isPrefetchingRecommendations) return;
+  async prefetchSmartRecommendations(seedTrack, force = false) {
+    if (!seedTrack) return;
+    if (this.isPrefetchingRecommendations && !force) return;
     this.isPrefetchingRecommendations = true;
     try {
-      await this.generateSmartRecommendations(seedTrack);
+      await this.generateSmartRecommendations(seedTrack, { force });
     } catch (e) {
       console.warn('[Autoplay] Prefetch notice:', e);
     } finally {
@@ -5922,6 +6264,13 @@ class REAMusicApp {
     if (this.maxProgressThumb) this.maxProgressThumb.style.left = `${pct}%`;
     if (this.maxTimeCurrent) this.maxTimeCurrent.textContent = this.formatTime(cur);
     if (this.maxTimeTotal) this.maxTimeTotal.textContent = this.formatTime(dur);
+
+    // Automatically prepare next songs before current song ends
+    if (this.autoplayEnabled && this.recommendationQueue.length < 5 && !this.isPrefetchingRecommendations) {
+      if (pct >= 50 || (dur - cur) <= 45) {
+        this.prefetchSmartRecommendations(this.currentTrack);
+      }
+    }
   }
 
   formatTime(secs) {
@@ -5985,15 +6334,19 @@ class REAMusicApp {
     }
 
     if (this.lastActiveLyricIndex === activeIndex) return;
+    const prevIndex = this.lastActiveLyricIndex;
     this.lastActiveLyricIndex = activeIndex;
 
     // 1. Update Mini Drawer Lyrics
     if (this.lyricsBody) {
-      const lines = this.lyricsBody.querySelectorAll('.lyric-line');
-      lines.forEach((line, idx) => {
-        const isActive = idx === activeIndex;
-        line.classList.toggle('active', isActive);
-        if (isActive && this.activeTab === 'lyrics') {
+      const lines = this.lyricsBody.children;
+      if (prevIndex >= 0 && lines[prevIndex] && lines[prevIndex].classList) {
+        lines[prevIndex].classList.remove('active');
+      }
+      if (activeIndex >= 0 && lines[activeIndex] && lines[activeIndex].classList) {
+        const line = lines[activeIndex];
+        line.classList.add('active');
+        if (this.activeTab === 'lyrics') {
           const c = this.lyricsBody;
           const lRect = line.getBoundingClientRect();
           const cRect = c.getBoundingClientRect();
@@ -6001,16 +6354,19 @@ class REAMusicApp {
           const target = relTop - (c.clientHeight / 2) + (line.clientHeight / 2);
           c.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
         }
-      });
+      }
     }
 
     // 2. Update Maximized Theater Lyrics
     if (this.maxLyricsScroll) {
-      const maxLines = this.maxLyricsScroll.querySelectorAll('.max-lyric-line');
-      maxLines.forEach((line, idx) => {
-        const isActive = idx === activeIndex;
-        line.classList.toggle('active-lyric', isActive);
-        if (isActive && this.isPlayerMaximized && this.currentMaxTab !== 'queue') {
+      const maxLines = this.maxLyricsScroll.children;
+      if (prevIndex >= 0 && maxLines[prevIndex] && maxLines[prevIndex].classList) {
+        maxLines[prevIndex].classList.remove('active-lyric');
+      }
+      if (activeIndex >= 0 && maxLines[activeIndex] && maxLines[activeIndex].classList) {
+        const line = maxLines[activeIndex];
+        line.classList.add('active-lyric');
+        if (this.isPlayerMaximized && this.currentMaxTab !== 'queue') {
           const c = this.maxLyricsScroll;
           const lRect = line.getBoundingClientRect();
           const cRect = c.getBoundingClientRect();
@@ -6018,7 +6374,7 @@ class REAMusicApp {
           const target = relTop - (c.clientHeight / 2) + (line.clientHeight / 2);
           c.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
         }
-      });
+      }
     }
   }
 
@@ -6052,11 +6408,20 @@ class REAMusicApp {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       this.engine.analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < 16; i++) sum += dataArray[i];
+
       const barWidth = 7;
       let x = 2;
+      const now = Date.now() / 150;
 
       for (let i = 0; i < 8; i++) {
-        const val = dataArray[i * 2] || 0;
+        let val = dataArray[i * 2] || 0;
+        // If audio stream is CORS-restricted or AudioContext buffer is zeroed, provide organic rhythmic wave
+        if (sum === 0 && this.isPlaying) {
+          const wave = Math.sin(now + i * 0.85) * 0.4 + Math.cos(now * 0.6 + i * 1.2) * 0.3 + 0.35;
+          val = Math.floor(Math.max(0.15, Math.min(1, wave)) * 230);
+        }
         const barHeight = Math.max(3, (val / 255) * canvas.height);
 
         const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
@@ -6431,17 +6796,20 @@ class REAMusicApp {
     const card = document.createElement('div');
     card.className = 'music-card';
     card.setAttribute('data-track-id', track.id);
+    const safeTitle = escapeHtml(track.title || 'Untitled');
+    const safeId = escapeHtml(track.id || '');
+    const safeCover = track.cover || FALLBACK_COVER;
     card.innerHTML = `
       <div class="music-card-thumb">
-        <img src="${track.cover || FALLBACK_COVER}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
-        <button class="music-card-play" aria-label="Play ${track.title}">
+        <img src="${safeCover}" alt="${safeTitle}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+        <button class="music-card-play" aria-label="Play ${safeTitle}">
           <svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M8 5v14l11-7z"/></svg>
         </button>
       </div>
-      <button class="track-card-more-btn" aria-label="More options for ${track.title}" title="More options">
+      <button class="track-card-more-btn" aria-label="More options for ${safeTitle}" title="More options">
         <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
       </button>
-      <div class="music-card-title song-link" data-song-id="${track.id}" style="cursor:pointer;">${track.title}</div>
+      <div class="music-card-title song-link" data-song-id="${safeId}" style="cursor:pointer;">${safeTitle}</div>
       <div class="music-card-sub">${this.renderClickableArtists(track)}</div>
     `;
 
@@ -6735,6 +7103,7 @@ class REAMusicApp {
     const dur = this.engine?.audio?.duration || (this.queue && this.queue[this.currentTrackIndex]?.duration) || 1;
     this.updateProgressBar(cur, dur);
     this.syncControlStates();
+    this.updateMaximizeButtonUI();
   }
 
   minimizePlayer() {
@@ -6743,13 +7112,89 @@ class REAMusicApp {
       this.maximizedPlayer.classList.remove('open');
       this.maximizedPlayer.setAttribute('aria-hidden', 'true');
     }
+    this.updateMaximizeButtonUI();
+  }
+
+  toggleMaximizePlayer() {
+    if (this.isPlayerMaximized) {
+      this.minimizePlayer();
+      return;
+    }
+    if (!this.currentTrack) {
+      const candidateTrack = (this.queue && this.queue.length > 0 && this.queue[0]) ||
+        (this.quickPicks && this.quickPicks.length > 0 && this.quickPicks[0]) ||
+        (this.trendingTracks && this.trendingTracks.length > 0 && this.trendingTracks[0]) ||
+        (this.homeTrendingTracks && this.homeTrendingTracks.length > 0 && this.homeTrendingTracks[0]);
+
+      if (candidateTrack) {
+        this.playActualTrack(candidateTrack);
+      } else {
+        this.showToast('Select a song to expand player');
+        return;
+      }
+    }
+    this.maximizePlayer();
+  }
+
+  updateMaximizeButtonUI() {
+    const isMax = Boolean(this.isPlayerMaximized);
+    const expandSvg = '<path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+    const collapseSvg = '<path fill="currentColor" d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+
+    if (this.fullscreenBtn) {
+      this.fullscreenBtn.title = isMax ? 'Minimize player (Esc)' : 'Expand player';
+      this.fullscreenBtn.setAttribute('aria-label', isMax ? 'Minimize player' : 'Expand player');
+      const svg = this.fullscreenBtn.querySelector('svg');
+      if (svg) svg.innerHTML = isMax ? collapseSvg : expandSvg;
+      this.fullscreenBtn.classList.toggle('active-maximized', isMax);
+    }
+  }
+
+  isFullscreen() {
+    return Boolean(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
   }
 
   toggleFullscreenWindow() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => { });
-    } else {
-      document.exitFullscreen().catch(() => { });
+    try {
+      if (!this.isFullscreen()) {
+        const elem = document.documentElement;
+        const requestFn = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
+        if (requestFn) {
+          const p = requestFn.call(elem);
+          if (p && typeof p.catch === 'function') {
+            p.catch(err => console.warn('[REA Fullscreen]', err));
+          }
+        }
+      } else {
+        const exitFn = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if (exitFn) {
+          const p = exitFn.call(document);
+          if (p && typeof p.catch === 'function') {
+            p.catch(err => console.warn('[REA Fullscreen]', err));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[REA Fullscreen] Toggle error:', err);
+    }
+  }
+
+  updateFullscreenWindowIcons() {
+    const isFs = this.isFullscreen();
+    const enterSvg = '<path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+    const exitSvg = '<path fill="currentColor" d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+
+    if (this.maxFullscreenToggleBtn) {
+      this.maxFullscreenToggleBtn.title = isFs ? 'Exit Fullscreen Window' : 'Toggle Fullscreen Window';
+      this.maxFullscreenToggleBtn.setAttribute('aria-label', isFs ? 'Exit Fullscreen Window' : 'Toggle Fullscreen Window');
+      const svg = this.maxFullscreenToggleBtn.querySelector('svg');
+      if (svg) svg.innerHTML = isFs ? exitSvg : enterSvg;
+      this.maxFullscreenToggleBtn.classList.toggle('active-fullscreen', isFs);
     }
   }
 
