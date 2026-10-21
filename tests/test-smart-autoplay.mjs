@@ -450,6 +450,116 @@ try {
     assert.equal(app.currentTrack.id, 'reco-1', 'Autoplay recommendation plays only after manual queue ends');
   });
 
+  // =========================================================================
+  // Scenario J: Universal Singer Autoplay Continuity (Arijit, Karan Aujla, Diljit, etc.)
+  // =========================================================================
+  await test('Scenario J: Universal Singer Autoplay Continuity across multiple diverse singers', async () => {
+    const { app } = createTestApp();
+
+    const singersToTest = [
+      { name: 'Arijit Singh', seedTitle: 'Tum Hi Ho', lang: 'hindi' },
+      { name: 'Karan Aujla', seedTitle: 'Softly', lang: 'punjabi' },
+      { name: 'Diljit Dosanjh', seedTitle: 'Lover', lang: 'punjabi' },
+      { name: 'Shreya Ghoshal', seedTitle: 'Sun Raha Hai', lang: 'hindi' }
+    ];
+
+    for (const singer of singersToTest) {
+      const seedTrack = {
+        id: `seed-${singer.name.toLowerCase().replace(/\s+/g, '-')}`,
+        title: singer.seedTitle,
+        artist: singer.name,
+        language: singer.lang
+      };
+
+      // Play the singer's song intentionally
+      app.currentTrack = seedTrack;
+      app.currentSeedArtist = singer.name.toLowerCase();
+      app.isTransitioning = false;
+
+      // Generate recommendations for this singer
+      const recos = await app.generateSmartRecommendations(seedTrack, { force: true });
+      assert(recos && recos.length >= 6, `Must return recommendations for ${singer.name}`);
+
+      // 1. The immediate next track must be by this singer
+      const firstUpcoming = recos[0];
+      assert(
+        firstUpcoming.artist.toLowerCase().includes(singer.name.toLowerCase()),
+        `Immediate next song must be by ${singer.name}, got: "${firstUpcoming.title}" by ${firstUpcoming.artist}`
+      );
+
+      // 2. Reason badge must credit this singer
+      assert(
+        firstUpcoming._reason.toLowerCase().includes(singer.name.toLowerCase()),
+        `Reason badge must cite ${singer.name}, got: "${firstUpcoming._reason}"`
+      );
+
+      // 3. The majority of recommendations must be by this singer
+      const matchingCount = recos.filter(t => t.artist.toLowerCase().includes(singer.name.toLowerCase())).length;
+      assert(
+        matchingCount >= 4,
+        `Expected at least 4 songs by ${singer.name}, got: ${matchingCount}/${recos.length}`
+      );
+    }
+  });
+
+  // =========================================================================
+  // Scenario K: Switching Singers Immediately Purges Prior Singer's Autoplay Queue
+  // =========================================================================
+  await test('Scenario K: Switching singers purges prior singer recommendations so next song belongs to new singer', async () => {
+    const { app } = createTestApp();
+
+    const dhandaTrack = {
+      id: 'dhanda-seed-1',
+      title: 'Boom Shaka',
+      artist: 'Dhanda Nyoliwala',
+      album: 'Up To Date',
+      audioUrl: 'https://example.com/dhanda.mp3'
+    };
+
+    const diljitTrack = {
+      id: 'diljit-seed-1',
+      title: 'Lover',
+      artist: 'Diljit Dosanjh',
+      language: 'punjabi',
+      audioUrl: 'https://example.com/diljit.mp3'
+    };
+
+    // 1. Play first singer and fill recommendation queue
+    app.currentTrack = dhandaTrack;
+    app.currentSeedArtist = 'dhanda nyoliwala';
+    const dhandaRecos = await app.generateSmartRecommendations(dhandaTrack, { force: true });
+    assert(dhandaRecos.length > 0, 'Dhanda recos should be populated');
+    assert(app.recommendationQueue.some(t => t.artist.toLowerCase().includes('dhanda')), 'Should have Dhanda songs');
+
+    // 2. User plays a completely different singer (Diljit Dosanjh)
+    app.isTransitioning = false;
+    app.playActualTrack(diljitTrack, { type: 'card_click' });
+
+    // 3. Prior artist queue must have been purged immediately
+    assert.equal(app.currentSeedArtist, 'diljit dosanjh', 'Seed artist must be updated to Diljit');
+    const hasOldDhanda = app.recommendationQueue.some(t => t.artist.toLowerCase().includes('dhanda'));
+    assert(!hasOldDhanda, 'Recommendation queue must not contain prior artist (Dhanda) tracks after singer switch');
+
+    // 4. Await prefetch completion for the new singer
+    await app.prefetchSmartRecommendations(diljitTrack, true);
+
+    // 5. The next upcoming track MUST be Diljit Dosanjh, NOT Dhanda
+    assert(app.recommendationQueue.length > 0, 'Must have new recommendations');
+    const nextUp = app.recommendationQueue[0];
+    assert(
+      nextUp.artist.toLowerCase().includes('diljit dosanjh'),
+      `Next autoplay track must be by new singer (Diljit Dosanjh), got: "${nextUp.title}" by ${nextUp.artist}`
+    );
+
+    // 6. Simulate track ending -> Next track played must be Diljit Dosanjh
+    app.isTransitioning = false;
+    app.advanceTrack('ended');
+    assert(
+      app.currentTrack.artist.toLowerCase().includes('diljit dosanjh'),
+      `Advanced track must be by Diljit Dosanjh, got: "${app.currentTrack.title}" by ${app.currentTrack.artist}`
+    );
+  });
+
 } finally {
   server.close();
 }

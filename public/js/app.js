@@ -5411,6 +5411,17 @@ class REAMusicApp {
       localStorage.setItem('rea_recently_played_ids', JSON.stringify(this.recentlyPlayedIds));
     }
 
+    const pArtist = (track.artist || '').split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)[0].replace(/\([^)]*\)/g, '').trim().toLowerCase();
+    const isNewArtistSeed = !this.currentSeedArtist || this.currentSeedArtist !== pArtist;
+
+    // When an intentional user selection plays or artist changes, purge stale recommendations
+    // (Preserve during continuous queue transitions like autoplay or manual_queue)
+    const isQueueAdvancing = context?.type === 'autoplay' || context?.type === 'manual_queue';
+    if (!isQueueAdvancing && (isNewArtistSeed || context?.type === 'search' || context?.type === 'card_click' || context?.type === 'song')) {
+      this.recommendationQueue = [];
+      this.currentSeedArtist = pArtist;
+    }
+
     // Synchronize legacy this.queue and this.currentTrackIndex for backward-compatibility
     const remainingSequence = (this.sequenceQueue && this.sequenceIndex >= 0) 
       ? this.sequenceQueue.slice(this.sequenceIndex + 1) 
@@ -5442,12 +5453,8 @@ class REAMusicApp {
     this.renderRelatedPane();
 
     // Background smart recommendations: refresh when new seed artist is played or queue runs low
-    const pArtist = (track.artist || '').split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)[0].replace(/\([^)]*\)/g, '').trim().toLowerCase();
-    const isNewArtistSeed = !this.currentSeedArtist || this.currentSeedArtist !== pArtist;
-
     if (this.autoplayEnabled) {
       if (context?.type !== 'autoplay' || isNewArtistSeed || this.recommendationQueue.length < 5) {
-        this.currentSeedArtist = pArtist;
         this.prefetchSmartRecommendations(track, isNewArtistSeed);
       }
     }
@@ -5826,11 +5833,13 @@ class REAMusicApp {
       .filter(Boolean);
 
     // Primary artist resolution: match current search query or active artist context if applicable
-    let primaryArtist = artistTokens[0] || rawArtistName;
-    if (this.lastSearchQuery) {
+    let primaryArtist = seedTrack.primaryArtist || artistTokens[0] || rawArtistName;
+    if (this.currentView === 'search' && this.lastSearchQuery) {
       const qLower = this.lastSearchQuery.toLowerCase();
       const matched = artistTokens.find(t => qLower.includes(t.toLowerCase()) || t.toLowerCase().includes(qLower));
       if (matched) primaryArtist = matched;
+    } else if (this.currentView === 'artist' && this.currentArtistName) {
+      primaryArtist = this.currentArtistName;
     }
     const primaryArtistLower = primaryArtist.toLowerCase();
 
