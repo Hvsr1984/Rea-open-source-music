@@ -47,7 +47,7 @@ class BoundedCache {
 // Bounded in-memory caches with individual capacity limits and TTLs
 const CACHE = {
   trending: new BoundedCache(50, 600000),      // 10 minutes
-  search: new BoundedCache(150, 300000),       // 5 minutes
+  search: new BoundedCache(500, 900000),       // 15 minutes, high capacity
   lyrics: new BoundedCache(150, 86400000),     // 24 hours
   artist: new BoundedCache(100, 600000),       // 10 minutes
   album: new BoundedCache(100, 600000),        // 10 minutes
@@ -165,10 +165,22 @@ async function fetchPlaylistSongs(listId) {
   }
 }
 
-async function searchSongs(query) {
+function normalizeTrackTitle(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/feat\.?.*|ft\.?.*/i, '')
+    .replace(/official.*|video.*|audio.*|remix.*|version.*/gi, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
+async function searchSongs(query, page = 1, limit = 20) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=20&p=1&q=${encodeURIComponent(query)}`;
-    const res = await safeFetch(url);
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}`;
+    const res = await safeFetch(url, { timeoutMs: 4500 });
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
     const data = JSON.parse(clean);
@@ -182,10 +194,10 @@ async function searchSongs(query) {
   }
 }
 
-async function searchArtists(query) {
+async function searchArtists(query, page = 1, limit = 8) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=8&p=1&q=${encodeURIComponent(query)}`;
-    const res = await safeFetch(url);
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}`;
+    const res = await safeFetch(url, { timeoutMs: 4500 });
     const text = await res.text();
     const clean = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
     const data = JSON.parse(clean);
@@ -214,10 +226,10 @@ async function searchArtists(query) {
   }
 }
 
-async function searchAlbums(query) {
+async function searchAlbums(query, page = 1, limit = 12) {
   try {
-    const url = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=12&p=1&q=${encodeURIComponent(query)}`;
-    const res = await safeFetch(url);
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getAlbumResults&_format=json&n=${limit}&p=${page}&q=${encodeURIComponent(query)}`;
+    const res = await safeFetch(url, { timeoutMs: 4500 });
     const text = await res.text();
     const clean = text.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '');
     const data = JSON.parse(clean);
@@ -405,22 +417,29 @@ async function fetchNewReleases() {
   }
 }
 
-// Regional & Genre Search Queries for Indian Catalogue Discovery
+// Regional & Genre Search Queries for Indian & Global Discovery
 const GENRE_QUERIES = {
   haryanvi: 'Haryanvi Hits',
   punjabi: 'Punjabi Hits',
+  punjabi_hiphop: 'Punjabi Hip Hop Hits',
   bollywood: 'Bollywood Hits',
   hindi: 'Hindi Top Songs',
-  indie: 'Indie India',
-  chill: 'Hindi Acoustic',
+  hindi_romantic: 'Romantic Hindi Love Songs',
   romantic: 'Love Songs Hindi',
-  workout: 'Workout Hindi',
-  party: 'Bollywood Dance'
+  indie: 'Indie India',
+  chill: 'Hindi Acoustic Chill',
+  lofi: 'Lofi Chill Beats Hindi English',
+  workout: 'Workout Gym Motivation Hits',
+  party: 'Bollywood Dance Party',
+  pop: 'Global Pop Hits',
+  synthpop: 'Synthpop 80s Retro Hits',
+  hiphop: 'Hip Hop Rap Hits',
+  english: 'English Pop Hits Top'
 };
 
-async function fetchGenreSongs(genreKey) {
-  const q = GENRE_QUERIES[genreKey] || `${genreKey} Indian Hits`;
-  return searchSongs(q);
+async function fetchGenreSongs(genreKey, page = 1) {
+  const q = GENRE_QUERIES[genreKey] || `${genreKey} Hits`;
+  return searchSongs(q, page, 20);
 }
 
 /**
@@ -509,10 +528,10 @@ export default async function handler(req, res) {
         return sendJson(200, { results: [], artists: [], albums: [], topResult: null });
       }
 
-      const cacheKey = q.trim().toLowerCase();
+      const cacheKey = q.trim().toLowerCase().replace(/\s+/g, ' ');
       const cached = CACHE.search.get(cacheKey);
       if (cached) {
-        return sendJson(200, cached, 300);
+        return sendJson(200, cached, 600);
       }
 
       const [songs, artists, albums] = await Promise.all([
@@ -523,7 +542,7 @@ export default async function handler(req, res) {
 
       // Calculate Top Result based on query relevance & photo availability
       let topResult = null;
-      const qLower = q.trim().toLowerCase();
+      const qLower = cacheKey;
       
       const artistsWithImages = artists.filter(a => a.image && !a.image.includes('artist-default'));
       const exactArtist = artistsWithImages.find(a => a.name.toLowerCase() === qLower) || artists.find(a => a.name.toLowerCase() === qLower);
@@ -555,8 +574,8 @@ export default async function handler(req, res) {
         topResult
       };
 
-      CACHE.search.set(cacheKey, payload, 300000);
-      return sendJson(200, payload, 300);
+      CACHE.search.set(cacheKey, payload, 900000);
+      return sendJson(200, payload, 600);
     }
 
     // 2. Dedicated Song Details & Related Songs
@@ -626,10 +645,16 @@ export default async function handler(req, res) {
 
       if (name) {
         const [songs, artists, albums] = await Promise.all([
-          searchSongs(name),
-          searchArtists(name),
-          searchAlbums(name)
+          searchSongs(name, 1, 40),
+          searchArtists(name, 1, 8),
+          searchAlbums(name, 1, 12)
         ]);
+
+        const uniqueTitles = new Set(songs.map(t => normalizeTrackTitle(t.title)));
+        if (uniqueTitles.size < 10) {
+          const page2Songs = await searchSongs(name, 2, 40);
+          songs.push(...page2Songs);
+        }
 
         const matchingArtist = artists.find(a => a.name.toLowerCase() === name.toLowerCase()) || artists[0];
 
@@ -764,18 +789,20 @@ export default async function handler(req, res) {
       return sendJson(200, exploreData);
     }
 
-    // 8. Indian Recommendations & Adaptive Discovery Engine
+    // 8. Recommendations & Continuous Discovery Engine
     if (isRecommendations) {
       const artist = parsedUrl.searchParams.get('artist') || '';
       const genre = parsedUrl.searchParams.get('genre') || '';
       const qParam = parsedUrl.searchParams.get('q') || '';
       const trackId = parsedUrl.searchParams.get('trackId') || '';
+      const page = Math.max(1, parseInt(parsedUrl.searchParams.get('page') || '1', 10));
       const limit = Math.min(30, parseInt(parsedUrl.searchParams.get('limit') || '16', 10));
 
       const trendingSearches = [
         'Arijit Singh',
         'Dhanda Nyoliwala',
         'Diljit Dosanjh',
+        'The Weeknd',
         'Tauba Tauba',
         'Kesariya',
         'Bollywood Romance',
@@ -788,7 +815,7 @@ export default async function handler(req, res) {
         'Lofi Hindi'
       ];
 
-      const cacheKey = ('reco__' + (artist || genre || qParam || 'all')).toLowerCase();
+      const cacheKey = ('reco__' + (artist || genre || qParam || 'all') + `__p${page}`).toLowerCase();
       const cachedReco = CACHE.trending.get(cacheKey);
       if (cachedReco) {
         return sendJson(200, cachedReco);
@@ -796,43 +823,76 @@ export default async function handler(req, res) {
 
       let recommendedTracks = [];
 
-      // 1. If artist specified: query top songs by primary artist
+      // 1. If artist specified: query songs by primary artist with pagination support
       if (artist && artist.trim()) {
-        const primaryArtist = artist.split(',')[0].replace(/\([^)]*\)/g, '').trim();
-        const searchResults = await searchSongs(primaryArtist);
+        const primaryArtist = artist.split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)[0].replace(/\([^)]*\)/g, '').trim();
+        const searchResults = await searchSongs(primaryArtist, page, 40);
         recommendedTracks = searchResults.filter(t => t && t.id !== trackId);
+
+        // If duplicate releases compress unique titles, pull page + 1 for variety
+        const initialTitles = new Set(recommendedTracks.map(t => normalizeTrackTitle(t.title)));
+        if (initialTitles.size < 10) {
+          const page2Results = await searchSongs(primaryArtist, page + 1, 40);
+          recommendedTracks = [...recommendedTracks, ...page2Results.filter(t => t && t.id !== trackId)];
+        }
       }
 
       // 2. If genre or query specified
       if (genre && recommendedTracks.length < limit) {
-        const genreSongs = await fetchGenreSongs(genre);
+        const genreSongs = await fetchGenreSongs(genre, page);
         const filteredGenre = genreSongs.filter(t => t && t.id !== trackId && !recommendedTracks.some(r => r.id === t.id));
         recommendedTracks = [...recommendedTracks, ...filteredGenre];
       } else if (qParam && recommendedTracks.length < limit) {
-        const querySongs = await searchSongs(qParam);
+        const querySongs = await searchSongs(qParam, page, 30);
         const filteredQ = querySongs.filter(t => t && t.id !== trackId && !recommendedTracks.some(r => r.id === t.id));
         recommendedTracks = [...recommendedTracks, ...filteredQ];
       }
 
-      // 3. Fallback to broad Indian discovery pool if sparse
-      if (recommendedTracks.length < 8) {
-        const [superhits, trending] = await Promise.all([
-          fetchPlaylistSongs(CHARTS.superhits),
-          fetchPlaylistSongs(CHARTS.trending)
-        ]);
-        const pool = [...superhits, ...trending];
+      // 3. Fallback to genre-aligned discovery pool if sparse on page 1
+      if (recommendedTracks.length < 8 && page === 1) {
+        let pool = [];
+        const gLower = (genre || '').toLowerCase();
+        if (gLower === 'english' || gLower === 'pop' || gLower === 'synthpop') {
+          pool = await searchSongs('Global Pop Hits', 1, 15);
+        } else if (gLower === 'punjabi_hiphop' || gLower === 'punjabi') {
+          pool = await fetchPlaylistSongs(CHARTS.punjabi);
+        } else if (gLower === 'hindi_romantic' || gLower === 'romantic') {
+          pool = await fetchPlaylistSongs(CHARTS.romantic);
+        } else if (gLower === 'lofi' || gLower === 'chill') {
+          pool = await searchSongs('Lofi Chill Beats', 1, 15);
+        } else if (gLower === 'haryanvi') {
+          pool = await fetchGenreSongs('haryanvi', 1);
+        } else {
+          const [superhits, trending] = await Promise.all([
+            fetchPlaylistSongs(CHARTS.superhits),
+            fetchPlaylistSongs(CHARTS.trending)
+          ]);
+          pool = [...superhits, ...trending];
+        }
         const additional = pool.filter(t => t.id !== trackId && !recommendedTracks.some(r => r.id === t.id));
         recommendedTracks = [...recommendedTracks, ...additional];
       }
 
-      recommendedTracks = recommendedTracks.slice(0, limit);
+      // Deduplicate songs by normalized title + artist to remove compilation/duplicate releases
+      const seenTitles = new Set();
+      const dedupedTracks = [];
+      for (const t of recommendedTracks) {
+        const key = `${normalizeTrackTitle(t.title)}__${(t.artist || '').split(',')[0].toLowerCase().trim()}`;
+        if (!seenTitles.has(key)) {
+          seenTitles.add(key);
+          dedupedTracks.push(t);
+        }
+      }
+
+      const finalTracks = dedupedTracks.slice(0, limit);
 
       const payload = {
-        recommendations: recommendedTracks,
+        recommendations: finalTracks,
         trendingSearches,
         artist: artist || '',
         genre: genre || '',
-        count: recommendedTracks.length
+        page,
+        count: finalTracks.length
       };
 
       CACHE.trending.set(cacheKey, payload, 300000);

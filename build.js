@@ -62,9 +62,9 @@ bundledHtml = bundledHtml.replace(/<link rel="stylesheet" href="css\/index\.css"
 
 // Brand logo inline fallback (clean existing fallback first to ensure idempotency)
 bundledHtml = bundledHtml.replace(/<div class="brand-logo-fallback"[^>]*>[\s\S]*?<\/div>\s*/g, '');
-const brandImgRegex = /<img src="assets\/logo\.jpg"[^>]*class="brand-logo-img"[^>]*>/;
-const brandReplacement = `<img src="assets/logo.jpg" alt="REA Music Logo" class="brand-logo-img" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='inline-flex';">
-        <div class="brand-logo-fallback" style="display:none; width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg, #0071e3, #42a5f5); align-items:center; justify-content:center; color:#fff; box-shadow:0 4px 12px rgba(0,113,227,0.35); margin-right:8px;">
+const brandImgRegex = /<img src="(?:\/)?(?:branding\/rea-music-logo\.png|assets\/logo\.jpg)"[^>]*class="brand-logo-img"[^>]*>/;
+const brandReplacement = `<img src="/branding/rea-music-logo.png" alt="REA Music" class="brand-logo-img" width="32" height="32" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='inline-flex';">
+        <div class="brand-logo-fallback" style="display:none; width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg, #8a2be2, #d924b8); align-items:center; justify-content:center; color:#fff; box-shadow:0 4px 12px rgba(138,43,226,0.35); margin-right:8px;">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
         </div>`;
 if (brandImgRegex.test(bundledHtml)) {
@@ -107,9 +107,22 @@ function copyFolderRecursiveSync(source, target) {
 
 copyFolderRecursiveSync(path.join(__dirname, 'assets'), path.join(distDir, 'assets'));
 copyFolderRecursiveSync(path.join(__dirname, 'assets'), path.join(publicDir, 'assets'));
+copyFolderRecursiveSync(path.join(__dirname, 'branding'), path.join(distDir, 'branding'));
+copyFolderRecursiveSync(path.join(__dirname, 'branding'), path.join(publicDir, 'branding'));
 
-// Copy PWA manifest and service worker files to public/ and dist/
-['manifest.webmanifest', 'manifest.json', 'sw.js'].forEach((file) => {
+// Copy PWA manifest, service worker, and favicon files to public/ and dist/
+[
+  'manifest.webmanifest',
+  'manifest.json',
+  'sw.js',
+  'favicon.ico',
+  'favicon-16x16.png',
+  'favicon-32x32.png',
+  'favicon-48x48.png',
+  'apple-touch-icon.png',
+  'icon-192.png',
+  'icon-512.png'
+].forEach((file) => {
   const src = path.join(__dirname, file);
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, path.join(publicDir, file));

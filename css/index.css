@@ -27,39 +27,35 @@ button, .music-card, .song-list-item, .mini-player-dock, .mobile-tab-btn {
 }
 
 .main-scroll-area,
-.music-shelf-scroll,
 .search-results-scroll,
 .queue-panel-body,
 .maximized-theater-overlay {
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  transform: translateZ(0);
   overscroll-behavior-y: contain;
   touch-action: pan-y;
+}
+
+.music-shelf-scroll,
+.cards-carousel,
+.spatial-releases-carousel,
+.chips-container,
+.quick-picks-grid {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
 }
 
 .mini-player-dock,
 .bottom-tab-bar,
 .top-nav {
-  transform: translateZ(0);
   backface-visibility: hidden;
-  will-change: transform;
 }
 
-/* Device rendering optimization: skip off-screen rendering calculations */
-.track-row-card,
-.ranked-track-card,
+/* Device rendering optimization for long vertical lists only */
 .download-track-row,
 .queue-item {
   content-visibility: auto;
-  contain-intrinsic-size: 0 68px;
-  contain: layout style paint;
-}
-
-.music-card {
-  content-visibility: auto;
-  contain-intrinsic-size: 190px 240px;
-  contain: layout style paint;
+  contain-intrinsic-size: 0 58px;
 }
 
 /* Crisp image rendering without wasteful GPU layer promotion */
@@ -386,9 +382,21 @@ a {
 .brand-logo-img {
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 12px var(--accent-glow);
-  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 0 14px rgba(179, 38, 235, 0.35);
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
+.sidebar-brand-logo-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  box-shadow: 0 0 10px rgba(179, 38, 235, 0.3);
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
 }
 
 .brand-name {
@@ -1306,11 +1314,23 @@ a {
 }
 
 .sidebar.collapsed .brand-name,
+.sidebar.collapsed .badge-free,
 .sidebar.collapsed .playlist-info,
 .sidebar.collapsed .sidebar-footer,
 .sidebar.collapsed .new-playlist-btn span,
 .sidebar.collapsed .nav-item span {
-  display: none;
+  display: none !important;
+}
+
+.sidebar.collapsed .sidebar-brand-header {
+  padding: 4px 0 12px 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center !important;
+  width: 100% !important;
 }
 
 .sidebar.collapsed .nav-item {
@@ -7269,6 +7289,7 @@ body.theme-dark .dl-track-quality {
     align-items: center;
     gap: 8px;
     user-select: none;
+    cursor: pointer;
   }
 
   .brand-badge-pill {
@@ -8179,6 +8200,39 @@ body.theme-dark .dl-track-quality {
     display: none !important;
   }
 
+  /* Disable expensive mix-blend-mode and parallax transforms on mobile */
+  .spatial-bg-ambient-light {
+    display: none !important;
+  }
+  .spatial-bg-image {
+    transition: none !important;
+    will-change: auto !important;
+    transform: none !important;
+  }
+
+  /* 60/120fps Mobile Scroll Fluidity:
+     Turn off live backdrop-filter computation and heavy box-shadows on scrolling in-page cards.
+     Use GPU-friendly semi-transparent backgrounds with crisp borders instead. */
+  .album-card,
+  .music-card,
+  .ranked-track-card,
+  .track-row-card,
+  .official-rankings-panel,
+  .spatial-album-card,
+  .taste-profile-banner,
+  .glass-panel,
+  .glass-card,
+  .glass-shelf,
+  .playlist-card,
+  .download-track-row,
+  .song-list-item,
+  .theme-choice-card,
+  .settings-row-item {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
   /* 1. Top Navigation Bar */
   .top-nav {
     position: fixed !important;
@@ -8189,16 +8243,16 @@ body.theme-dark .dl-track-quality {
     padding-top: env(safe-area-inset-top, 0px) !important;
     padding-left: 12px !important;
     padding-right: 12px !important;
-    background: rgba(14, 12, 18, 0.85) !important;
+    background: rgba(14, 12, 18, 0.92) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: blur(28px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
     z-index: 95 !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
   }
 
   .nav-left {
@@ -8290,6 +8344,7 @@ body.theme-dark .dl-track-quality {
     overflow-y: auto !important;
     overscroll-behavior-y: contain !important;
     -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
     padding: 12px 14px calc(var(--mobile-tab-height) + var(--player-height) + 28px + env(safe-area-inset-bottom, 0px)) 14px !important;
     width: 100% !important;
     box-sizing: border-box !important;
@@ -8301,6 +8356,8 @@ body.theme-dark .dl-track-quality {
     padding-bottom: 6px !important;
     scroll-snap-type: x mandatory !important;
     -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    overscroll-behavior-x: contain !important;
   }
 
   .spatial-album-card {
@@ -8438,11 +8495,11 @@ body.theme-dark .dl-track-quality {
     transform: none !important;
     height: 60px !important;
     border-radius: 16px !important;
-    background: rgba(24, 20, 30, 0.94) !important;
+    background: rgba(22, 18, 28, 0.95) !important;
     border: 1px solid rgba(255, 255, 255, 0.16) !important;
-    backdrop-filter: blur(28px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45) !important;
     padding: 0 12px !important;
     z-index: 450 !important;
     display: flex !important;
@@ -8451,7 +8508,7 @@ body.theme-dark .dl-track-quality {
     cursor: pointer !important;
     user-select: none !important;
     overflow: hidden !important;
-    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, background 0.25s ease !important;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease !important;
   }
 
   .player-bar:active {
@@ -8612,15 +8669,15 @@ body.theme-dark .dl-track-quality {
     right: 0 !important;
     height: calc(var(--mobile-tab-height) + env(safe-area-inset-bottom, 0px)) !important;
     padding-bottom: env(safe-area-inset-bottom, 0px) !important;
-    background: rgba(16, 14, 22, 0.94) !important;
+    background: rgba(14, 12, 18, 0.94) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
-    backdrop-filter: blur(28px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-around !important;
     z-index: 500 !important;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3) !important;
   }
 
   .mobile-tab-btn {
@@ -9254,7 +9311,8 @@ body.theme-white .mobile-tab-btn.active {
 }
 
 /* Settings Modal in White UI */
-body.theme-white .settings-modal-box {
+body.theme-white .settings-modal-box,
+body.theme-white .ios-install-modal-box {
   background: rgba(255, 255, 255, 0.97) !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16) !important;

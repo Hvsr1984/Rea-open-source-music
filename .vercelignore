@@ -1,3 +1,8 @@
 build.js
 temp_live.html
 .git
+tests/
+archive/
+docs/
+scripts/
+

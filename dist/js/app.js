@@ -35,7 +35,7 @@ const API_BASE_URL = (typeof window !== 'undefined' && window.__API_BASE_URL__) 
 // =============================================================================
 const DONATION_CONFIG = Object.freeze({
   appName: 'REA Music',
-  upiId: '950878807@fam',
+  upiId: '9509878807@fam',
   payeeName: 'REA Music Developer',
   currency: 'INR',
   route: '/donate',
@@ -352,6 +352,14 @@ class HybridAudioEngine {
       this.audio.currentTime = Math.max(0, Math.min(this.audio.duration, timeInSeconds));
     }
   }
+
+  getCurrentTime() {
+    return this.audio ? (this.audio.currentTime || 0) : 0;
+  }
+
+  getDuration() {
+    return this.audio ? (this.audio.duration || 0) : 0;
+  }
 }
 
 // =============================================================================
@@ -371,6 +379,11 @@ const REGIONAL_ARTISTS = {
     'yo yo honey singh', 'badshah', 'raftaar', 'sukhe', 'mankirt aulakh', 'tarsem jassar',
     'kulwinder billa', 'parmish verma', 'jordan sandhu', 'guru randhawa'
   ],
+  punjabi_hiphop: [
+    'karan aujla', 'diljit dosanjh', 'sidhu moose wala', 'ap dhillon', 'shubh',
+    'gurinder gill', 'yo yo honey singh', 'badshah', 'raftaar', 'ikka',
+    'kr$na', 'divine', 'seedhe maut', 'talwiinder', 'wazir patar'
+  ],
   bollywood: [
     'arijit singh', 'pritam', 'sachin-jigar', 'amitabh bhattacharya', 'shreya ghoshal',
     'sonu nigam', 'jubin nautiyal', 'neha kakkar', 'armaan malik', 'darshan raval',
@@ -378,10 +391,29 @@ const REGIONAL_ARTISTS = {
     'udit narayan', 'kishore kumar', 'lata mangeshkar', 'mithoon', 'anupam aravind',
     'badshah', 'vishal mishra', 'jasleen royal', 'shankar-ehsaan-loy'
   ],
+  hindi_romantic: [
+    'arijit singh', 'shreya ghoshal', 'atif aslam', 'mohit chauhan', 'armaan malik',
+    'darshan raval', 'jubin nautiyal', 'pritam', 'sachin-jigar', 'mithoon', 'kk',
+    'vishal mishra', 'jasleen royal', 'sonu nigam', 'alka yagnik', 'kumar sanu', 'udit narayan'
+  ],
   indie: [
     'anuv jain', 'prateek kuhad', 'zaeden', 'ritviz', 'when chai met toast',
     'the local train', 'jasleen royal', 'taba chake', 'aditya a', 'sanah moidutty',
     'o shoot', 'achint', 'sai abhyankkar', 'seedhe maut', 'kr$na', 'divine'
+  ],
+  lofi: [
+    'anuv jain', 'prateek kuhad', 'zaeden', 'jasleen royal', 'taba chake', 'aditya a',
+    'twin strings', 'osho jain', 'when chai met toast', 'the local train', 'kavita seth'
+  ],
+  english: [
+    'the weeknd', 'dua lipa', 'bruno mars', 'post malone', 'ed sheeran', 'taylor swift',
+    'billie eilish', 'harry styles', 'charlie puth', 'justin bieber', 'ariana grande',
+    'coldplay', 'maroon 5', 'imagine dragons', 'daft punk', 'calvin harris', 'shawn mendes',
+    'adele', 'sam smith', 'selena gomez', 'marshmello', 'alan walker', 'drake', 'travis scott',
+    'eminem', 'kendrick lamar', 'twenty one pilots', 'one direction', 'olivia rodrigo'
+  ],
+  synthpop: [
+    'the weeknd', 'daft punk', 'kavinsky', 'dua lipa', 'm83', 'chvrches', 'mgmt', 'empire of the sun', 'bleachers'
   ]
 };
 
@@ -401,11 +433,23 @@ function detectTrackTags(track) {
   const languages = new Set();
   const moods = new Set();
 
+  if (track.genre) {
+    const gLower = String(track.genre).toLowerCase().trim();
+    genres.add(gLower);
+    if (gLower === 'lofi') moods.add('chill');
+    if (gLower === 'hard_techno' || gLower === 'drill') moods.add('workout');
+    if (gLower === 'romantic' || gLower === 'acoustic') moods.add('romantic');
+  }
+
   if (explicitLang) {
     languages.add(explicitLang);
     if (explicitLang === 'haryanvi') genres.add('haryanvi');
     if (explicitLang === 'punjabi') genres.add('punjabi');
     if (explicitLang === 'hindi') genres.add('bollywood');
+    if (explicitLang === 'english') {
+      genres.add('pop');
+      languages.add('english');
+    }
   }
 
   // Artist-based matching
@@ -436,14 +480,43 @@ function detectTrackTags(track) {
       break;
     }
   }
+  for (const eArtist of REGIONAL_ARTISTS.english) {
+    if (artist.includes(eArtist)) {
+      genres.add('pop');
+      genres.add('english');
+      languages.add('english');
+      break;
+    }
+  }
+  for (const sArtist of REGIONAL_ARTISTS.synthpop) {
+    if (artist.includes(sArtist)) {
+      genres.add('synthpop');
+      genres.add('pop');
+      languages.add('english');
+      break;
+    }
+  }
 
   // Keyword-based genre & language heuristics
   const combined = `${title} ${album} ${artist}`;
+  if (/blinding lights|save your tears|after hours|starboy|synth|synthpop|retrowave|80s pop|electropop/i.test(combined)) {
+    genres.add('synthpop');
+    genres.add('pop');
+    languages.add('english');
+  }
+  if (/english|billboard|hollywood|pop hits/i.test(combined)) {
+    genres.add('pop');
+    languages.add('english');
+  }
   if (/haryanvi|ragni|desi hip hop|haryana/i.test(combined)) {
     genres.add('haryanvi');
     languages.add('haryanvi');
   }
-  if (/punjabi|bhangra|desi bass|punjab/i.test(combined)) {
+  if (/punjabi hip hop|drill|trap|desi bass|bhangra rap|sidhu|aujla|shubh|dhillon/i.test(combined)) {
+    genres.add('punjabi_hiphop');
+    genres.add('punjabi');
+    languages.add('punjabi');
+  } else if (/punjabi|bhangra|punjab/i.test(combined)) {
     genres.add('punjabi');
     languages.add('punjabi');
   }
@@ -454,25 +527,52 @@ function detectTrackTags(track) {
   if (/indie|acoustic|unplugged|pop indie/i.test(combined)) {
     genres.add('indie');
   }
+  if (/lofi|lo-fi|chillhop|slowed|reverb|chill beats|midnight/i.test(combined)) {
+    genres.add('lofi');
+    genres.add('chill');
+  }
 
   // Mood tags
-  if (/romantic|love|ishq|pyaar|dil|tum|hum|heart|kasam|deewani/i.test(combined)) {
+  if (/romantic|love|ishq|pyaar|dil|tum|hum|heart|kasam|deewani|humsafar|raatan|gehra/i.test(combined)) {
     moods.add('romantic');
+    if (languages.has('hindi') || languages.has('bollywood') || genres.has('bollywood')) {
+      genres.add('hindi_romantic');
+    }
   }
-  if (/chill|lofi|relax|peace|acoustic|slowed|reverb|ambient|sufi/i.test(combined)) {
+  if (/chill|lofi|relax|peace|acoustic|slowed|reverb|ambient|sufi|unplugged/i.test(combined)) {
     moods.add('chill');
   }
-  if (/party|dance|club|dj|remix|dhamaka|celebration|banger|nach/i.test(combined)) {
+  if (/party|dance|club|dj|remix|dhamaka|celebration|banger|nach|disco/i.test(combined)) {
     moods.add('party');
   }
-  if (/workout|gym|beast|power|pump|energy|motivation|fitness|hard/i.test(combined)) {
+  if (/workout|gym|beast|power|pump|energy|motivation|fitness|hard|drill/i.test(combined)) {
     moods.add('workout');
+  }
+
+  // Energy level heuristic (low / medium / high)
+  let energy = 'medium';
+  if (/workout|gym|drill|hard|trap|banger|edm|club|remix|dhamaka|bass boosted|dhol|party/i.test(combined)) {
+    energy = 'high';
+  } else if (/chill|lofi|slowed|reverb|ambient|acoustic|unplugged|peace|sleep|midnight|ghazal|piano|sad|dard/i.test(combined)) {
+    energy = 'low';
+  } else if (moods.has('romantic') && !moods.has('party')) {
+    energy = 'low';
+  }
+
+  // Production character (acoustic / electronic / standard)
+  let character = 'standard';
+  if (/acoustic|unplugged|live guitar|piano|classical|harmonium|flute|sufi|ghazal/i.test(combined)) {
+    character = 'acoustic';
+  } else if (/synth|synthpop|retrowave|electronic|edm|techno|dance|80s/i.test(combined)) {
+    character = 'electronic';
   }
 
   return {
     genres: Array.from(genres),
     languages: Array.from(languages),
     moods: Array.from(moods),
+    energy,
+    character,
     artistTokens
   };
 }
@@ -997,10 +1097,86 @@ class ArtistAffinityService {
   }
 }
 
+// =============================================================================
+// Phase 6 & Phase 3: Genre Compatibility Graph & Musical Semantic Rules
+// =============================================================================
+const GENRE_COMPATIBILITY = {
+  hindi_romantic: {
+    primary: ['hindi_romantic', 'bollywood', 'romantic'],
+    compatible: ['indie', 'lofi', 'chill', 'acoustic', 'sufi', 'bollywood'],
+    clashing: ['haryanvi', 'drill', 'punjabi_hiphop', 'party', 'hard_techno', 'workout', 'edm'],
+    defaultLang: 'hindi',
+    allowedLangs: ['hindi', 'urdu']
+  },
+  punjabi_hiphop: {
+    primary: ['punjabi_hiphop', 'punjabi'],
+    compatible: ['hiphop', 'drill', 'workout', 'party', 'punjabi'],
+    clashing: ['lofi', 'chill', 'hindi_romantic', 'ghazal', 'acoustic', 'classical'],
+    defaultLang: 'punjabi',
+    allowedLangs: ['punjabi', 'hindi']
+  },
+  synthpop: {
+    primary: ['synthpop', 'pop', 'english'],
+    compatible: ['electropop', '80s', 'electronic', 'retrowave', 'rnb', 'dance', 'pop'],
+    clashing: ['haryanvi', 'bhangra', 'ragni', 'classical', 'devotional', 'ghazal'],
+    defaultLang: 'english',
+    allowedLangs: ['english']
+  },
+  pop: {
+    primary: ['pop', 'english'],
+    compatible: ['synthpop', 'dance', 'rnb', 'acoustic', 'pop_rock'],
+    clashing: ['haryanvi', 'ragni', 'classical', 'devotional'],
+    defaultLang: 'english',
+    allowedLangs: ['english']
+  },
+  lofi: {
+    primary: ['lofi', 'chill'],
+    compatible: ['acoustic', 'indie', 'ambient', 'soft_pop', 'chill'],
+    clashing: ['party', 'workout', 'drill', 'hard_techno', 'haryanvi', 'banger'],
+    defaultLang: 'any',
+    allowedLangs: ['hindi', 'english', 'punjabi', 'instrumental']
+  },
+  chill: {
+    primary: ['chill', 'lofi', 'acoustic'],
+    compatible: ['indie', 'hindi_romantic', 'ambient', 'soft_pop'],
+    clashing: ['party', 'workout', 'drill', 'hard_techno', 'haryanvi'],
+    defaultLang: 'any',
+    allowedLangs: ['hindi', 'english', 'punjabi', 'instrumental']
+  },
+  haryanvi: {
+    primary: ['haryanvi'],
+    compatible: ['desi_hiphop', 'workout', 'party', 'haryanvi'],
+    clashing: ['synthpop', 'english', 'lofi', 'ambient', 'classical', 'romantic_ballad'],
+    defaultLang: 'haryanvi',
+    allowedLangs: ['haryanvi', 'hindi']
+  },
+  bollywood: {
+    primary: ['bollywood'],
+    compatible: ['hindi_romantic', 'romantic', 'indie', 'sufi', 'party'],
+    clashing: ['hard_techno', 'drill', 'metal'],
+    defaultLang: 'hindi',
+    allowedLangs: ['hindi', 'punjabi']
+  },
+  indie: {
+    primary: ['indie'],
+    compatible: ['acoustic', 'lofi', 'hindi_romantic', 'chill', 'pop'],
+    clashing: ['hard_techno', 'drill', 'haryanvi'],
+    defaultLang: 'any',
+    allowedLangs: ['hindi', 'english', 'punjabi']
+  },
+  punjabi: {
+    primary: ['punjabi'],
+    compatible: ['punjabi_hiphop', 'party', 'bhangra', 'workout'],
+    clashing: ['ghazal', 'ambient', 'classical'],
+    defaultLang: 'punjabi',
+    allowedLangs: ['punjabi', 'hindi']
+  }
+};
+
 class TrackSimilarityService {
   calculateSimilarity(trackA, trackB) {
     if (!trackA || !trackB) return 0;
-    if (trackA.id === trackB.id) return 1.0;
+    if (String(trackA.id) === String(trackB.id)) return 1.0;
 
     const tagsA = detectTrackTags(trackA);
     const tagsB = detectTrackTags(trackB);
@@ -1010,23 +1186,27 @@ class TrackSimilarityService {
     const artistA = (trackA.artist || '').toLowerCase();
     const artistB = (trackB.artist || '').toLowerCase();
     if (artistA === artistB && artistA.length > 0) {
-      score += 0.40;
+      score += 0.35;
     } else {
       const sharedArtist = tagsA.artistTokens.some(a => tagsB.artistTokens.includes(a));
-      if (sharedArtist) score += 0.30;
+      if (sharedArtist) score += 0.25;
     }
 
+    // Shared genres
     const sharedGenre = tagsA.genres.some(g => tagsB.genres.includes(g));
-    if (sharedGenre) score += 0.20;
+    if (sharedGenre) score += 0.25;
+
+    // Shared language
     const sharedLang = tagsA.languages.some(l => tagsB.languages.includes(l));
-    if (sharedLang) score += 0.10;
+    if (sharedLang) score += 0.15;
 
+    // Shared mood
     const sharedMood = tagsA.moods.some(m => tagsB.moods.includes(m));
-    if (sharedMood) score += 0.20;
+    if (sharedMood) score += 0.15;
 
-    if (trackA.album && trackB.album && trackA.album.toLowerCase() === trackB.album.toLowerCase()) {
-      score += 0.10;
-    }
+    // Energy & Character match
+    if (tagsA.energy && tagsB.energy && tagsA.energy === tagsB.energy) score += 0.05;
+    if (tagsA.character && tagsB.character && tagsA.character === tagsB.character && tagsA.character !== 'standard') score += 0.05;
 
     return Math.min(1.0, score);
   }
@@ -1037,117 +1217,274 @@ class RecommendationEngine {
     this.preferenceService = preferenceService;
     this.affinityService = affinityService;
     this.similarityService = similarityService;
+    // Phase 5 Configurable Weights
     this.weights = {
-      artistAffinity: 0.30,
-      recentSimilarity: 0.25,
-      genreLanguage: 0.15,
-      mood: 0.10,
-      engagement: 0.10,
-      freshnessDiscovery: 0.10
+      genreSubgenre: 0.30,
+      moodEmotion: 0.20,
+      trackSimilarity: 0.20,
+      tempoEnergy: 0.10,
+      language: 0.10,
+      freshnessDiversity: 0.10
     };
   }
 
+  // Phase 4: Stage C Hard Compatibility Filter
+  isHardIncompatible(candidate, seedTrack, rollingSession = [], discoveryMode = 'balanced') {
+    if (!candidate || !seedTrack) return true;
+    if (!candidate.audioUrl && !candidate.src && !candidate.url && !candidate.id) return true;
+
+    const candTags = detectTrackTags(candidate);
+    const seedTags = detectTrackTags(seedTrack);
+
+    const primarySeedGenre = seedTags.genres[0] ||
+      (seedTrack.language === 'punjabi' ? 'punjabi' :
+       seedTrack.language === 'english' ? 'pop' : 'bollywood');
+
+    const genreRule = GENRE_COMPATIBILITY[primarySeedGenre];
+
+    const seedLang = (seedTrack.language || seedTags.languages[0] || '').toLowerCase();
+    const candLang = (candidate.language || candTags.languages[0] || '').toLowerCase();
+
+    // 1. Language clash check
+    if (seedLang === 'english' && candLang && candLang !== 'english') {
+      return true; // Never inject regional Indian songs into an English pop/synthpop session
+    }
+    if ((seedLang === 'haryanvi' || primarySeedGenre === 'haryanvi') && candLang === 'english') {
+      return true;
+    }
+
+    // 2. Hard genre clash check from compatibility graph
+    if (genreRule && Array.isArray(genreRule.clashing)) {
+      if (candTags.genres.some(g => genreRule.clashing.includes(g))) {
+        return true;
+      }
+    }
+
+    // 3. Hard mood/energy clash check
+    if (seedTags.moods.includes('romantic') || seedTags.moods.includes('chill') || seedTags.genres.includes('lofi')) {
+      if (candTags.moods.includes('workout') || candTags.genres.includes('drill') || candTags.genres.includes('hard_techno')) {
+        return true;
+      }
+    }
+
+    // 4. In "close" mode, strictly require same language and compatible genre
+    if (discoveryMode === 'close') {
+      if (seedLang && candLang && seedLang !== candLang) return true;
+      if (!candTags.genres.some(g => seedTags.genres.includes(g) || (genreRule?.compatible || []).includes(g))) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Phase 5 & 6: Mathematical Musical Compatibility & Transition Scoring
+  calculateMusicalCompatibility(candidate, seedTrack, rollingSession = [], discoveryMode = 'balanced') {
+    if (!candidate || !seedTrack) {
+      return { score: 0, isCompatible: false, reason: '' };
+    }
+
+    // Disliked check
+    if (this.preferenceService) {
+      const dislikedTracks = this.preferenceService.profile?.dislikedTrackIds || [];
+      if (dislikedTracks.includes(candidate.id)) {
+        return { score: -1, isCompatible: false, reason: 'Disliked track' };
+      }
+      const dislikedArtists = this.preferenceService.profile?.dislikedArtists || [];
+      const cTags = detectTrackTags(candidate);
+      if (cTags.artistTokens.some(a => dislikedArtists.includes(a.toLowerCase()))) {
+        return { score: -1, isCompatible: false, reason: 'Disliked artist' };
+      }
+    }
+
+    // Hard incompatibility check (Phase 4)
+    if (this.isHardIncompatible(candidate, seedTrack, rollingSession, discoveryMode)) {
+      return { score: 0, isCompatible: false, reason: 'Incompatible genre or language' };
+    }
+
+    const candTags = detectTrackTags(candidate);
+    const seedTags = detectTrackTags(seedTrack);
+
+    const primarySeedGenre = seedTags.genres[0] ||
+      (seedTrack.language === 'punjabi' ? 'punjabi' :
+       seedTrack.language === 'english' ? 'pop' : 'bollywood');
+    const primaryCandGenre = candTags.genres[0] ||
+      (candidate.language === 'punjabi' ? 'punjabi' :
+       candidate.language === 'english' ? 'pop' : 'bollywood');
+
+    const genreRule = GENRE_COMPATIBILITY[primarySeedGenre] || {
+      primary: [primarySeedGenre],
+      compatible: ['bollywood', 'indie', 'pop'],
+      clashing: ['hard_techno', 'drill'],
+      allowedLangs: ['hindi', 'english', 'punjabi']
+    };
+
+    // 1. Genre & Subgenre Compatibility (30% weight -> max 30 pts)
+    let genreScore = 0;
+    const isSameGenre = candTags.genres.some(g => seedTags.genres.includes(g)) || primarySeedGenre === primaryCandGenre;
+    const isCompatibleGenre = candTags.genres.some(g => (genreRule.compatible || []).includes(g));
+
+    if (isSameGenre) {
+      genreScore = 30;
+    } else if (isCompatibleGenre) {
+      genreScore = 20;
+    } else {
+      genreScore = 8;
+    }
+
+    // 2. Mood & Emotional Compatibility (20% weight -> max 20 pts)
+    let moodScore = 0;
+    const sharedMoods = candTags.moods.filter(m => seedTags.moods.includes(m));
+    if (sharedMoods.length > 0) {
+      moodScore = 20;
+    } else if (
+      (seedTags.moods.includes('romantic') && candTags.moods.includes('chill')) ||
+      (seedTags.moods.includes('chill') && candTags.moods.includes('romantic'))
+    ) {
+      moodScore = 16;
+    } else {
+      moodScore = 10;
+    }
+
+    // 3. Track Similarity to current track (20% weight -> max 20 pts)
+    const simRatio = this.similarityService ? this.similarityService.calculateSimilarity(candidate, seedTrack) : 0.5;
+    const similarityScore = Math.round(simRatio * 20);
+
+    // 4. Tempo & Energy Compatibility (10% weight -> max 10 pts)
+    let energyScore = 0;
+    if (candTags.energy === seedTags.energy) {
+      energyScore = 10;
+    } else if (
+      (seedTags.energy === 'medium' && (candTags.energy === 'low' || candTags.energy === 'high')) ||
+      (candTags.energy === 'medium' && (seedTags.energy === 'low' || seedTags.energy === 'high'))
+    ) {
+      energyScore = 6;
+    } else {
+      energyScore = 0;
+    }
+
+    // 5. Language Compatibility (10% weight -> max 10 pts)
+    let languageScore = 0;
+    const seedLang = (seedTrack.language || seedTags.languages[0] || 'hindi').toLowerCase();
+    const candLang = (candidate.language || candTags.languages[0] || 'hindi').toLowerCase();
+
+    if (seedLang === candLang) {
+      languageScore = 10;
+    } else if (genreRule.allowedLangs && genreRule.allowedLangs.includes(candLang)) {
+      languageScore = 6;
+    } else {
+      languageScore = 1;
+    }
+
+    // 6. Freshness & Artist Diversity (10% weight -> max 10 pts)
+    let freshnessScore = 10;
+    const pArtist = (seedTrack.artist || '').split(',')[0].toLowerCase().trim();
+    const cArtist = (candidate.artist || '').toLowerCase();
+    if (cArtist.includes(pArtist)) {
+      freshnessScore = 5;
+    }
+
+    // Base score (0 - 100)
+    let total = genreScore + moodScore + similarityScore + energyScore + languageScore + freshnessScore;
+
+    // Phase 6: Transition Compatibility Score (Rolling context of last 3-5 tracks)
+    let transitionPenalty = 0;
+    if (Array.isArray(rollingSession) && rollingSession.length > 0) {
+      const recentTracks = rollingSession.slice(-3);
+      const recentLangs = recentTracks.map(t => (t.language || detectTrackTags(t).languages[0] || '').toLowerCase()).filter(Boolean);
+      const isConsistentLang = recentLangs.length >= 2 && recentLangs.every(l => l === recentLangs[0]);
+
+      if (isConsistentLang && candLang && candLang !== recentLangs[0]) {
+        if (discoveryMode === 'close') transitionPenalty += 40;
+        else if (discoveryMode === 'balanced') transitionPenalty += 25;
+        else transitionPenalty += 10;
+      }
+    }
+
+    // Phase 11: Discovery Mode adjustments
+    if (discoveryMode === 'close') {
+      total = (total * 0.8) + (similarityScore * 1.0) + (isSameGenre ? 10 : -10);
+    } else if (discoveryMode === 'explore') {
+      if (!cArtist.includes(pArtist) && (isSameGenre || isCompatibleGenre)) {
+        total += 10;
+      }
+    }
+
+    // Personalization adjustments & skip penalties
+    let skippedIds = [];
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('rea_recently_skipped_ids') : null;
+      if (raw) skippedIds = JSON.parse(raw);
+    } catch (_) {}
+    if (this.preferenceService?.profile?.recentlySkippedTrackIds) {
+      skippedIds = skippedIds.concat(this.preferenceService.profile.recentlySkippedTrackIds);
+    }
+    if (skippedIds.includes(String(candidate.id))) {
+      total -= 40;
+    }
+
+    const finalScore = Math.max(0, Math.round(total - transitionPenalty));
+    const isCompatible = finalScore >= 35;
+
+    let reason = `Matches ${primarySeedGenre.replace(/_/g, ' ')}`;
+    let reasonBadge = 'badge-discovery';
+
+    if (cArtist.includes(pArtist)) {
+      reason = `More from ${seedTrack.artist.split(',')[0].trim()}`;
+      reasonBadge = 'badge-artist';
+    } else if (isCompatibleGenre) {
+      reason = `Similar ${candTags.genres[0] || 'scene'} music`;
+      reasonBadge = 'badge-related';
+    }
+
+    return {
+      score: finalScore,
+      isCompatible,
+      reason,
+      reasonBadge,
+      breakdown: { genreScore, moodScore, similarityScore, energyScore, languageScore, freshnessScore, transitionPenalty }
+    };
+  }
+
+  // Legacy wrapper for existing test compatibility
   scoreCandidate(track, recentTracks = []) {
     if (!track) return 0;
-    const dislikedTracks = this.preferenceService.profile.dislikedTrackIds || [];
-    if (dislikedTracks.includes(track.id)) return -1;
+    const seed = recentTracks && recentTracks.length > 0 ? recentTracks[0] : null;
 
-    const dislikedArtists = this.preferenceService.profile.dislikedArtists || [];
-    const tags = detectTrackTags(track);
-    if (tags.artistTokens.some(a => dislikedArtists.includes(a))) return -1;
-
-    let artistAffinityScore = 0;
-    tags.artistTokens.forEach(a => {
-      const aff = this.affinityService.getAffinity(a);
-      if (aff > artistAffinityScore) artistAffinityScore = aff;
-    });
-    const normArtist = Math.min(1.0, artistAffinityScore / 15);
-
-    let recentSimScore = 0;
-    if (recentTracks.length > 0) {
-      const topSims = recentTracks.slice(0, 5).map(rt => this.similarityService.calculateSimilarity(track, rt));
-      recentSimScore = topSims.reduce((sum, s) => sum + s, 0) / topSims.length;
+    let skippedIds = [];
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('rea_recently_skipped_ids') : null;
+      if (raw) skippedIds = JSON.parse(raw);
+    } catch (_) {}
+    if (this.preferenceService?.profile?.recentlySkippedTrackIds) {
+      skippedIds = skippedIds.concat(this.preferenceService.profile.recentlySkippedTrackIds);
     }
+    const isSkipped = skippedIds.includes(String(track.id));
 
-    let genreScore = 0;
-    tags.genres.forEach(g => {
-      const gEntry = this.preferenceService.profile.genreWeights[g];
-      if (gEntry) {
-        const w = this.preferenceService.getDecayedWeight(gEntry);
-        if (w > genreScore) genreScore = w;
-      }
-    });
-    const normGenre = Math.min(1.0, genreScore / 10);
-
-    let moodScore = 0;
-    tags.moods.forEach(m => {
-      const mEntry = this.preferenceService.profile.moodWeights[m];
-      if (mEntry) {
-        const w = this.preferenceService.getDecayedWeight(mEntry);
-        if (w > moodScore) moodScore = w;
-      }
-    });
-    const normMood = Math.min(1.0, moodScore / 8);
-
-    let engagementScore = 0;
-    tags.artistTokens.forEach(a => {
-      const entry = this.preferenceService.profile.artistAffinities[a];
-      if (entry) {
-        if (entry.likes > 0) engagementScore += 0.5;
-        if (entry.completions > 1) engagementScore += 0.5;
-      }
-    });
-    engagementScore = Math.min(1.0, engagementScore);
-
-    const discoveryScore = 0.5;
-
-    let totalScore =
-      (normArtist * this.weights.artistAffinity) +
-      (recentSimScore * this.weights.recentSimilarity) +
-      (normGenre * this.weights.genreLanguage) +
-      (normMood * this.weights.mood) +
-      (engagementScore * this.weights.engagement) +
-      (discoveryScore * this.weights.freshnessDiscovery);
-
-    const recentIds = JSON.parse(localStorage.getItem('rea_recently_played_ids') || '[]');
-    if (recentIds.slice(0, 15).includes(track.id)) {
-      totalScore *= 0.5;
+    if (!seed) {
+      return isSkipped ? 20 : 50;
     }
-
-    const skippedIds = JSON.parse(localStorage.getItem('rea_recently_skipped_ids') || '[]');
-    if (skippedIds.slice(0, 15).includes(String(track.id))) {
-      totalScore *= 0.15;
-    }
-
-    tags.artistTokens.forEach(a => {
-      const entry = this.preferenceService.profile.artistAffinities[a];
-      if (entry && entry.skips > 2 && entry.skips > (entry.completions || 0)) {
-        totalScore *= 0.65;
-      }
-    });
-
-    return totalScore;
+    const comp = this.calculateMusicalCompatibility(track, seed, recentTracks.slice(1), 'balanced');
+    return isSkipped ? Math.max(0, comp.score - 40) : comp.score;
   }
 
   rankTracks(candidates, recentTracks = [], maxPerArtist = 3) {
     if (!candidates || candidates.length === 0) return [];
+    const seed = recentTracks && recentTracks.length > 0 ? recentTracks[0] : null;
 
     const seenIds = new Set();
-    const uniqueCandidates = [];
-    for (const track of candidates) {
-      if (track && track.id && !seenIds.has(track.id)) {
-        seenIds.add(track.id);
-        uniqueCandidates.push(track);
+    const unique = [];
+    for (const t of candidates) {
+      if (t && t.id && !seenIds.has(String(t.id))) {
+        seenIds.add(String(t.id));
+        unique.push(t);
       }
     }
 
-    const scored = [];
-    for (const track of uniqueCandidates) {
-      const score = this.scoreCandidate(track, recentTracks);
-      if (score >= 0) {
-        scored.push({ track, score });
-      }
-    }
+    const scored = unique.map(t => ({
+      track: t,
+      score: seed ? this.calculateMusicalCompatibility(t, seed, recentTracks.slice(1)).score : this.scoreCandidate(t, recentTracks)
+    })).filter(x => x.score >= 0);
 
     scored.sort((a, b) => b.score - a.score);
 
@@ -1361,12 +1698,16 @@ class REAMusicApp {
     this.recommendationQueue = [];
     this.playbackContext = null;
 
-    // Persistent Playback State
+    // Persistent Playback State & Anti-Repetition Config
     this.autoplayEnabled = this.loadLocalStorage('rea_autoplay_enabled', true);
     this.repeatMode = this.loadLocalStorage('rea_repeat_mode', 'off'); // 'off' | 'one' | 'all'
     this.isShuffle = this.loadLocalStorage('rea_shuffle', false);
     this.recentlyPlayedIds = this.loadLocalStorage('rea_recently_played_ids', []);
+    this.recentlyPlayedFingerprints = [];
     this.dismissedTrackIds = new Set(this.loadLocalStorage('rea_dismissed_ids', []));
+    this.cooldownWindow = 50; // Minimum played tracks before automatic re-recommendation
+    this.recommendationPage = 1;
+    this.discoveryMode = this.loadLocalStorage('rea_discovery_mode', 'balanced'); // 'close' | 'balanced' | 'explore'
 
     // Concurrency, transition locks & error bounding
     this.isTransitioning = false;
@@ -1639,27 +1980,70 @@ class REAMusicApp {
 
     if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
       try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: track.title,
-          artist: track.artist,
-          album: track.album || 'REA Music',
-          artwork: [
-            { src: track.cover || 'assets/logo.jpg', sizes: '500x500', type: 'image/jpeg' }
-          ]
-        });
+        const coverUrl = track.cover || '/assets/icons/icon-512.png';
+        if (typeof MediaMetadata !== 'undefined') {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title,
+            artist: track.artist,
+            album: track.album || 'REA Music',
+            artwork: [
+              { src: coverUrl, sizes: '96x96', type: 'image/jpeg' },
+              { src: coverUrl, sizes: '128x128', type: 'image/jpeg' },
+              { src: coverUrl, sizes: '192x192', type: 'image/png' },
+              { src: coverUrl, sizes: '256x256', type: 'image/jpeg' },
+              { src: coverUrl, sizes: '384x384', type: 'image/jpeg' },
+              { src: coverUrl, sizes: '512x512', type: 'image/png' }
+            ]
+          });
+        }
         navigator.mediaSession.playbackState = this.isPlaying ? 'playing' : 'paused';
 
-        navigator.mediaSession.setActionHandler('play', () => {
+        const safeSetAction = (action, handler) => {
+          try {
+            navigator.mediaSession.setActionHandler(action, handler);
+          } catch (_) {}
+        };
+
+        safeSetAction('play', () => {
           if (!this.isPlaying) this.togglePlayPause();
         });
-        navigator.mediaSession.setActionHandler('pause', () => {
+        safeSetAction('pause', () => {
           if (this.isPlaying) this.togglePlayPause();
         });
-        navigator.mediaSession.setActionHandler('previoustrack', () => this.prevTrack());
-        navigator.mediaSession.setActionHandler('nexttrack', () => this.nextTrack());
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-          if (details.seekTime) this.engine.seek(details.seekTime);
+        safeSetAction('previoustrack', () => this.prevTrack());
+        safeSetAction('nexttrack', () => this.nextTrack());
+        safeSetAction('seekto', (details) => {
+          if (details && typeof details.seekTime === 'number') {
+            this.engine.seek(details.seekTime);
+          }
         });
+        safeSetAction('seekbackward', (details) => {
+          const skip = (details && details.seekOffset) || 10;
+          const cur = this.engine.getCurrentTime ? this.engine.getCurrentTime() : (this.engine.audio?.currentTime || 0);
+          this.engine.seek(Math.max(0, cur - skip));
+        });
+        safeSetAction('seekforward', (details) => {
+          const skip = (details && details.seekOffset) || 10;
+          const cur = this.engine.getCurrentTime ? this.engine.getCurrentTime() : (this.engine.audio?.currentTime || 0);
+          const dur = this.engine.getDuration ? this.engine.getDuration() : (this.engine.audio?.duration || 9999);
+          this.engine.seek(Math.min(dur, cur + skip));
+        });
+        safeSetAction('stop', () => {
+          if (this.isPlaying) this.togglePlayPause();
+        });
+
+        // Synchronize initial position state for iOS Lock Screen & Dynamic Island
+        if (typeof navigator.mediaSession.setPositionState === 'function') {
+          const cur = this.engine.getCurrentTime ? this.engine.getCurrentTime() : (this.engine.audio?.currentTime || 0);
+          const dur = this.engine.getDuration ? this.engine.getDuration() : (this.engine.audio?.duration || 0);
+          if (dur > 0 && !isNaN(dur) && !isNaN(cur)) {
+            navigator.mediaSession.setPositionState({
+              duration: Math.max(0, dur),
+              playbackRate: this.isPlaying ? 1.0 : 0.0,
+              position: Math.max(0, Math.min(cur, dur))
+            });
+          }
+        }
       } catch (e) {
         console.warn('MediaSession sync notice:', e);
       }
@@ -1764,11 +2148,23 @@ class REAMusicApp {
           // Browser guidance fallback for Android Chrome & iOS Safari
           const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
           if (isIOS) {
-            this.showToast('To install: Tap the Share button [↑] at the bottom of Safari, then choose "Add to Home Screen"');
+            this.showIosInstallGuideModal();
           } else {
             this.showToast('To install: Tap the Chrome menu (⋮) at top right and choose "Install app"');
           }
         }
+      });
+    }
+
+    // Wire iOS Installation Guide sheet close controls
+    const closeIosBtn = document.getElementById('closeIosInstallModalBtn');
+    const gotItIosBtn = document.getElementById('gotItIosInstallBtn');
+    const iosModal = document.getElementById('iosInstallGuideModal');
+    if (closeIosBtn) closeIosBtn.addEventListener('click', () => this.closeIosInstallGuideModal());
+    if (gotItIosBtn) gotItIosBtn.addEventListener('click', () => this.closeIosInstallGuideModal());
+    if (iosModal) {
+      iosModal.addEventListener('click', (e) => {
+        if (e.target === iosModal) this.closeIosInstallGuideModal();
       });
     }
 
@@ -1780,6 +2176,24 @@ class REAMusicApp {
       if (installDesc) installDesc.textContent = 'REA Music is installed on your device!';
       this.showToast('🎉 REA Music installed successfully!');
     });
+  }
+
+  showIosInstallGuideModal() {
+    const iosModal = document.getElementById('iosInstallGuideModal');
+    if (iosModal) {
+      iosModal.classList.remove('hidden');
+      iosModal.style.display = 'flex';
+    } else {
+      this.showToast('To install: Tap the Share button [↑] at the bottom of Safari, then choose "Add to Home Screen"');
+    }
+  }
+
+  closeIosInstallGuideModal() {
+    const iosModal = document.getElementById('iosInstallGuideModal');
+    if (iosModal) {
+      iosModal.classList.add('hidden');
+      iosModal.style.display = 'none';
+    }
   }
 
   setTheme(themeName, showToastFeedback = true) {
@@ -1827,6 +2241,67 @@ class REAMusicApp {
     }
   }
 
+  getTrackFingerprint(track) {
+    if (!track) return '';
+    const normTitle = (track.title || '')
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, '')
+      .replace(/\[[^\]]*\]/g, '')
+      .replace(/feat\.?.*|ft\.?.*/i, '')
+      .replace(/official.*|video.*|audio.*|remix.*|version.*/gi, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+    const primaryArt = (track.artist || '')
+      .toLowerCase()
+      .split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)[0]
+      .replace(/\([^)]*\)/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+    return `${normTitle}__${primaryArt}`;
+  }
+
+  isEligibleForAutoplay(cand, options = {}) {
+    if (!cand || !cand.id || !cand.title) return false;
+    const cId = String(cand.id);
+    const fp = this.getTrackFingerprint(cand);
+
+    // 1. Current track
+    if (this.currentTrack && String(this.currentTrack.id) === cId) return false;
+    if (this.currentTrack && fp && this.getTrackFingerprint(this.currentTrack) === fp) return false;
+
+    // 2. Dismissed track (User clicked "Not Interested")
+    if (this.dismissedTrackIds && this.dismissedTrackIds.has(cId)) return false;
+
+    // 3. User manual queue (Explicit user choices must never be duplicated)
+    if (this.manualQueue && this.manualQueue.some(t => t && (String(t.id) === cId || (fp && this.getTrackFingerprint(t) === fp)))) return false;
+
+    // 4. Remaining sequence queue (Albums / Playlists)
+    if (this.sequenceQueue && this.sequenceIndex >= 0) {
+      for (let i = this.sequenceIndex + 1; i < this.sequenceQueue.length; i++) {
+        const sq = this.sequenceQueue[i];
+        if (sq && (String(sq.id) === cId || (fp && this.getTrackFingerprint(sq) === fp))) return false;
+      }
+    }
+
+    // 5. Already in active recommendation queue
+    const activeQueue = options.activeQueue || this.recommendationQueue || [];
+    if (activeQueue.some(t => t && (String(t.id) === cId || (fp && this.getTrackFingerprint(t) === fp)))) return false;
+
+    // 6. Anti-repetition cooldown window (default 50 tracks)
+    const cooldown = options.cooldownWindow !== undefined ? options.cooldownWindow : (this.cooldownWindow || 50);
+    if (cooldown > 0 && !options.ignoreCooldown) {
+      const recentSlice = (this.recentlyPlayedIds || []).slice(0, cooldown);
+      if (recentSlice.some(id => String(id) === cId)) return false;
+
+      if (fp) {
+        const recentFpSlice = (this.recentlyPlayedFingerprints || []).slice(0, Math.min(30, cooldown));
+        if (recentFpSlice.includes(fp)) return false;
+      }
+    }
+
+    return true;
+  }
+
   initDOMElements() {
     // Settings & Theme Switcher Elements
     this.settingsBtn = document.getElementById('settingsBtn');
@@ -1838,6 +2313,8 @@ class REAMusicApp {
     this.settingClearHistoryBtn = document.getElementById('settingClearHistoryBtn');
 
     // Navigation items
+    this.brandLogo = document.getElementById('brandLogo');
+    this.sidebarBrandLogo = document.getElementById('sidebarBrandLogo');
     this.navHome = document.getElementById('navHome');
     this.navExplore = document.getElementById('navExplore');
     this.navLibrary = document.getElementById('navLibrary');
@@ -2441,7 +2918,29 @@ class REAMusicApp {
       });
     }
 
-    // 1. Navigation Routing (Home, Explore, Library)
+    // 1. Navigation Routing (Brand Logo, Home, Explore, Library)
+    const brandHomeHandler = (e) => {
+      e.preventDefault();
+      this.switchView('home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    if (this.brandLogo) {
+      this.brandLogo.addEventListener('click', brandHomeHandler);
+      this.brandLogo.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          brandHomeHandler(e);
+        }
+      });
+    }
+    if (this.sidebarBrandLogo) {
+      this.sidebarBrandLogo.addEventListener('click', brandHomeHandler);
+      this.sidebarBrandLogo.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          brandHomeHandler(e);
+        }
+      });
+    }
+
     if (this.navHome) {
       this.navHome.addEventListener('click', (e) => {
         e.preventDefault();
@@ -2763,10 +3262,10 @@ class REAMusicApp {
         // 2. Instant local preview from memory (0ms visual feedback)
         this.showInstantSearchPreview(clean);
 
-        // 3. Responsive 120ms debounce for remote search
+        // 3. Ultra-fast 90ms debounce for live remote search
         this.searchDebounceTimer = setTimeout(() => {
           this.performLiveSearch(clean);
-        }, 120);
+        }, 90);
       });
 
       this.searchInput.addEventListener('keydown', (e) => {
@@ -6200,7 +6699,7 @@ class REAMusicApp {
   async performLiveSearch(query, forceImmediate = false) {
     const cleanQuery = (query || "").trim();
     if (!cleanQuery) return;
-    const cacheKey = cleanQuery.toLowerCase();
+    const cacheKey = cleanQuery.toLowerCase().replace(/\s+/g, ' ');
 
     // 1. Instant response if in client cache (0ms)
     if (this.clientSearchCache && this.clientSearchCache.has(cacheKey) && !forceImmediate) {
@@ -6241,10 +6740,10 @@ class REAMusicApp {
       const albums = data.albums || [];
       const topResult = data.topResult || null;
 
-      // Save to bounded client cache with timestamp
+      // Save to bounded client cache with timestamp (up to 250 queries for instant navigation)
       if (this.clientSearchCache) {
         this.clientSearchCache.set(cacheKey, { results, artists, albums, topResult, timestamp: Date.now() });
-        if (this.clientSearchCache.size > 80) {
+        if (this.clientSearchCache.size > 250) {
           const firstKey = this.clientSearchCache.keys().next().value;
           this.clientSearchCache.delete(firstKey);
         }
@@ -6335,14 +6834,26 @@ class REAMusicApp {
     // Reset bounded retry count on intentional track play
     this.playbackRetryCount = 0;
 
-    // Track recently played IDs window (keep last 30 for diversity scoring)
+    // Track recently played IDs & title fingerprints (keep up to 100 for 50-track cooldown window)
     if (track.id) {
-      this.recentlyPlayedIds = this.recentlyPlayedIds.filter(id => String(id) !== String(track.id));
-      this.recentlyPlayedIds.unshift(track.id);
-      if (this.recentlyPlayedIds.length > 30) {
+      const sId = String(track.id);
+      this.recentlyPlayedIds = (this.recentlyPlayedIds || []).filter(id => String(id) !== sId);
+      this.recentlyPlayedIds.unshift(sId);
+      if (this.recentlyPlayedIds.length > 100) {
         this.recentlyPlayedIds.pop();
       }
-      localStorage.setItem('rea_recently_played_ids', JSON.stringify(this.recentlyPlayedIds));
+      try {
+        localStorage.setItem('rea_recently_played_ids', JSON.stringify(this.recentlyPlayedIds));
+      } catch (_) {}
+
+      const fp = this.getTrackFingerprint(track);
+      if (fp) {
+        this.recentlyPlayedFingerprints = (this.recentlyPlayedFingerprints || []).filter(f => f !== fp);
+        this.recentlyPlayedFingerprints.unshift(fp);
+        if (this.recentlyPlayedFingerprints.length > 100) {
+          this.recentlyPlayedFingerprints.pop();
+        }
+      }
     }
 
     const pArtist = (track.artist || '').split(/[,&/|]|\bfeat\.?\b|\bft\.?\b/i)[0].replace(/\([^)]*\)/g, '').trim().toLowerCase();
@@ -6354,6 +6865,7 @@ class REAMusicApp {
     if (!isQueueAdvancing && (isNewArtistSeed || context?.type === 'search' || context?.type === 'card_click' || context?.type === 'song')) {
       this.recommendationQueue = [];
       this.currentSeedArtist = pArtist;
+      this.recommendationPage = 1;
     }
 
     // Synchronize legacy this.queue and this.currentTrackIndex for backward-compatibility
@@ -6455,7 +6967,7 @@ class REAMusicApp {
         const nextReco = this.recommendationQueue.shift();
         this.playActualTrack(nextReco, { type: 'autoplay', seedTrack: this.currentTrack });
         if (this.recommendationQueue.length < 5) {
-          this.prefetchSmartRecommendations(nextReco);
+          this.prefetchSmartRecommendations(nextReco, false);
         }
         return;
       }
@@ -6467,12 +6979,12 @@ class REAMusicApp {
         return;
       }
       this.showToast('Autoplay: Finding next song...');
-      this.generateSmartRecommendations(seed).then(recs => {
+      this.generateSmartRecommendations(seed, { force: true, append: false }).then(recs => {
         if (recs && recs.length > 0) {
           const nextReco = this.recommendationQueue.shift();
           this.playActualTrack(nextReco, { type: 'autoplay', seedTrack: seed });
           if (this.recommendationQueue.length < 5) {
-            this.prefetchSmartRecommendations(nextReco);
+            this.prefetchSmartRecommendations(nextReco, false);
           }
         } else {
           this.stopPlaybackGracefully('Queue finished');
@@ -6743,6 +7255,30 @@ class REAMusicApp {
     this.renderQueue();
   }
 
+  getRecentTracks(limit = 5) {
+    const tracks = [];
+    if (this.currentTrack) tracks.push(this.currentTrack);
+    if (this.playbackHistoryStack && this.playbackHistoryStack.length > 0) {
+      for (let i = this.playbackHistoryStack.length - 1; i >= 0 && tracks.length < limit; i--) {
+        const t = this.playbackHistoryStack[i]?.track;
+        if (t && !tracks.some(x => String(x.id) === String(t.id))) {
+          tracks.push(t);
+        }
+      }
+    }
+    return tracks;
+  }
+
+  setDiscoveryMode(mode) {
+    if (!['close', 'balanced', 'explore'].includes(mode)) return;
+    this.discoveryMode = mode;
+    localStorage.setItem('rea_discovery_mode', mode);
+    this.showToast(`Discovery Mode: ${mode === 'close' ? 'Stay Close to Song' : mode === 'explore' ? 'Explore Related Genres' : 'Balanced Discovery'}`);
+    if (this.currentTrack) {
+      this.refreshRecommendations();
+    }
+  }
+
   playRecommendation(track) {
     if (!track) return;
     this.recommendationQueue = this.recommendationQueue.filter(t => String(t.id) !== String(track.id));
@@ -6796,20 +7332,29 @@ class REAMusicApp {
     this.recoAbortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const signal = this.recoAbortController?.signal;
 
+    const isAppendMode = options.append === true;
+
     // Fast-path: Check in-memory recommendation cache for this seed
-    if (!options.force && seedId && this.recommendationCache.has(seedId)) {
+    if (!options.force && !isAppendMode && seedId && this.recommendationCache.has(seedId)) {
       const cached = this.recommendationCache.get(seedId);
       if (cached && cached.length > 0) {
-        const validCached = cached.filter(t => 
-          !this.dismissedTrackIds.has(String(t.id)) && 
-          String(t.id) !== String(this.currentTrack?.id)
-        );
-        if (validCached.length >= 4) {
+        const validCached = cached.filter(t => this.isEligibleForAutoplay(t, { cooldownWindow: 20 }));
+        if (validCached.length >= 6) {
           this.recommendationQueue = validCached;
           this.renderQueue();
           return this.recommendationQueue;
         }
       }
+    }
+
+    // Pagination support: Increment page during continuous append prefetch
+    let page = 1;
+    if (isAppendMode) {
+      this.recommendationPage = (this.recommendationPage || 1) + 1;
+      page = this.recommendationPage;
+    } else {
+      this.recommendationPage = 1;
+      page = 1;
     }
 
     const rawArtistName = seedTrack.artist || 'Arijit Singh';
@@ -6818,7 +7363,7 @@ class REAMusicApp {
       .map(a => a.replace(/\([^)]*\)/g, '').trim())
       .filter(Boolean);
 
-    // Primary artist resolution: match current search query or active artist context if applicable
+    // Primary artist resolution
     let primaryArtist = seedTrack.primaryArtist || artistTokens[0] || rawArtistName;
     if (this.currentView === 'search' && this.lastSearchQuery) {
       const qLower = this.lastSearchQuery.toLowerCase();
@@ -6832,29 +7377,31 @@ class REAMusicApp {
     const seedTags = detectTrackTags(seedTrack);
     const primaryGenre = seedTags.genres[0] || 
       (seedTrack.language === 'punjabi' ? 'punjabi' : 
-       seedTrack.language === 'haryanvi' ? 'haryanvi' : 'bollywood');
-    const songLang = (seedTrack.language || seedTags.languages[0] || 'hindi').toLowerCase();
+       seedTrack.language === 'haryanvi' ? 'haryanvi' : 
+       seedTrack.language === 'english' ? 'pop' : 'bollywood');
+    const songLang = (seedTrack.language || seedTags.languages[0] || 
+      (primaryGenre === 'english' || primaryGenre === 'pop' || primaryGenre === 'synthpop' ? 'english' : 'hindi')).toLowerCase();
 
-    // 1. Concurrently fetch Candidate Pools
+    // 1. Concurrently fetch Candidate Pools with pagination
     const candidatePromises = [];
 
-    // Source A: Dedicated Artist Page API (returns full discography 20+ tracks and similar artists)
+    // Source A: Dedicated Artist Page API (returns discography tracks and similar artists)
     candidatePromises.push(
-      fetch(`${API_BASE_URL}/api/artist?name=${encodeURIComponent(primaryArtist)}`, { signal })
+      fetch(`${API_BASE_URL}/api/artist?name=${encodeURIComponent(primaryArtist)}&page=${page}`, { signal })
         .then(r => r.ok ? r.json() : null)
         .catch(() => null)
     );
 
-    // Source B: Recommendations endpoint (artist search & curated recommendations)
+    // Source B: Recommendations endpoint (artist & genre search with pagination)
     candidatePromises.push(
-      fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(primaryArtist)}&trackId=${encodeURIComponent(seedId)}&limit=20`, { signal })
+      fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(primaryArtist)}&genre=${encodeURIComponent(primaryGenre)}&trackId=${encodeURIComponent(seedId)}&page=${page}&limit=25`, { signal })
         .then(r => r.ok ? r.json() : null)
         .then(d => (d && d.recommendations) ? d.recommendations : [])
         .catch(() => [])
     );
 
-    // Source C: Song detail related tracks (if authentic JioSaavn song ID)
-    if (seedId && !seedId.startsWith('track-') && !seedId.startsWith('chart-')) {
+    // Source C: Song detail related tracks (if authentic JioSaavn song ID and page 1)
+    if (page === 1 && seedId && !seedId.startsWith('track-') && !seedId.startsWith('chart-')) {
       candidatePromises.push(
         fetch(`${API_BASE_URL}/api/song?id=${encodeURIComponent(seedId)}`, { signal })
           .then(r => r.ok ? r.json() : null)
@@ -6865,15 +7412,34 @@ class REAMusicApp {
       candidatePromises.push(Promise.resolve([]));
     }
 
-    // Source D: Trending hits for regional scene/language
-    const trendingCategory = primaryGenre === 'punjabi' ? 'punjabi' : 
-                             primaryGenre === 'haryanvi' ? 'all' : 
-                             primaryGenre === 'indie' ? 'all' : 'superhits';
-    candidatePromises.push(
-      fetch(`${API_BASE_URL}/api/trending?category=${encodeURIComponent(trendingCategory)}`, { signal })
-        .then(r => r.ok ? r.json() : null)
-        .catch(() => null)
-    );
+    // Source D: Trending or genre hits for the primary genre / scene
+    let trendingCategory = 'superhits';
+    if (primaryGenre === 'punjabi' || primaryGenre === 'punjabi_hiphop') {
+      trendingCategory = 'punjabi';
+    } else if (primaryGenre === 'haryanvi') {
+      trendingCategory = 'all';
+    } else if (primaryGenre === 'indie' || primaryGenre === 'lofi') {
+      trendingCategory = 'all';
+    } else if (primaryGenre === 'romantic' || primaryGenre === 'hindi_romantic') {
+      trendingCategory = 'romantic';
+    } else if (primaryGenre === 'english' || primaryGenre === 'pop' || primaryGenre === 'synthpop') {
+      trendingCategory = 'english';
+    }
+
+    if (trendingCategory === 'english' || primaryGenre === 'english' || primaryGenre === 'pop' || primaryGenre === 'synthpop' || primaryGenre === 'lofi') {
+      candidatePromises.push(
+        fetch(`${API_BASE_URL}/api/recommendations?genre=${encodeURIComponent(primaryGenre)}&page=${page}&limit=20`, { signal })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => (d && d.recommendations) ? d.recommendations : [])
+          .catch(() => [])
+      );
+    } else {
+      candidatePromises.push(
+        fetch(`${API_BASE_URL}/api/trending?category=${encodeURIComponent(trendingCategory)}`, { signal })
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      );
+    }
 
     const [artistData, recoSongs, songRelated, trendingData] = await Promise.all(candidatePromises);
 
@@ -6883,7 +7449,7 @@ class REAMusicApp {
       return [];
     }
 
-    // 2. Identify Related Scene Artists for Pool 2 (25% quota)
+    // 2. Identify Related Scene Artists for Pool 2
     const relatedArtistNames = new Set();
     if (artistData && Array.isArray(artistData.similarArtists)) {
       artistData.similarArtists.forEach(a => {
@@ -6902,10 +7468,14 @@ class REAMusicApp {
       });
     }
 
-    // Fetch related artist tracks in parallel (top 2-3 related artists)
-    const topRelatedArtists = Array.from(relatedArtistNames).slice(0, 3);
-    const relatedArtistPromises = topRelatedArtists.map(relName =>
-      fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(relName)}&limit=6`, { signal })
+    // Rotate related artists based on page so continuous listening discovers new artists
+    const allRelatedArr = Array.from(relatedArtistNames);
+    const relOffset = ((page - 1) * 2) % Math.max(1, allRelatedArr.length);
+    const topRelatedArtists = allRelatedArr.slice(relOffset, relOffset + 3);
+    const finalRelatedArtists = topRelatedArtists.length > 0 ? topRelatedArtists : allRelatedArr.slice(0, 3);
+
+    const relatedArtistPromises = finalRelatedArtists.map(relName =>
+      fetch(`${API_BASE_URL}/api/recommendations?artist=${encodeURIComponent(relName)}&page=${page}&limit=8`, { signal })
         .then(r => r.ok ? r.json() : null)
         .then(d => (d && d.recommendations) ? d.recommendations : [])
         .catch(() => [])
@@ -6918,166 +7488,212 @@ class REAMusicApp {
       return [];
     }
 
-    // 3. Build Exclusion Sets
-    const seenIds = new Set();
-    const seenTitles = new Set();
-
-    if (seedId) seenIds.add(String(seedId));
-    if (this.currentTrack?.id) seenIds.add(String(this.currentTrack.id));
-    if (seedTrack.title) seenTitles.add(seedTrack.title.toLowerCase().trim());
-
-    // Exclude manual queue and remaining album sequence items
-    this.manualQueue.forEach(t => t?.id && seenIds.add(String(t.id)));
-    if (this.sequenceQueue && this.playbackContext?.type === 'album') {
-      for (let i = this.sequenceIndex + 1; i < this.sequenceQueue.length; i++) {
-        if (this.sequenceQueue[i]?.id) seenIds.add(String(this.sequenceQueue[i].id));
-      }
-    }
-
-    // Exclude user dismissed tracks
-    this.dismissedTrackIds.forEach(id => seenIds.add(String(id)));
-
-    // Track recently skipped and recently played for penalty / diversity filtering
+    // 3. Candidate Qualification & Deduplication with Adaptive Cooldown Window
     const skippedIds = new Set(this.listeningHistoryService?.recentlySkippedTrackIds || []);
-    const recentPlayedIds = new Set(this.recentlyPlayedIds || []);
+    const activeQueueToCheck = isAppendMode ? this.recommendationQueue : [];
+    const rollingSession = typeof this.getRecentTracks === 'function' ? this.getRecentTracks(5) : [seedTrack];
+    const discoveryMode = this.discoveryMode || 'balanced';
 
-    const isAvailableCandidate = (cand) => {
-      if (!cand || !cand.id || !cand.title) return false;
-      const cId = String(cand.id);
-      const cTitle = (cand.title || '').toLowerCase().trim();
-      if (seenIds.has(cId) || seenTitles.has(cTitle)) return false;
+    const isAvailableCandidate = (cand, cooldown = 50) => {
+      if (!this.isEligibleForAutoplay(cand, {
+        cooldownWindow: cooldown,
+        activeQueue: activeQueueToCheck
+      })) return false;
+
+      // Phase 4 Stage C: Hard Incompatibility Filter
+      if (this.recommendationEngine && this.recommendationEngine.isHardIncompatible(cand, seedTrack, rollingSession, discoveryMode)) {
+        return false;
+      }
       return true;
     };
 
-    // 4. Partition Candidates into Pools (60% Same Artist, 25% Related Artists, 15% Discovery)
+    // 4. Partition Candidates into Pools
     const TARGET_QUEUE_SIZE = 12;
     const TARGET_SAME_ARTIST = 7;     // ~60%
     const TARGET_RELATED_ARTISTS = 3; // ~25%
     const TARGET_DISCOVERY = 2;       // ~15%
 
-    // --- POOL 1: Same Artist Candidates ---
-    const artistRawSongs = [
-      ...(artistData?.songs || []),
-      ...(recoSongs || [])
-    ];
+    const buildPools = (cooldown) => {
+      const poolSame = [];
+      const poolRel = [];
+      const poolDisc = [];
 
-    const sameArtistPool = [];
-    artistRawSongs.forEach(cand => {
-      if (!isAvailableCandidate(cand)) return;
-      const cArtist = (cand.artist || '').toLowerCase();
-      // Match primary artist or any seed artist tokens
-      const matchesArtist = cArtist.includes(primaryArtistLower) || primaryArtistLower.includes(cArtist) ||
-        artistTokens.some(tok => {
-          const tokLower = tok.toLowerCase();
-          return tokLower.length >= 3 && (cArtist.includes(tokLower) || tokLower.includes(cArtist));
-        });
+      const poolIds = new Set();
+      const poolFps = new Set();
 
-      if (matchesArtist) {
+      const canAdd = (c) => {
+        if (!isAvailableCandidate(c, cooldown)) return false;
+        const id = String(c.id);
+        const fp = this.getTrackFingerprint(c);
+        if (poolIds.has(id) || (fp && poolFps.has(fp))) return false;
+        return true;
+      };
+
+      const markAdded = (c) => {
+        poolIds.add(String(c.id));
+        const fp = this.getTrackFingerprint(c);
+        if (fp) poolFps.add(fp);
+      };
+
+      // --- POOL 1: Same Artist Candidates ---
+      const artistRawSongs = [
+        ...(artistData?.songs || []),
+        ...(recoSongs || [])
+      ];
+
+      artistRawSongs.forEach(cand => {
+        if (!canAdd(cand)) return;
+        const cArtist = (cand.artist || '').toLowerCase();
+        const matchesArtist = cArtist.includes(primaryArtistLower) || primaryArtistLower.includes(cArtist) ||
+          artistTokens.some(tok => {
+            const tokLower = tok.toLowerCase();
+            return tokLower.length >= 3 && (cArtist.includes(tokLower) || tokLower.includes(cArtist));
+          });
+
+        if (matchesArtist) {
+          const isSkipped = skippedIds.has(String(cand.id));
+          if (isSkipped && poolSame.length >= TARGET_SAME_ARTIST) return;
+
+          const comp = this.recommendationEngine
+            ? this.recommendationEngine.calculateMusicalCompatibility(cand, seedTrack, rollingSession, discoveryMode)
+            : { score: 50, isCompatible: true, reason: `More from ${primaryArtist}`, reasonBadge: 'badge-artist' };
+
+          if (!comp.isCompatible || comp.score < 20) return;
+
+          cand._reason = comp.reason || `More from ${primaryArtist}`;
+          cand._reasonBadge = comp.reasonBadge || 'badge-artist';
+          cand._isSameArtist = true;
+          cand._isSkipped = isSkipped;
+          cand._score = comp.score;
+          if (isSkipped) cand._score -= 50;
+
+          markAdded(cand);
+          poolSame.push(cand);
+        }
+      });
+
+      // --- POOL 2: Related Artists Candidates ---
+      const trendingHitsList = Array.isArray(trendingData) ? trendingData : [
+        ...(trendingData?.haryanviHits && primaryGenre === 'haryanvi' ? trendingData.haryanviHits : []),
+        ...(trendingData?.punjabiHits && (primaryGenre === 'punjabi' || primaryGenre === 'punjabi_hiphop') ? trendingData.punjabiHits : []),
+        ...(trendingData?.bollywoodHits && (primaryGenre === 'bollywood' || primaryGenre === 'hindi_romantic') ? trendingData.bollywoodHits : []),
+        ...(trendingData?.romanticHits && (primaryGenre === 'romantic' || primaryGenre === 'hindi_romantic') ? trendingData.romanticHits : []),
+        ...(trendingData?.indieHits && (primaryGenre === 'indie' || primaryGenre === 'lofi') ? trendingData.indieHits : [])
+      ];
+
+      const relatedArtistRawSongs = [
+        ...relatedPools.flat(),
+        ...(songRelated || []),
+        ...trendingHitsList
+      ];
+
+      relatedArtistRawSongs.forEach(cand => {
+        if (!canAdd(cand)) return;
+        const cArtist = (cand.artist || '').toLowerCase();
+        if (cArtist.includes(primaryArtistLower)) return;
+
+        const matchedRelArtist = finalRelatedArtists.find(r => cArtist.includes(r.toLowerCase())) ||
+                                 cand.artist.split(',')[0].trim();
+
         const isSkipped = skippedIds.has(String(cand.id));
-        const isRecent = recentPlayedIds.has(String(cand.id));
-        if (isSkipped && sameArtistPool.length >= TARGET_SAME_ARTIST) return;
+        if (isSkipped && poolRel.length >= TARGET_RELATED_ARTISTS) return;
 
-        cand._reason = `More from ${primaryArtist}`;
-        cand._reasonBadge = 'badge-artist';
-        cand._isSameArtist = true;
-        cand._isSkipped = isSkipped;
-        cand._isRecent = isRecent;
+        const comp = this.recommendationEngine
+          ? this.recommendationEngine.calculateMusicalCompatibility(cand, seedTrack, rollingSession, discoveryMode)
+          : { score: 40, isCompatible: true, reason: `Similar artist: ${matchedRelArtist}`, reasonBadge: 'badge-related' };
 
-        cand._score = this.recommendationEngine ? this.recommendationEngine.scoreCandidate(cand, [seedTrack]) : 50;
+        if (!comp.isCompatible || comp.score < 25) return;
+
+        cand._reason = comp.reason || `Similar artist: ${matchedRelArtist}`;
+        cand._reasonBadge = comp.reasonBadge || 'badge-related';
+        cand._isRelatedArtist = true;
+        cand._score = comp.score;
         if (isSkipped) cand._score -= 50;
-        if (isRecent) cand._score -= 30;
 
-        sameArtistPool.push(cand);
+        markAdded(cand);
+        poolRel.push(cand);
+      });
+
+      // --- POOL 3: Personalized Discoveries & Taste Matching ---
+      const topUserArtists = this.artistAffinityService ? this.artistAffinityService.getTopArtists(5) : [];
+      const hasListeningHistory = topUserArtists.length > 0 || (this.likedTracks && this.likedTracks.length > 0);
+
+      const discoveryRawSongs = [
+        ...(this.likedTracks || []),
+        ...(Array.isArray(trendingData) ? [] : (trendingData?.trendingHits || [])),
+        ...(Array.isArray(trendingData) ? [] : (trendingData?.quickPicks || [])),
+        ...(this.quickPicks || []),
+        ...(FALLBACK_TRACKS || [])
+      ];
+
+      discoveryRawSongs.forEach(cand => {
+        if (!canAdd(cand)) return;
+        const cArtist = (cand.artist || '').toLowerCase();
+        if (cArtist.includes(primaryArtistLower)) return;
+
+        const comp = this.recommendationEngine
+          ? this.recommendationEngine.calculateMusicalCompatibility(cand, seedTrack, rollingSession, discoveryMode)
+          : { score: 30, isCompatible: true, reason: 'Trending discovery', reasonBadge: 'badge-discovery' };
+
+        if (!comp.isCompatible || comp.score < 30) return;
+
+        const isLiked = this.likedTrackIds?.has(cand.id);
+        const isAffinity = topUserArtists.some(a => cArtist.includes(a.artist.toLowerCase()));
+
+        let reason = comp.reason || 'Trending discovery';
+        let reasonBadge = comp.reasonBadge || 'badge-discovery';
+
+        if (isLiked) {
+          reason = 'From your Liked Songs';
+          reasonBadge = 'badge-liked';
+        } else if (isAffinity || hasListeningHistory) {
+          reason = 'Based on your listening';
+          reasonBadge = 'badge-discovery';
+        }
+
+        cand._reason = reason;
+        cand._reasonBadge = reasonBadge;
+        cand._score = comp.score;
+
+        markAdded(cand);
+        poolDisc.push(cand);
+      });
+
+      poolSame.sort((a, b) => (b._score || 0) - (a._score || 0));
+      poolRel.sort((a, b) => (b._score || 0) - (a._score || 0));
+      poolDisc.sort((a, b) => (b._score || 0) - (a._score || 0));
+
+      return { poolSame, poolRel, poolDisc };
+    };
+
+    // First attempt with full 50-track cooldown window
+    let { poolSame, poolRel, poolDisc } = buildPools(50);
+
+    // If total candidate count is insufficient, adaptively relax cooldown window
+    if (poolSame.length + poolRel.length + poolDisc.length < 8) {
+      const relaxed = buildPools(20);
+      if (relaxed.poolSame.length + relaxed.poolRel.length + relaxed.poolDisc.length > poolSame.length + poolRel.length + poolDisc.length) {
+        poolSame = relaxed.poolSame;
+        poolRel = relaxed.poolRel;
+        poolDisc = relaxed.poolDisc;
       }
-    });
-
-    sameArtistPool.sort((a, b) => (b._score || 0) - (a._score || 0));
-
-    // --- POOL 2: Related Artists Candidates ---
-    const relatedArtistRawSongs = [
-      ...relatedPools.flat(),
-      ...(songRelated || []),
-      ...(trendingData?.haryanviHits && primaryGenre === 'haryanvi' ? trendingData.haryanviHits : []),
-      ...(trendingData?.punjabiHits && primaryGenre === 'punjabi' ? trendingData.punjabiHits : []),
-      ...(trendingData?.bollywoodHits && primaryGenre === 'bollywood' ? trendingData.bollywoodHits : []),
-      ...(trendingData?.indieHits && primaryGenre === 'indie' ? trendingData.indieHits : [])
-    ];
-
-    const relatedArtistPool = [];
-    relatedArtistRawSongs.forEach(cand => {
-      if (!isAvailableCandidate(cand)) return;
-      const cArtist = (cand.artist || '').toLowerCase();
-      if (cArtist.includes(primaryArtistLower)) return;
-
-      const matchedRelArtist = topRelatedArtists.find(r => cArtist.includes(r.toLowerCase())) ||
-                               cand.artist.split(',')[0].trim();
-
-      const isSkipped = skippedIds.has(String(cand.id));
-      const isRecent = recentPlayedIds.has(String(cand.id));
-      if (isSkipped && relatedArtistPool.length >= TARGET_RELATED_ARTISTS) return;
-
-      cand._reason = `Similar artist: ${matchedRelArtist}`;
-      cand._reasonBadge = 'badge-related';
-      cand._isRelatedArtist = true;
-      cand._score = this.recommendationEngine ? this.recommendationEngine.scoreCandidate(cand, [seedTrack]) : 40;
-      if (isSkipped) cand._score -= 50;
-      if (isRecent) cand._score -= 30;
-
-      relatedArtistPool.push(cand);
-    });
-
-    relatedArtistPool.sort((a, b) => (b._score || 0) - (a._score || 0));
-
-    // --- POOL 3: Personalized Discoveries & Taste Matching ---
-    const topUserArtists = this.artistAffinityService ? this.artistAffinityService.getTopArtists(5) : [];
-    const hasListeningHistory = topUserArtists.length > 0 || (this.likedTracks && this.likedTracks.length > 0);
-
-    const discoveryRawSongs = [
-      ...(this.likedTracks || []),
-      ...(trendingData?.trendingHits || []),
-      ...(trendingData?.quickPicks || []),
-      ...(this.quickPicks || []),
-      ...(FALLBACK_TRACKS || [])
-    ];
-
-    const discoveryPool = [];
-    discoveryRawSongs.forEach(cand => {
-      if (!isAvailableCandidate(cand)) return;
-      const cArtist = (cand.artist || '').toLowerCase();
-      if (cArtist.includes(primaryArtistLower)) return;
-
-      const isLiked = this.likedTrackIds?.has(cand.id);
-      const isAffinity = topUserArtists.some(a => cArtist.includes(a.artist.toLowerCase()));
-
-      let reason = 'Trending discovery';
-      let reasonBadge = 'badge-discovery';
-
-      if (isLiked) {
-        reason = 'From your Liked Songs';
-        reasonBadge = 'badge-liked';
-      } else if (isAffinity || hasListeningHistory) {
-        reason = 'Based on your listening';
-        reasonBadge = 'badge-discovery';
-      }
-
-      cand._reason = reason;
-      cand._reasonBadge = reasonBadge;
-      cand._score = this.recommendationEngine ? this.recommendationEngine.scoreCandidate(cand, [seedTrack]) : 30;
-
-      discoveryPool.push(cand);
-    });
-
-    discoveryPool.sort((a, b) => (b._score || 0) - (a._score || 0));
+    }
+    if (poolSame.length + poolRel.length + poolDisc.length < 6) {
+      const relaxed0 = buildPools(0);
+      poolSame = relaxed0.poolSame;
+      poolRel = relaxed0.poolRel;
+      poolDisc = relaxed0.poolDisc;
+    }
 
     // 5. Select Quotas and Handle Artist Exhaustion (Graceful Fallback)
-    const selectedSameArtist = sameArtistPool.slice(0, TARGET_SAME_ARTIST);
+    const selectedSameArtist = poolSame.slice(0, TARGET_SAME_ARTIST);
     const sameArtistDeficit = TARGET_SAME_ARTIST - selectedSameArtist.length;
 
     const neededRelated = TARGET_RELATED_ARTISTS + Math.ceil(sameArtistDeficit * 0.7);
     const selectedRelated = [];
     const relatedArtistCounts = new Map();
 
-    for (const cand of relatedArtistPool) {
+    for (const cand of poolRel) {
       if (selectedSameArtist.some(s => s.id === cand.id)) continue;
       const art = (cand.artist || 'various').split(',')[0].trim().toLowerCase();
       const count = relatedArtistCounts.get(art) || 0;
@@ -7090,35 +7706,40 @@ class REAMusicApp {
 
     const neededDiscovery = TARGET_DISCOVERY + Math.floor(sameArtistDeficit * 0.3);
     const selectedDiscovery = [];
-    for (const cand of discoveryPool) {
+    for (const cand of poolDisc) {
       if (selectedSameArtist.some(s => s.id === cand.id)) continue;
       if (selectedRelated.some(r => r.id === cand.id)) continue;
       selectedDiscovery.push(cand);
       if (selectedDiscovery.length >= neededDiscovery) break;
     }
 
-    // 6. Intelligent Queue Interleaving
-    // The immediate next tracks prioritize the same artist first (slots 1, 2, 3),
-    // followed by related artists and discoveries.
+    // 6. Intelligent Queue Interleaving & Anti-Clumping
+    // Immediate tracks prioritize the chosen singer first (slots 1, 2)
+    // Then alternate with related artists and discoveries to avoid clumping
     const finalQueue = [];
     const usedIds = new Set();
+    const usedFps = new Set();
 
     const pushTrack = (t) => {
-      if (!t || !t.id || usedIds.has(String(t.id))) return;
-      usedIds.add(String(t.id));
+      if (!t || !t.id) return;
+      const tId = String(t.id);
+      const fp = this.getTrackFingerprint(t);
+      if (usedIds.has(tId) || (fp && usedFps.has(fp))) return;
+      usedIds.add(tId);
+      if (fp) usedFps.add(fp);
       finalQueue.push(t);
     };
 
-    // Immediate tracks: Same artist (up to 3 tracks immediately)
-    for (let i = 0; i < 3 && i < selectedSameArtist.length; i++) {
+    // Immediate tracks: chosen artist
+    for (let i = 0; i < 2 && i < selectedSameArtist.length; i++) {
       pushTrack(selectedSameArtist[i]);
     }
 
-    let saIdx = 3;
+    let saIdx = 2;
     let relIdx = 0;
     let discIdx = 0;
 
-    // Interleave remaining: Same Artist, Related Artist, Same Artist, Related Artist, Discovery, etc.
+    // Interleave remaining: Related, Same Artist, Discovery, Related, Same Artist, etc.
     while (finalQueue.length < TARGET_QUEUE_SIZE && (saIdx < selectedSameArtist.length || relIdx < selectedRelated.length || discIdx < selectedDiscovery.length)) {
       if (relIdx < selectedRelated.length) pushTrack(selectedRelated[relIdx++]);
       if (saIdx < selectedSameArtist.length) pushTrack(selectedSameArtist[saIdx++]);
@@ -7127,14 +7748,21 @@ class REAMusicApp {
       if (saIdx < selectedSameArtist.length) pushTrack(selectedSameArtist[saIdx++]);
     }
 
-    // Fallback fill to reach at least 10 items if still short
-    if (finalQueue.length < 10) {
-      const fallbackPool = [...relatedArtistPool, ...discoveryPool, ...(this.quickPicks || [])];
+    // Fallback fill to reach at least 8-10 items if still short
+    if (finalQueue.length < 8) {
+      const fallbackPool = [...poolRel, ...poolDisc];
+      // Only include quickPicks if they pass hard compatibility filter for this seed track
+      if (this.quickPicks && this.quickPicks.length > 0) {
+        const compatiblePicks = this.quickPicks.filter(c => {
+          if (!c) return false;
+          if (this.recommendationEngine && this.recommendationEngine.isHardIncompatible(c, seedTrack, rollingSession, discoveryMode)) return false;
+          return true;
+        });
+        fallbackPool.push(...compatiblePicks);
+      }
       for (const cand of fallbackPool) {
-        if (!usedIds.has(String(cand.id))) {
-          pushTrack(cand);
-          if (finalQueue.length >= TARGET_QUEUE_SIZE) break;
-        }
+        pushTrack(cand);
+        if (finalQueue.length >= TARGET_QUEUE_SIZE) break;
       }
     }
 
@@ -7143,20 +7771,43 @@ class REAMusicApp {
       return [];
     }
 
-    this.recommendationQueue = finalQueue;
-    if (seedId) {
-      this.recommendationCache.set(seedId, finalQueue);
+    // 7. Authoritative Queue Update (Append during prefetch, Replace on new seed)
+    if (isAppendMode) {
+      const existingQueueIds = new Set(this.recommendationQueue.map(t => String(t.id)));
+      const existingQueueFps = new Set(this.recommendationQueue.map(t => this.getTrackFingerprint(t)));
+
+      const tracksToAppend = [];
+      for (const t of finalQueue) {
+        const id = String(t.id);
+        const fp = this.getTrackFingerprint(t);
+        if (!existingQueueIds.has(id) && (!fp || !existingQueueFps.has(fp))) {
+          existingQueueIds.add(id);
+          if (fp) existingQueueFps.add(fp);
+          tracksToAppend.push(t);
+        }
+      }
+      this.recommendationQueue.push(...tracksToAppend);
+      if (this.recommendationQueue.length > 25) {
+        this.recommendationQueue = this.recommendationQueue.slice(0, 25);
+      }
+    } else {
+      this.recommendationQueue = finalQueue;
+      if (seedId) {
+        this.recommendationCache.set(seedId, finalQueue);
+      }
     }
+
     this.renderQueue();
-    return finalQueue;
+    return this.recommendationQueue;
   }
 
-  async prefetchSmartRecommendations(seedTrack, force = false) {
+  async prefetchSmartRecommendations(seedTrack, isNewSeedOrForce = false) {
     if (!seedTrack) return;
-    if (this.isPrefetchingRecommendations && !force) return;
+    if (this.isPrefetchingRecommendations && !isNewSeedOrForce) return;
     this.isPrefetchingRecommendations = true;
     try {
-      await this.generateSmartRecommendations(seedTrack, { force });
+      const append = !isNewSeedOrForce;
+      await this.generateSmartRecommendations(seedTrack, { force: isNewSeedOrForce, append });
     } catch (e) {
       console.warn('[Autoplay] Prefetch notice:', e);
     } finally {
@@ -7234,6 +7885,9 @@ class REAMusicApp {
         }
       }
     }
+
+    // Synchronize Native Media Session playback state (iOS Safari Lock Screen / Dynamic Island)
+    this.syncMediaControls();
   }
 
   updateProgressBar(cur, dur) {
@@ -7259,6 +7913,21 @@ class REAMusicApp {
     if (this.maxProgressThumb) this.maxProgressThumb.style.left = `${pct}%`;
     if (this.maxTimeCurrent) this.maxTimeCurrent.textContent = this.formatTime(cur);
     if (this.maxTimeTotal) this.maxTimeTotal.textContent = this.formatTime(dur);
+
+    // Synchronize iOS Safari MediaSession Position State for Lock Screen & Dynamic Island scrub bar
+    if (typeof navigator !== 'undefined' && 'mediaSession' in navigator && typeof navigator.mediaSession.setPositionState === 'function') {
+      const roundedCur = Math.floor(cur);
+      if (dur > 0 && (!this._lastMediaSessionSec || this._lastMediaSessionSec !== roundedCur)) {
+        this._lastMediaSessionSec = roundedCur;
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: Math.max(0, dur),
+            playbackRate: this.isPlaying ? 1.0 : 0.0,
+            position: Math.max(0, Math.min(cur, dur))
+          });
+        } catch (_) {}
+      }
+    }
 
     // Automatically prepare next songs before current song ends
     if (this.autoplayEnabled && this.recommendationQueue.length < 5 && !this.isPrefetchingRecommendations) {
@@ -9228,7 +9897,7 @@ class REAMusicApp {
       }, DONATION_CONFIG.copyFeedbackDurationMs);
     } else {
       if (this.copyFeedbackMsg) {
-        this.copyFeedbackMsg.textContent = 'Could not copy automatically. Please copy 950878807@fam manually.';
+        this.copyFeedbackMsg.textContent = 'Could not copy automatically. Please copy 9509878807@fam manually.';
         this.copyFeedbackMsg.classList.remove('hidden');
       }
       setTimeout(() => {
@@ -9365,8 +10034,15 @@ class REAMusicApp {
 }
 
 // =============================================================================
-// Bootstrap on DOM Ready
+// Bootstrap on DOM Ready & Global Exports
 // =============================================================================
+if (typeof window !== 'undefined') {
+  window.REAMusicApp = REAMusicApp;
+  window.RecommendationEngine = RecommendationEngine;
+  window.detectTrackTags = detectTrackTags;
+  window.GENRE_COMPATIBILITY = GENRE_COMPATIBILITY;
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     window.reamusic = new REAMusicApp();

@@ -46,7 +46,16 @@
       ]
     },
     {
-      "source": "/assets/(.*)",
+      "source": "/(assets|branding)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(favicon.*|apple-touch-icon\\.png|icon-.*\\.png)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -62,6 +71,33 @@
           "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
+    },
+    {
+      "source": "/api/search(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/api/trending(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/api/recommendations(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400"
+        }
+      ]
     }
   ],
   "rewrites": [
@@ -74,7 +110,7 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/((?!api|assets|css|js|sw\\.js|manifest\\.webmanifest|manifest\\.json|favicon\\.ico).*)",
+      "source": "/((?!api|assets|branding|css|js|sw\\.js|manifest\\.webmanifest|manifest\\.json|favicon\\.ico|favicon-.*\\.png|apple-touch-icon\\.png|icon-.*\\.png).*)",
       "destination": "/server.js"
     }
   ]

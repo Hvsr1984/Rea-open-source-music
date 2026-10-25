@@ -91,9 +91,9 @@ for (const file of htmlFiles) {
     content.includes('id="donationQrImg"') &&
     content.includes('/assets/rea-donation-qr.png') &&
     content.includes('id="donationUpiId"') &&
-    content.includes('950878807@fam') &&
+    content.includes('9509878807@fam') &&
     content.includes('id="donationCopyUpiBtn"'),
-    `${relName} defines Scan & Support QR card with 950878807@fam and Copy button`
+    `${relName} defines Scan & Support QR card with 9509878807@fam and Copy button`
   );
 
   // Suggested donation amounts & controls
@@ -219,15 +219,15 @@ function testGenerateUpiUri(upiId, payeeName, currency, amount) {
   return uri;
 }
 
-const uri51 = testGenerateUpiUri('950878807@fam', 'REA Music Developer', 'INR', 51);
+const uri51 = testGenerateUpiUri('9509878807@fam', 'REA Music Developer', 'INR', 51);
 assert(
-  uri51 === 'upi://pay?pa=950878807%40fam&pn=REA%20Music%20Developer&cu=INR&am=51',
+  uri51 === 'upi://pay?pa=9509878807%40fam&pn=REA%20Music%20Developer&cu=INR&am=51',
   `testGenerateUpiUri(51) outputs exact spec: ${uri51}`
 );
 
-const uriCustom = testGenerateUpiUri('950878807@fam', 'REA Music Developer', 'INR', 250.50);
+const uriCustom = testGenerateUpiUri('9509878807@fam', 'REA Music Developer', 'INR', 250.50);
 assert(
-  uriCustom === 'upi://pay?pa=950878807%40fam&pn=REA%20Music%20Developer&cu=INR&am=250.50',
+  uriCustom === 'upi://pay?pa=9509878807%40fam&pn=REA%20Music%20Developer&cu=INR&am=250.50',
   `testGenerateUpiUri(250.50) properly encodes decimal amount: ${uriCustom}`
 );
 
@@ -290,7 +290,7 @@ try {
   assert(donateRes.headers['content-type']?.includes('text/html'), 'GET /donate serves text/html');
   const donateHtml = donateRes.body.toString('utf8');
   assert(donateHtml.includes('id="viewDonate"'), 'GET /donate serves SPA shell containing #viewDonate');
-  assert(donateHtml.includes('950878807@fam'), 'GET /donate serves HTML containing configured UPI ID');
+  assert(donateHtml.includes('9509878807@fam'), 'GET /donate serves HTML containing configured UPI ID');
 
   // Test static serving of the extracted QR PNG asset
   const qrRes = await request('/assets/rea-donation-qr.png');

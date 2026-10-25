@@ -58,11 +58,29 @@ async function runTests() {
     if (!res.body.includes('REA Music')) throw new Error('Body missing "REA Music"');
   });
 
-  // Test 2: Static asset serving
+  // Test 2: Static asset serving & Brand assets
   await testCase('GET /assets/logo.jpg returns 200 OK and image/jpeg', async () => {
     const res = await request('/assets/logo.jpg');
     if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
     if (!res.headers['content-type']?.includes('image/jpeg')) throw new Error('Not image/jpeg');
+  });
+
+  await testCase('GET /favicon.ico returns 200 OK and valid ICO', async () => {
+    const res = await request('/favicon.ico');
+    if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
+    if (!res.headers['content-type']?.includes('image/x-icon')) throw new Error('Not image/x-icon');
+  });
+
+  await testCase('GET /branding/rea-music-logo.png returns 200 OK and image/png', async () => {
+    const res = await request('/branding/rea-music-logo.png');
+    if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
+    if (!res.headers['content-type']?.includes('image/png')) throw new Error('Not image/png');
+  });
+
+  await testCase('GET /favicon-32x32.png returns 200 OK and image/png', async () => {
+    const res = await request('/favicon-32x32.png');
+    if (res.statusCode !== 200) throw new Error(`Status ${res.statusCode}`);
+    if (!res.headers['content-type']?.includes('image/png')) throw new Error('Not image/png');
   });
 
   // Test 3: API Router /api/trending
