@@ -1,8 +1,8 @@
-// REA Music Service Worker v2.7.0
+// REA Music Service Worker v2.7.1
 // High-performance PWA service worker with app shell caching, Stale-While-Revalidate API cache, and safe audio passthrough
 
-const SHELL_CACHE_NAME = 'rea-music-shell-v2.7.0';
-const API_CACHE_NAME = 'rea-music-api-v2.7.0';
+const SHELL_CACHE_NAME = 'rea-music-shell-v2.7.1';
+const API_CACHE_NAME = 'rea-music-api-v2.7.1';
 
 const PRECACHE_ASSETS = [
   '/',
