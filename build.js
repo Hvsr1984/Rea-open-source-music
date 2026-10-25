@@ -121,7 +121,8 @@ copyFolderRecursiveSync(path.join(__dirname, 'branding'), path.join(publicDir, '
   'favicon-48x48.png',
   'apple-touch-icon.png',
   'icon-192.png',
-  'icon-512.png'
+  'icon-512.png',
+  'icon-maskable-512.png'
 ].forEach((file) => {
   const src = path.join(__dirname, file);
   if (fs.existsSync(src)) {

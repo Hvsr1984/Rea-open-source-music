@@ -54,6 +54,12 @@
       "purpose": "maskable"
     },
     {
+      "src": "/icon-maskable-512.png?v=2.7.1",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/branding/rea-music-logo.png?v=2.7.1",
       "sizes": "1024x1024",
       "type": "image/png",
@@ -68,7 +74,7 @@
       "url": "/#explore",
       "icons": [
         {
-          "src": "/assets/icons/icon-192.png",
+          "src": "/assets/icons/icon-192.png?v=2.7.1",
           "sizes": "192x192"
         }
       ]
@@ -80,7 +86,7 @@
       "url": "/#search",
       "icons": [
         {
-          "src": "/assets/icons/icon-192.png",
+          "src": "/assets/icons/icon-192.png?v=2.7.1",
           "sizes": "192x192"
         }
       ]

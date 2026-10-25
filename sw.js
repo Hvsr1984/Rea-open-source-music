@@ -17,6 +17,7 @@ const PRECACHE_ASSETS = [
   '/apple-touch-icon.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon-maskable-512.png',
   '/branding/rea-music-logo.png',
   '/assets/branding/rea-music-logo.png',
   '/assets/logo.jpg',

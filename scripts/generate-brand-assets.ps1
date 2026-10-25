@@ -32,6 +32,29 @@ function New-ResizedBitmap {
     return $dest
 }
 
+function New-MaskableBitmap {
+    param(
+        [System.Drawing.Image]$Image,
+        [int]$Size = 512,
+        [int]$SafeSize = 400
+    )
+    $dest = New-Object System.Drawing.Bitmap $Size, $Size
+    $g = [System.Drawing.Graphics]::FromImage($dest)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    # Brand dark background #0a0a0e
+    $bgBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 10, 10, 14))
+    $g.FillRectangle($bgBrush, 0, 0, $Size, $Size)
+    $bgBrush.Dispose()
+    
+    $offset = [int](($Size - $SafeSize) / 2)
+    $g.DrawImage($Image, $offset, $offset, $SafeSize, $SafeSize)
+    $g.Dispose()
+    return $dest
+}
+
 function Save-Png {
     param(
         [System.Drawing.Bitmap]$Bitmap,
@@ -128,6 +151,7 @@ $bmp180 = New-ResizedBitmap -Image $srcImg -Width 180 -Height 180
 $bmp48  = New-ResizedBitmap -Image $srcImg -Width 48 -Height 48
 $bmp32  = New-ResizedBitmap -Image $srcImg -Width 32 -Height 32
 $bmp16  = New-ResizedBitmap -Image $srcImg -Width 16 -Height 16
+$maskable512 = New-MaskableBitmap -Image $srcImg -Size 512 -SafeSize 400
 
 Write-Host "Writing assets to public/..."
 Save-Png -Bitmap $master1024 -Path "$ProjectRoot\public\branding\rea-music-logo.png"
@@ -137,6 +161,7 @@ Save-Png -Bitmap $bmp48 -Path "$ProjectRoot\public\favicon-48x48.png"
 Save-Png -Bitmap $bmp180 -Path "$ProjectRoot\public\apple-touch-icon.png"
 Save-Png -Bitmap $bmp192 -Path "$ProjectRoot\public\icon-192.png"
 Save-Png -Bitmap $bmp512 -Path "$ProjectRoot\public\icon-512.png"
+Save-Png -Bitmap $maskable512 -Path "$ProjectRoot\public\icon-maskable-512.png"
 Build-MultiResIco -Images @($bmp16, $bmp32, $bmp48) -OutFile "$ProjectRoot\public\favicon.ico"
 
 Write-Host "Writing assets to root project..."
@@ -147,6 +172,7 @@ Save-Png -Bitmap $bmp48 -Path "$ProjectRoot\favicon-48x48.png"
 Save-Png -Bitmap $bmp180 -Path "$ProjectRoot\apple-touch-icon.png"
 Save-Png -Bitmap $bmp192 -Path "$ProjectRoot\icon-192.png"
 Save-Png -Bitmap $bmp512 -Path "$ProjectRoot\icon-512.png"
+Save-Png -Bitmap $maskable512 -Path "$ProjectRoot\icon-maskable-512.png"
 Build-MultiResIco -Images @($bmp16, $bmp32, $bmp48) -OutFile "$ProjectRoot\favicon.ico"
 
 Write-Host "Writing assets to assets/ directory (updating existing paths)..."
@@ -155,7 +181,8 @@ Save-Jpeg -Bitmap $master1024 -Path "$ProjectRoot\assets\branding\rea-music-app-
 Save-Png -Bitmap $bmp180 -Path "$ProjectRoot\assets\icons\apple-touch-icon.png"
 Save-Png -Bitmap $bmp192 -Path "$ProjectRoot\assets\icons\icon-192.png"
 Save-Png -Bitmap $bmp512 -Path "$ProjectRoot\assets\icons\icon-512.png"
-Save-Png -Bitmap $bmp512 -Path "$ProjectRoot\assets\icons\icon-maskable-512.png"
+Save-Png -Bitmap $maskable512 -Path "$ProjectRoot\assets\icons\icon-maskable-512.png"
+Save-Png -Bitmap $maskable512 -Path "$ProjectRoot\public\assets\icons\icon-maskable-512.png"
 Save-Jpeg -Bitmap $master1024 -Path "$ProjectRoot\assets\icons\logo.jpg" -Quality 95
 Save-Jpeg -Bitmap $master1024 -Path "$ProjectRoot\assets\logo.jpg" -Quality 95
 
@@ -163,6 +190,7 @@ Save-Jpeg -Bitmap $master1024 -Path "$ProjectRoot\assets\logo.jpg" -Quality 95
 $srcImg.Dispose()
 $master1024.Dispose()
 $bmp512.Dispose()
+$maskable512.Dispose()
 $bmp192.Dispose()
 $bmp180.Dispose()
 $bmp48.Dispose()
