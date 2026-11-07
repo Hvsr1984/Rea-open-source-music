@@ -484,6 +484,81 @@ export default async function handler(req, res) {
   };
 
   try {
+    // Donation checkout: create an order server-side. Keep gateway credentials
+    // in Vercel environment variables; never expose them to the browser.
+    if (pathname === '/api/donation/create' || pathParam === 'donation/create') {
+      if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST');
+        return sendJson(405, { error: 'Method not allowed' });
+      }
+      const apiBase = (process.env.UPI_GATEWAY_URL || '').replace(/\/+$/, '');
+      const apiKey = process.env.UPI_GATEWAY_API_KEY || '';
+      const apiSecret = process.env.UPI_GATEWAY_API_SECRET || '';
+      if (!apiBase || !apiKey || !apiSecret) return sendJson(503, { error: 'Donation checkout is not configured yet.' });
+
+      let body = req.body;
+      if (!body || typeof body !== 'object') {
+        try {
+          const raw = await new Promise((resolve, reject) => {
+            let data = '';
+            req.on('data', chunk => { data += chunk; if (data.length > 8192) reject(new Error('Request too large')); });
+            req.on('end', () => resolve(data));
+            req.on('error', reject);
+          });
+          body = raw ? JSON.parse(raw) : {};
+        } catch { return sendJson(400, { error: 'Invalid request body.' }); }
+      }
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount) || amount < 1 || amount > 100000 || Math.round(amount * 100) !== amount * 100) {
+        return sendJson(422, { error: 'Enter an amount between ₹1 and ₹1,00,000 with up to 2 decimal places.' });
+      }
+      const clientOrderId = `REA-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`;
+      try {
+        const gatewayRes = await fetch(`${apiBase}/api/v1/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Api-Key': apiKey, 'X-Api-Secret': apiSecret },
+          body: JSON.stringify({ amount: amount.toFixed(2), client_order_id: clientOrderId, note: 'REA Music voluntary support' }),
+          signal: AbortSignal.timeout(12000)
+        });
+        const payload = await gatewayRes.json().catch(() => ({}));
+        const order = payload?.data;
+        if (!gatewayRes.ok || !payload.success || !order?.payment_url || !order?.order_id) {
+          console.error('[REA Donation] Gateway order creation failed:', gatewayRes.status);
+          return sendJson(502, { error: 'Unable to start payment right now. Please try again.' });
+        }
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJson(201, { success: true, orderId: order.order_id, clientOrderId, amount: order.amount, paymentUrl: order.payment_url, expiresAt: order.expires_at || null });
+      } catch (error) {
+        console.error('[REA Donation] Gateway request error:', error.message);
+        return sendJson(502, { error: 'Payment service is temporarily unavailable.' });
+      }
+    }
+
+    // Verify status server-to-server; a client redirect or acknowledgement is not proof.
+    if (pathname.startsWith('/api/donation/status/') || pathParam.startsWith('donation/status/')) {
+      if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return sendJson(405, { error: 'Method not allowed' }); }
+      const apiBase = (process.env.UPI_GATEWAY_URL || '').replace(/\/+$/, '');
+      const apiKey = process.env.UPI_GATEWAY_API_KEY || '';
+      const apiSecret = process.env.UPI_GATEWAY_API_SECRET || '';
+      if (!apiBase || !apiKey || !apiSecret) return sendJson(503, { error: 'Donation checkout is not configured yet.' });
+      const orderId = decodeURIComponent(pathname.startsWith('/api/donation/status/')
+        ? pathname.slice('/api/donation/status/'.length)
+        : pathParam.slice('donation/status/'.length));
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(orderId)) return sendJson(400, { error: 'Invalid order reference.' });
+      try {
+        const gatewayRes = await fetch(`${apiBase}/api/v1/orders/${encodeURIComponent(orderId)}`, {
+          headers: { 'Accept': 'application/json', 'X-Api-Key': apiKey, 'X-Api-Secret': apiSecret },
+          signal: AbortSignal.timeout(10000)
+        });
+        const payload = await gatewayRes.json().catch(() => ({}));
+        if (!gatewayRes.ok || !payload.success || !payload.data) return sendJson(gatewayRes.status === 404 ? 404 : 502, { error: 'Unable to verify this payment yet.' });
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJson(200, { success: true, orderId: payload.data.order_id, amount: payload.data.amount, status: payload.data.status, paidAt: payload.data.paid_at || null, expiresAt: payload.data.expires_at || null });
+      } catch (error) {
+        console.error('[REA Donation] Gateway status error:', error.message);
+        return sendJson(502, { error: 'Payment verification is temporarily unavailable.' });
+      }
+    }
     // 0. Audio Download Proxy (attachment with memory-efficient stream piping)
     if (isDownload) {
       const audioUrl = parsedUrl.searchParams.get('url');
