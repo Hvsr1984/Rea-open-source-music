@@ -1,5 +1,6 @@
 import { decryptSaavnUrl } from './des.js';
 import { Readable } from 'node:stream';
+import crypto from 'node:crypto';
 
 /**
  * High-performance Bounded Cache with LRU eviction and TTL expiration.
@@ -517,7 +518,7 @@ export default async function handler(req, res) {
         const gatewayRes = await fetch(`${apiBase}/api/v1/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Api-Key': apiKey, 'X-Api-Secret': apiSecret },
-          body: JSON.stringify({ amount: amount.toFixed(2), client_order_id: clientOrderId, note: 'REA Music voluntary support' }),
+          body: JSON.stringify({ amount: amount.toFixed(2), client_order_id: clientOrderId, note: 'REA Music voluntary support', ...(process.env.UPI_GATEWAY_RETURN_URL ? { redirect_url: process.env.UPI_GATEWAY_RETURN_URL } : {}) }),
           signal: AbortSignal.timeout(12000)
         });
         const payload = await gatewayRes.json().catch(() => ({}));
