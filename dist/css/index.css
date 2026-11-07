@@ -10657,6 +10657,162 @@ body.theme-white .btn-taste-action:hover {
   margin: 0;
 }
 
+/* Payment Status Card (Pending, Under Review, Failed, Expired) */
+.donation-status-card {
+  margin-top: 14px;
+  border-radius: 14px;
+  padding: 16px 18px;
+  animation: fadeIn 0.2s ease-out;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.donation-status-card.status-pending {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.donation-status-card.status-review {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.donation-status-card.status-failed {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.donation-status-card.status-expired {
+  background: rgba(156, 163, 175, 0.12);
+  border-color: rgba(156, 163, 175, 0.35);
+}
+
+.donation-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.donation-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.donation-status-badge.badge-pending {
+  background: rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+}
+
+.donation-status-badge.badge-review {
+  background: rgba(59, 130, 246, 0.25);
+  color: #3b82f6;
+}
+
+.donation-status-badge.badge-failed {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+.donation-status-badge.badge-expired {
+  background: rgba(156, 163, 175, 0.25);
+  color: #9ca3af;
+}
+
+.donation-status-title {
+  font-family: var(--font-family-display);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.donation-status-msg {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 10px 0;
+}
+
+.donation-status-meta {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  margin: 0 0 10px 0;
+}
+
+.donation-status-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-retry-payment,
+.btn-donate-again {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-retry-payment:hover,
+.btn-donate-again:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.donation-processing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #10b981;
+}
+
+.donation-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(16, 185, 129, 0.25);
+  border-top-color: #10b981;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.manual-qr-tag-note {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
 /* 3. QR Lightbox Modal */
 .qr-lightbox-box {
   width: 360px;
@@ -10759,6 +10915,18 @@ body.theme-white .btn-donation-secondary {
 
 body.theme-white .btn-donation-secondary:hover {
   background: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .donation-status-card {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .btn-retry-payment,
+body.theme-white .btn-donate-again {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #1d1d1f !important;
 }
 
 /* 5. Mobile & Tablet Responsive Breakpoints */

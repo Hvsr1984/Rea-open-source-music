@@ -6,6 +6,21 @@ This integration keeps the existing REA Music donation page and creates payment 
 
 The upstream `mynkdev-21/upi-gateway` README (checked 7 November 2026) says the project is undergoing security, verification, and production-readiness work and explicitly advises against production deployment until those fixes and reviews are complete. Keep this integration on a test deployment and use sandbox credentials until the upstream project is independently reviewed and declared ready. Do not accept real contributions through an unreviewed gateway.
 
+## Gateway Deployment Checklist
+
+Follow these steps to deploy and configure the separate Laravel 12 gateway:
+
+1. **Deploy Laravel Gateway on HTTPS Hosting**: Deploy to an isolated PHP 8.2+ hosting environment with SSL/TLS enforced.
+2. **Complete Installation Wizard**: Run through the Laravel web installation wizard to initialize application keys and environment.
+3. **Configure MySQL**: Set up a dedicated MySQL 8.0+ database with strict utf8mb4 collation and configure database credentials in `.env`.
+4. **Create Initial Administrator**: Generate the primary administrative user through the wizard or `php artisan make:admin`.
+5. **Configure Merchant Account**: Create or register the merchant entity corresponding to REA Music.
+6. **Add & Activate Payment Account**: Link a valid UPI payment account (VPA / QR collection handler) and mark it active.
+7. **Configure Payment Verification Provider**: Set up the automated payment reconciliation provider or banking webhook.
+8. **Generate Merchant API Credentials**: In the merchant dashboard, generate the `X-Api-Key` and `X-Api-Secret` pair.
+9. **Configure Redirect Domains**: In **Settings → Redirect Domains**, whitelist the REA Music domain (e.g., `https://reamusic.vercel.app` or `http://localhost:4500`). The gateway rejects unapproved redirect domains.
+10. **Use Sandbox Credentials for Integration Testing**: Always test end-to-end payment creation and verification in sandbox mode before considering any production use.
+
 ## Required gateway setup
 
 1. Deploy the gateway only to an HTTPS host after reviewing its current release and security guidance.
