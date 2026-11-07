@@ -16,7 +16,8 @@
     "test:autoplay": "node tests/test-smart-autoplay.mjs",
     "test:donation": "node tests/test-donation-system.mjs",
     "test:pwa": "node tests/test-ios-pwa-suite.mjs",
-    "test:all": "node tests/smoke-test.js && node tests/test-ios-pwa-suite.mjs && node tests/test-personalization-engine.mjs && node tests/test-fresh-launch.mjs && node tests/test-queue-scroll.mjs && node tests/test-search-perf.mjs && node tests/test-smart-autoplay.mjs && node tests/test-donation-system.mjs && node tests/playlists-and-prev-test.js"
+    "test:all": "node tests/smoke-test.js && node tests/test-ios-pwa-suite.mjs && node tests/test-personalization-engine.mjs && node tests/test-fresh-launch.mjs && node tests/test-queue-scroll.mjs && node tests/test-search-perf.mjs && node tests/test-smart-autoplay.mjs && node tests/test-donation-system.mjs && node tests/test-upi-gateway-integration.mjs && node tests/playlists-and-prev-test.js",
+    "test:upi-gateway": "node tests/test-upi-gateway-integration.mjs"
   },
   "keywords": [
     "music-player",
