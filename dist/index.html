@@ -12893,14 +12893,14 @@ body.theme-white .btn-donation-secondary:hover {
               </button>
               <p class="donation-security-hint">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
-                <span>Opens your installed UPI application. REA Music never requests or collects UPI PINs, passwords, or payment credentials.</span>
+                <span>Opens a secure hosted checkout. REA Music never requests or collects UPI PINs, passwords, or payment credentials.</span>
               </p>
             </div>
 
             <!-- Thank-You / Acknowledgment Section -->
             <div class="donate-acknowledgment-wrap">
               <button class="btn-acknowledge-payment" id="donationAcknowledgeBtn" type="button">
-                I've completed my payment
+                Check payment status
               </button>
               <div class="donation-thankyou-box hidden" id="donationThankYouBox">
                 <div class="thankyou-header">
@@ -13902,7 +13902,7 @@ body.theme-white .btn-donation-secondary:hover {
     </footer>
   </div>
 
-  <script id="rea-embedded-script">
+    <script id="rea-embedded-script">
 // REA Music Engine v2.4.1
 if (window.__REA_INITIALIZED__) {
   console.log('[REA] App already initialized');
@@ -15758,6 +15758,7 @@ class REAMusicApp {
         this.homeReleasesCarousel.scrollBy({ left: 360, behavior: 'smooth' });
       });
     }
+  
 
     this.lastActiveLyricIndex = -1;
 
@@ -20336,6 +20337,7 @@ class REAMusicApp {
     }
   }
 
+  
   createArtistInitialsSvg(name) {
     const cleanName = (name || 'Artist').trim();
     const words = cleanName.split(/\s+/).filter(Boolean);
@@ -23113,6 +23115,7 @@ class REAMusicApp {
     }
   }
 
+
   // ===========================================================================
   // Search History & Live Recommendations Engine
   // ===========================================================================
@@ -23733,7 +23736,7 @@ class REAMusicApp {
     return uri;
   }
 
-  executeUpiPayment() {
+  async executeUpiPayment() {
     const valResult = this.validateDonationAmount(this.selectedDonationAmount);
     if (!valResult.valid) {
       if (this.donationAmountError) {
@@ -23743,13 +23746,111 @@ class REAMusicApp {
       return;
     }
 
-    const upiUri = this.generateUpiUri(valResult.amount);
+    if (this.donationPayUpiBtn) {
+      this.donationPayUpiBtn.disabled = true;
+      const label = this.donationPayUpiBtn.querySelector('span');
+      if (label) label.textContent = 'Creating secure checkout…';
+    }
+    if (this.donationAmountError) this.donationAmountError.classList.add('hidden');
 
     try {
-      window.location.href = upiUri;
+      const response = await fetch('/api/donation/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ amount: valResult.amount })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success || !result.paymentUrl || !result.orderId) {
+        throw new Error(result.error || 'Could not start secure checkout. Please try again.');
+      }
+
+      try {
+        sessionStorage.setItem('reaDonationOrderId', result.orderId);
+        sessionStorage.setItem('reaDonationAmount', String(result.amount || valResult.amount));
+      } catch (_) {
+        // Session storage can be unavailable in strict privacy modes.
+      }
+      window.location.assign(result.paymentUrl);
     } catch (err) {
-      console.warn('[REA Donate] Direct window.location navigation error:', err);
+      console.error('[REA Donate] Secure checkout error:', err);
+      if (this.donationAmountError) {
+        this.donationAmountError.textContent = err.message || 'Payment service is temporarily unavailable.';
+        this.donationAmountError.classList.remove('hidden');
+      }
+      if (this.donationPayUpiBtn) {
+        this.donationPayUpiBtn.disabled = false;
+        const label = this.donationPayUpiBtn.querySelector('span');
+        if (label) label.textContent = 'Pay with UPI';
+      }
     }
+  }
+
+  async verifyDonationPayment(orderId) {
+    if (!orderId) return;
+    if (this.donationAcknowledgeBtn) {
+      this.donationAcknowledgeBtn.disabled = true;
+      this.donationAcknowledgeBtn.textContent = 'Checking payment…';
+    }
+
+    try {
+      const response = await fetch(`/api/donation/status/${encodeURIComponent(orderId)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Payment status could not be checked. Please try again.');
+      }
+
+      const status = String(result.status || '').toLowerCase();
+      if (status === 'paid') {
+        try {
+          sessionStorage.removeItem('reaDonationOrderId');
+          sessionStorage.removeItem('reaDonationAmount');
+        } catch (_) {}
+        const message = this.donationThankYouBox?.querySelector('.thankyou-primary-text');
+        if (message) message.textContent = `Your contribution of ₹${Number(result.amount || 0).toLocaleString('en-IN')} has been verified. Thank you for keeping REA Music alive! 💚`;
+        const disclaimer = this.donationThankYouBox?.querySelector('.thankyou-disclaimer');
+        if (disclaimer) disclaimer.textContent = `Payment verified by the UPI Gateway on ${result.paidAt ? new Date(result.paidAt).toLocaleString('en-IN') : 'confirmation'}.`;
+        if (this.donationThankYouBox) this.donationThankYouBox.classList.remove('hidden');
+        if (this.donationAmountError) this.donationAmountError.classList.add('hidden');
+        if (this.donationAcknowledgeBtn) this.donationAcknowledgeBtn.classList.add('hidden');
+      } else {
+        const messages = {
+          pending: 'Payment is still pending. Complete the payment in your UPI app, then check again.',
+          under_review: 'Your payment reference is under review. Please check again shortly.',
+          expired: 'This payment link has expired. Please create a new contribution.',
+          failed: 'The payment was not successful. You can try again.'
+        };
+        if (this.donationAmountError) {
+          this.donationAmountError.textContent = messages[status] || `Payment status: ${status}. Please check again.`;
+          this.donationAmountError.classList.remove('hidden');
+        }
+      }
+    } catch (err) {
+      if (this.donationAmountError) {
+        this.donationAmountError.textContent = err.message || 'Payment verification is temporarily unavailable.';
+        this.donationAmountError.classList.remove('hidden');
+      }
+    } finally {
+      if (this.donationAcknowledgeBtn) {
+        this.donationAcknowledgeBtn.disabled = false;
+        this.donationAcknowledgeBtn.textContent = 'Check payment status';
+      }
+    }
+  }
+
+  handleDonationReturn() {
+    let orderId = '';
+    try {
+      const params = new URLSearchParams(window.location.search);
+      orderId = params.get('order_id') || sessionStorage.getItem('reaDonationOrderId') || '';
+    } catch (_) {}
+    if (!orderId) return;
+
+    this.switchView('donate');
+    this.verifyDonationPayment(orderId);
   }
 
   async copyUpiId() {
@@ -23916,10 +24017,18 @@ class REAMusicApp {
     }
 
     if (this.donationAcknowledgeBtn) {
+      this.donationAcknowledgeBtn.textContent = 'Check payment status';
       this.donationAcknowledgeBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (this.donationThankYouBox) {
-          this.donationThankYouBox.classList.toggle('hidden');
+        let orderId = '';
+        try {
+          orderId = new URLSearchParams(window.location.search).get('order_id')
+            || sessionStorage.getItem('reaDonationOrderId') || '';
+        } catch (_) {}
+        if (orderId) this.verifyDonationPayment(orderId);
+        else if (this.donationAmountError) {
+          this.donationAmountError.textContent = 'No recent payment reference found. Start a new contribution first.';
+          this.donationAmountError.classList.remove('hidden');
         }
       });
     }
@@ -23932,6 +24041,8 @@ class REAMusicApp {
         }
       });
     }
+
+    this.handleDonationReturn();
   }
 }
 
