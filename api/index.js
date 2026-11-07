@@ -46,6 +46,39 @@ class BoundedCache {
 }
 
 // Bounded in-memory caches with individual capacity limits and TTLs
+const DONATION_RATE_LIMITS = new Map();
+
+function donationRequestAllowed(req, action, limit, windowMs) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const ip = forwarded || req.socket?.remoteAddress || 'unknown';
+  const key = `${action}:${ip}`;
+  const now = Date.now();
+  const current = DONATION_RATE_LIMITS.get(key);
+  if (!current || now - current.startedAt >= windowMs) {
+    DONATION_RATE_LIMITS.set(key, { startedAt: now, count: 1 });
+  } else {
+    if (current.count >= limit) return false;
+    current.count += 1;
+  }
+  if (DONATION_RATE_LIMITS.size > 1000) {
+    for (const [entryKey, entry] of DONATION_RATE_LIMITS) {
+      if (now - entry.startedAt >= windowMs) DONATION_RATE_LIMITS.delete(entryKey);
+    }
+  }
+  return true;
+}
+
+function isSameOriginDonationRequest(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    return new URL(origin).host.toLowerCase() === forwardedHost.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 const CACHE = {
   trending: new BoundedCache(50, 600000),      // 10 minutes
   search: new BoundedCache(500, 900000),       // 15 minutes, high capacity
@@ -474,7 +507,7 @@ export default async function handler(req, res) {
   const isSong = pathname.endsWith('/song') || pathParam.startsWith('song');
 
   const sendJson = (statusCode, data, maxAge = 120) => {
-    if (statusCode === 200) {
+    if (statusCode === 200 && !String(res.getHeader?.('Cache-Control') || '').includes('no-store')) {
       res.setHeader('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge * 2}, stale-while-revalidate=86400`);
     }
     if (res.status && res.json) {
@@ -488,6 +521,8 @@ export default async function handler(req, res) {
     // Donation checkout: create an order server-side. Keep gateway credentials
     // in Vercel environment variables; never expose them to the browser.
     if (pathname === '/api/donation/create' || pathParam === 'donation/create') {
+      if (!isSameOriginDonationRequest(req)) return sendJson(403, { error: 'Cross-origin donation requests are not allowed.' });
+      if (!donationRequestAllowed(req, 'create', 5, 60000)) return sendJson(429, { error: 'Too many payment attempts. Please wait a minute and try again.' });
       if (req.method !== 'POST') {
         res.setHeader('Allow', 'POST');
         return sendJson(405, { error: 'Method not allowed' });
@@ -537,6 +572,8 @@ export default async function handler(req, res) {
 
     // Verify status server-to-server; a client redirect or acknowledgement is not proof.
     if (pathname.startsWith('/api/donation/status/') || pathParam.startsWith('donation/status/')) {
+      if (!isSameOriginDonationRequest(req)) return sendJson(403, { error: 'Cross-origin donation requests are not allowed.' });
+      if (!donationRequestAllowed(req, 'status', 30, 60000)) return sendJson(429, { error: 'Too many status checks. Please try again shortly.' });
       if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return sendJson(405, { error: 'Method not allowed' }); }
       const apiBase = (process.env.UPI_GATEWAY_URL || '').replace(/\/+$/, '');
       const apiKey = process.env.UPI_GATEWAY_API_KEY || '';
