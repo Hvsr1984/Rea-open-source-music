@@ -24109,6 +24109,19 @@ class REAMusicApp {
         // Session storage can be unavailable in strict privacy modes.
       }
 
+      const paymentUrlStr = String(result.paymentUrl || '').trim();
+      let isSafeRedirect = false;
+      try {
+        const parsedUrl = new URL(paymentUrlStr);
+        const isLocal = parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1';
+        isSafeRedirect = parsedUrl.protocol === 'https:' || (isLocal && parsedUrl.protocol === 'http:');
+      } catch (_) {
+        isSafeRedirect = false;
+      }
+      if (!isSafeRedirect) {
+        throw new Error('Invalid payment gateway redirect address.');
+      }
+
       this.showDonationProcessing('Redirecting to secure gateway checkout…');
       window.location.assign(result.paymentUrl);
     } catch (err) {

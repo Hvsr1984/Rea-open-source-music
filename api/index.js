@@ -115,19 +115,41 @@ function checkDuplicateOrder(req, amountStr) {
 
 function isSameOriginDonationRequest(req) {
   const origin = req.headers.origin;
-  if (!origin) return true;
+  const referer = req.headers.referer;
+  const candidate = origin || referer;
+  if (!candidate) return true;
   try {
-    const originUrl = new URL(origin);
+    const candidateUrl = new URL(candidate);
     const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
     if (!forwardedHost) return true;
-    const originHost = originUrl.host.toLowerCase();
+    const originHost = candidateUrl.host.toLowerCase();
     const targetHost = forwardedHost.toLowerCase();
     if (originHost === targetHost) return true;
-    if ((originUrl.hostname === 'localhost' || originUrl.hostname === '127.0.0.1') &&
+    if ((candidateUrl.hostname === 'localhost' || candidateUrl.hostname === '127.0.0.1') &&
         (targetHost.startsWith('localhost') || targetHost.startsWith('127.0.0.1'))) {
       return true;
     }
     return false;
+  } catch {
+    return false;
+  }
+}
+
+function isValidGatewayPaymentUrl(paymentUrl, gatewayApiBase) {
+  if (!paymentUrl || typeof paymentUrl !== 'string') return false;
+  try {
+    const parsed = new URL(paymentUrl);
+    const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+    if (parsed.protocol !== 'https:' && (!isLocal || parsed.protocol !== 'http:')) {
+      return false;
+    }
+    if (gatewayApiBase) {
+      const baseParsed = new URL(gatewayApiBase);
+      if (parsed.hostname.toLowerCase() !== baseParsed.hostname.toLowerCase()) {
+        return false;
+      }
+    }
+    return true;
   } catch {
     return false;
   }
@@ -718,8 +740,8 @@ export default async function handler(req, res) {
 
         const payload = await gatewayRes.json().catch(() => ({}));
         const order = payload?.data;
-        if (!gatewayRes.ok || !payload.success || !order?.payment_url || !order?.order_id) {
-          console.error('[REA Donation] Gateway order creation failed:', gatewayRes.status);
+        if (!gatewayRes.ok || !payload.success || !order?.payment_url || !order?.order_id || !isValidGatewayPaymentUrl(order.payment_url, apiBase)) {
+          console.error('[REA Donation] Gateway order creation failed or returned invalid payment URL:', gatewayRes.status);
           return sendJson(502, { error: 'Unable to start payment right now. Please try again.' });
         }
 

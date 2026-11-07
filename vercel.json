@@ -109,7 +109,7 @@
       ]
     },
     {
-      "source": "/api/donation/(.*)",
+      "source": "/api/donation(.*)",
       "headers": [
         {
           "key": "Cache-Control",
