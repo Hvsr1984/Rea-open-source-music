@@ -225,18 +225,16 @@ body.theme-white {
   --max-bg: linear-gradient(160deg, #FFFFFF 0%, #F5F5F7 50%, #E8EAEF 100%);
 }
 
-body.theme-white .spatial-bg-wrapper {
+body.theme-white .spatial-bg-wrapper,
+body.theme-white .app-background-container {
   display: none;
 }
 
 body.theme-dark {
-  --bg-main: #000000;
-  --bg-gradient:
-    radial-gradient(circle at 15% 15%, rgba(28, 28, 34, 0.5) 0%, transparent 45%),
-    radial-gradient(circle at 85% 20%, rgba(20, 20, 26, 0.45) 0%, transparent 45%),
-    radial-gradient(circle at 80% 85%, rgba(24, 24, 30, 0.45) 0%, transparent 50%),
-    radial-gradient(circle at 20% 80%, rgba(18, 18, 24, 0.5) 0%, transparent 50%),
-    #000000;
+  --bg-main: transparent;
+  --bg-gradient: transparent;
+  background-color: transparent !important;
+  background-image: none !important;
 
   /* Apple Glassmorphism Tokens (Simple Black) */
   --glass-bg-nav: rgba(14, 14, 16, 0.78);
@@ -288,6 +286,10 @@ body.theme-dark {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+html {
+  background-color: #0c0a10;
 }
 
 html,
@@ -7114,55 +7116,87 @@ body.theme-dark .dl-track-quality {
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 1. Atmospheric Cinematic Background System */
-.spatial-bg-wrapper {
+/* 1. Atmospheric Cinematic Background System & Luxury Wallpaper Blur */
+.spatial-bg-wrapper,
+.app-background-container {
   position: fixed;
   inset: 0;
-  z-index: -10;
+  z-index: -2;
   overflow: hidden;
   pointer-events: none;
 }
 
-.spatial-bg-image {
-  position: absolute;
-  top: -24px;
-  left: -24px;
-  width: calc(100% + 48px);
-  height: calc(100% + 48px);
-  background-image: url("../assets/spatial_dusk_bg.jpg"), url("assets/spatial_dusk_bg.jpg");
+.spatial-bg-image,
+.app-background {
+  position: fixed;
+  inset: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  z-index: -2;
+  background-image: url("assets/spatial_dusk_bg.jpg");
+  background-image: url("/assets/spatial_dusk_bg.jpg");
   background-size: cover;
-  background-position: center 30%;
-  transform: translate3d(0, 0, 0);
-  will-change: transform;
+  background-position: center center;
+  background-repeat: no-repeat;
+  filter: blur(22px) brightness(0.65) saturate(0.85);
+  -webkit-filter: blur(22px) brightness(0.65) saturate(0.85);
+  transform: scale(1.05) translate3d(0, 0, 0);
+  -webkit-transform: scale(1.05) translate3d(0, 0, 0);
+  will-change: transform, filter;
+  pointer-events: none;
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.spatial-bg-gradient-overlay {
-  position: absolute;
+.spatial-bg-gradient-overlay,
+.app-background-overlay {
+  position: fixed;
   inset: 0;
-  background: linear-gradient(180deg, rgba(16, 12, 18, 0.18) 0%, rgba(14, 10, 16, 0.10) 45%, rgba(12, 8, 14, 0.32) 100%);
+  z-index: -1;
+  background: linear-gradient(
+    135deg,
+    rgba(12, 9, 15, 0.48),
+    rgba(25, 17, 24, 0.38),
+    rgba(10, 12, 22, 0.52)
+  );
+  pointer-events: none;
 }
 
 .spatial-bg-ambient-light {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: -1;
   background: 
     radial-gradient(circle at 75% 20%, rgba(255, 60, 90, 0.12) 0%, transparent 55%),
     radial-gradient(circle at 25% 75%, rgba(255, 130, 70, 0.08) 0%, transparent 50%);
   mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .spatial-bg-vignette {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: -1;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.40) 100%);
+  pointer-events: none;
+}
+
+/* Glass Panel Definition */
+.glass-panel {
+  background: rgba(29, 27, 39, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* 2. Desktop Spatial Layout (min-width: 769px) */
 @media (min-width: 769px) {
   body.theme-spatial,
   body.theme-dark {
-    background-color: #0c0a10 !important;
+    background-color: transparent !important;
+    background-image: none !important;
     color: #ffffff;
     overflow: hidden;
   }
@@ -8222,11 +8256,20 @@ body.theme-dark .dl-track-quality {
   }
 
   /* Safe viewport & layout bounds */
+  html {
+    background-color: #0c0a10;
+  }
   html,
   body {
     height: 100% !important;
     height: 100dvh !important;
     overflow: hidden !important;
+  }
+
+  body.theme-dark,
+  body.theme-spatial {
+    background-color: transparent !important;
+    background-image: none !important;
   }
 
   .sidebar-brand-header,
@@ -8237,14 +8280,15 @@ body.theme-dark .dl-track-quality {
     display: none !important;
   }
 
-  /* Disable expensive mix-blend-mode and parallax transforms on mobile */
+  /* Disable expensive mix-blend-mode and parallax transforms on mobile while preserving edge coverage */
   .spatial-bg-ambient-light {
     display: none !important;
   }
-  .spatial-bg-image {
+  .spatial-bg-image,
+  .app-background {
     transition: none !important;
     will-change: auto !important;
-    transform: none !important;
+    transform: scale(1.05) translate3d(0, 0, 0) !important;
   }
 
   /* 60/120fps Mobile Scroll Fluidity:
@@ -9112,6 +9156,7 @@ body.theme-white {
 }
 
 body.theme-white .spatial-bg-wrapper,
+body.theme-white .app-background-container,
 body.theme-white .spatial-aurora-orb {
   display: none !important;
 }
@@ -10694,6 +10739,162 @@ body.theme-white .btn-taste-action:hover {
   margin: 0;
 }
 
+/* Payment Status Card (Pending, Under Review, Failed, Expired) */
+.donation-status-card {
+  margin-top: 14px;
+  border-radius: 14px;
+  padding: 16px 18px;
+  animation: fadeIn 0.2s ease-out;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.donation-status-card.status-pending {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.donation-status-card.status-review {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.donation-status-card.status-failed {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.donation-status-card.status-expired {
+  background: rgba(156, 163, 175, 0.12);
+  border-color: rgba(156, 163, 175, 0.35);
+}
+
+.donation-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.donation-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.donation-status-badge.badge-pending {
+  background: rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+}
+
+.donation-status-badge.badge-review {
+  background: rgba(59, 130, 246, 0.25);
+  color: #3b82f6;
+}
+
+.donation-status-badge.badge-failed {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+.donation-status-badge.badge-expired {
+  background: rgba(156, 163, 175, 0.25);
+  color: #9ca3af;
+}
+
+.donation-status-title {
+  font-family: var(--font-family-display);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.donation-status-msg {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 10px 0;
+}
+
+.donation-status-meta {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  margin: 0 0 10px 0;
+}
+
+.donation-status-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-retry-payment,
+.btn-donate-again {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-retry-payment:hover,
+.btn-donate-again:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.donation-processing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #10b981;
+}
+
+.donation-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(16, 185, 129, 0.25);
+  border-top-color: #10b981;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.manual-qr-tag-note {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
 /* 3. QR Lightbox Modal */
 .qr-lightbox-box {
   width: 360px;
@@ -10796,6 +10997,18 @@ body.theme-white .btn-donation-secondary {
 
 body.theme-white .btn-donation-secondary:hover {
   background: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .donation-status-card {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.theme-white .btn-retry-payment,
+body.theme-white .btn-donate-again {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #1d1d1f !important;
 }
 
 /* 5. Mobile & Tablet Responsive Breakpoints */
@@ -11726,9 +11939,9 @@ body.theme-white .btn-donation-secondary:hover {
 </head>
 <body class="theme-dark">
   <!-- Spatial Atmospheric Cinematic Background Layer -->
-  <div class="spatial-bg-wrapper" id="spatialBgWrapper" aria-hidden="true">
-    <div class="spatial-bg-image" id="spatialBgImage"></div>
-    <div class="spatial-bg-gradient-overlay"></div>
+  <div class="spatial-bg-wrapper app-background-container" id="spatialBgWrapper" aria-hidden="true">
+    <div class="spatial-bg-image app-background" id="spatialBgImage"></div>
+    <div class="spatial-bg-gradient-overlay app-background-overlay"></div>
     <div class="spatial-bg-ambient-light"></div>
     <div class="spatial-bg-vignette"></div>
   </div>
@@ -12814,9 +13027,9 @@ body.theme-white .btn-donation-secondary:hover {
           <!-- Card 1: Scan & Support (QR Card) -->
           <div class="donate-card donate-qr-card">
             <div class="donate-card-header">
-              <span class="donate-card-tag">SCAN TO PAY</span>
+              <span class="donate-card-tag">MANUAL UPI ALTERNATIVE</span>
               <h2 class="donate-card-title">Scan & Support</h2>
-              <p class="donate-card-subtitle">Open a compatible UPI app and scan the QR code to contribute.</p>
+              <p class="donate-card-subtitle">Open a compatible UPI app and scan the QR code to contribute. <span class="manual-qr-tag-note">(Manual alternative — not gateway verified)</span></p>
             </div>
 
             <div class="donate-qr-wrapper">
@@ -12850,9 +13063,9 @@ body.theme-white .btn-donation-secondary:hover {
           <!-- Card 2: Select Contribution & UPI Payment -->
           <div class="donate-card donate-options-card">
             <div class="donate-card-header">
-              <span class="donate-card-tag">VOLUNTARY SUPPORT</span>
+              <span class="donate-card-tag">SECURE UPI GATEWAY</span>
               <h2 class="donate-card-title">Select Contribution</h2>
-              <p class="donate-card-subtitle">Choose an amount to support REA Music development.</p>
+              <p class="donate-card-subtitle">Choose an amount to support REA Music development with verified instant checkout.</p>
             </div>
 
             <!-- Preset Amount Pills -->
@@ -12893,26 +13106,58 @@ body.theme-white .btn-donation-secondary:hover {
               </button>
               <p class="donation-security-hint">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
-                <span>Opens your installed UPI application. REA Music never requests or collects UPI PINs, passwords, or payment credentials.</span>
+                <span>Opens a secure hosted checkout. REA Music never requests or collects UPI PINs, passwords, or payment credentials.</span>
               </p>
+
+              <!-- Dynamic Payment Processing & Status Display -->
+              <div class="donation-status-box" id="donationStatusBox">
+                <div class="donation-processing-indicator hidden" id="donationProcessingIndicator">
+                  <div class="donation-spinner"></div>
+                  <span id="donationProcessingText">Connecting to secure gateway…</span>
+                </div>
+
+                <div class="donation-status-card hidden" id="donationStatusCard">
+                  <div class="donation-status-header">
+                    <h4 class="donation-status-title" id="donationStatusTitle">Payment Status</h4>
+                    <span class="donation-status-badge badge-pending" id="donationStatusBadge">Pending</span>
+                  </div>
+                  <p class="donation-status-msg" id="donationStatusMsg"></p>
+                  <div class="donation-status-meta" id="donationStatusMeta"></div>
+                  <div class="donation-status-actions" id="donationStatusActions">
+                    <button class="btn-retry-payment hidden" id="donationRetryBtn" type="button">
+                      <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                      <span>Retry Payment</span>
+                    </button>
+                    <button class="btn-retry-payment hidden" id="donationCheckStatusBtn" type="button">
+                      <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                      <span>Check Status Now</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Thank-You / Acknowledgment Section -->
             <div class="donate-acknowledgment-wrap">
               <button class="btn-acknowledge-payment" id="donationAcknowledgeBtn" type="button">
-                I've completed my payment
+                Check payment status
               </button>
               <div class="donation-thankyou-box hidden" id="donationThankYouBox">
                 <div class="thankyou-header">
                   <span class="thankyou-heart">💚</span>
-                  <h4>Thank you for supporting REA Music</h4>
+                  <h4 id="donationThankYouTitle">Payment Successfully Verified</h4>
                 </div>
-                <p class="thankyou-primary-text">
-                  "Thank you for supporting REA Music. If you completed a contribution, we truly appreciate it."
+                <p class="thankyou-primary-text" id="donationThankYouMsg">
+                  Thank you for supporting REA Music! Your contribution has been successfully verified. Your support helps us keep the music experience alive.
                 </p>
-                <p class="thankyou-disclaimer">
-                  Note: This is a user acknowledgment. Please check your UPI application's transaction history to confirm your payment details.
+                <p class="thankyou-disclaimer" id="donationThankYouMeta">
+                  Verified by the UPI Gateway. Thank you for keeping REA Music alive and ad-free.
                 </p>
+                <div class="donation-status-actions" style="margin-top:14px;">
+                  <button class="btn-donate-again" id="donationResetBtn" type="button">
+                    <span>Make another contribution</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -15774,7 +16019,7 @@ class REAMusicApp {
           const yNorm = (e.clientY / window.innerHeight) - 0.5;
           const moveX = xNorm * -10;
           const moveY = yNorm * -8;
-          bgImage.style.transform = `translate3d(${moveX}px, ${moveY}px, 0)`;
+          bgImage.style.transform = `scale(1.05) translate3d(${moveX}px, ${moveY}px, 0)`;
         });
       }, { passive: true });
     }
@@ -16265,6 +16510,21 @@ class REAMusicApp {
     this.donationAcknowledgeBtn = document.getElementById('donationAcknowledgeBtn');
     this.donationThankYouBox = document.getElementById('donationThankYouBox');
     this.settingsSupportBtn = document.getElementById('settingsSupportBtn');
+
+    // Dynamic Donation Gateway UI Elements
+    this.donationProcessingIndicator = document.getElementById('donationProcessingIndicator');
+    this.donationProcessingText = document.getElementById('donationProcessingText');
+    this.donationStatusCard = document.getElementById('donationStatusCard');
+    this.donationStatusTitle = document.getElementById('donationStatusTitle');
+    this.donationStatusBadge = document.getElementById('donationStatusBadge');
+    this.donationStatusMsg = document.getElementById('donationStatusMsg');
+    this.donationStatusMeta = document.getElementById('donationStatusMeta');
+    this.donationRetryBtn = document.getElementById('donationRetryBtn');
+    this.donationCheckStatusBtn = document.getElementById('donationCheckStatusBtn');
+    this.donationResetBtn = document.getElementById('donationResetBtn');
+    this.donationThankYouTitle = document.getElementById('donationThankYouTitle');
+    this.donationThankYouMsg = document.getElementById('donationThankYouMsg');
+    this.donationThankYouMeta = document.getElementById('donationThankYouMeta');
 
     // Unified Search View Elements
     this.searchBackBtn = document.getElementById('searchBackBtn');
@@ -18325,6 +18585,10 @@ class REAMusicApp {
       this.renderDownloads();
     } else if (viewName === 'donate') {
       this.initDonationPage();
+    }
+
+    if (viewName !== 'donate' && typeof this.stopDonationPolling === 'function') {
+      this.stopDonationPolling();
     }
   }
 
@@ -23733,7 +23997,122 @@ class REAMusicApp {
     return uri;
   }
 
-  executeUpiPayment() {
+  showDonationProcessing(text) {
+    if (this.donationProcessingIndicator) {
+      if (this.donationProcessingText) {
+        this.donationProcessingText.textContent = text || 'Connecting to payment service…';
+      }
+      this.donationProcessingIndicator.classList.remove('hidden');
+    }
+    if (this.donationStatusCard) {
+      this.donationStatusCard.classList.add('hidden');
+    }
+    if (this.donationAmountError) {
+      this.donationAmountError.classList.add('hidden');
+    }
+  }
+
+  hideDonationProcessing() {
+    if (this.donationProcessingIndicator) {
+      this.donationProcessingIndicator.classList.add('hidden');
+    }
+  }
+
+  showDonationStatus(status, title, message, meta, allowRetry = false, allowCheck = false) {
+    this.hideDonationProcessing();
+    if (!this.donationStatusCard) return;
+
+    this.donationStatusCard.classList.remove('status-pending', 'status-review', 'status-failed', 'status-expired');
+    const normStatus = status.includes('review') ? 'review' : status;
+    this.donationStatusCard.classList.add(`status-${normStatus}`);
+
+    if (this.donationStatusTitle) {
+      this.donationStatusTitle.textContent = title;
+    }
+
+    if (this.donationStatusBadge) {
+      this.donationStatusBadge.className = 'donation-status-badge';
+      this.donationStatusBadge.classList.add(`badge-${normStatus}`);
+      this.donationStatusBadge.textContent = status.replace('_', ' ').toUpperCase();
+    }
+
+    if (this.donationStatusMsg) {
+      this.donationStatusMsg.textContent = message;
+    }
+
+    if (this.donationStatusMeta) {
+      this.donationStatusMeta.textContent = meta || '';
+    }
+
+    if (this.donationRetryBtn) {
+      this.donationRetryBtn.classList.toggle('hidden', !allowRetry);
+    }
+
+    if (this.donationCheckStatusBtn) {
+      this.donationCheckStatusBtn.classList.toggle('hidden', !allowCheck);
+    }
+
+    this.donationStatusCard.classList.remove('hidden');
+    if (this.donationThankYouBox) this.donationThankYouBox.classList.add('hidden');
+  }
+
+  stopDonationPolling() {
+    if (this.donationPollTimer) {
+      clearInterval(this.donationPollTimer);
+      this.donationPollTimer = null;
+    }
+    this.donationPollCount = 0;
+  }
+
+  startDonationPolling(orderId) {
+    this.stopDonationPolling();
+    this.donationPollCount = 0;
+    this.donationPollTimer = setInterval(async () => {
+      this.donationPollCount += 1;
+      if (this.donationStatusMeta) {
+        this.donationStatusMeta.textContent = `Order reference: ${orderId} • Checking confirmation (${this.donationPollCount} of 10)...`;
+      }
+      await this.verifyDonationPayment(orderId, true);
+      if (this.donationPollCount >= 10) {
+        this.stopDonationPolling();
+        if (this.donationStatusMsg) {
+          this.donationStatusMsg.textContent = 'Payment is still pending. If you just approved in your UPI application, click Check Status Now.';
+        }
+      }
+    }, 4000);
+  }
+
+  resetDonationState() {
+    this.stopDonationPolling();
+    this.activeDonationOrderId = null;
+    this.isCreatingDonationOrder = false;
+
+    this.hideDonationProcessing();
+    if (this.donationStatusCard) this.donationStatusCard.classList.add('hidden');
+    if (this.donationThankYouBox) this.donationThankYouBox.classList.add('hidden');
+    if (this.donationAmountError) this.donationAmountError.classList.add('hidden');
+    if (this.donationAcknowledgeBtn) {
+      this.donationAcknowledgeBtn.classList.remove('hidden');
+      this.donationAcknowledgeBtn.disabled = false;
+      this.donationAcknowledgeBtn.textContent = 'Check payment status';
+    }
+
+    if (this.donationPayUpiBtn) {
+      this.donationPayUpiBtn.disabled = false;
+      const label = this.donationPayUpiBtn.querySelector('span');
+      if (label) label.textContent = 'Pay with UPI';
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.location && window.location.search) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (_) {}
+  }
+
+  async executeUpiPayment() {
+    if (this.isCreatingDonationOrder) return;
+
     const valResult = this.validateDonationAmount(this.selectedDonationAmount);
     if (!valResult.valid) {
       if (this.donationAmountError) {
@@ -23743,13 +24122,220 @@ class REAMusicApp {
       return;
     }
 
-    const upiUri = this.generateUpiUri(valResult.amount);
+    this.isCreatingDonationOrder = true;
+    this.stopDonationPolling();
+    if (this.donationThankYouBox) this.donationThankYouBox.classList.add('hidden');
+    if (this.donationStatusCard) this.donationStatusCard.classList.add('hidden');
+    if (this.donationAmountError) this.donationAmountError.classList.add('hidden');
+
+    if (this.donationPayUpiBtn) {
+      this.donationPayUpiBtn.disabled = true;
+      const label = this.donationPayUpiBtn.querySelector('span');
+      if (label) label.textContent = 'Creating secure checkout…';
+    }
+    this.showDonationProcessing('Creating secure checkout with UPI Gateway…');
 
     try {
-      window.location.href = upiUri;
+      const response = await fetch('/api/donation/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ amount: valResult.amount })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success || !result.paymentUrl || !result.orderId) {
+        throw new Error(result.error || 'Could not start secure checkout. Please try again.');
+      }
+
+      this.activeDonationOrderId = result.orderId;
+      try {
+        sessionStorage.setItem('reaDonationOrderId', result.orderId);
+        sessionStorage.setItem('reaDonationAmount', String(result.amount || valResult.amount));
+      } catch (_) {
+        // Session storage can be unavailable in strict privacy modes.
+      }
+
+      const paymentUrlStr = String(result.paymentUrl || '').trim();
+      let isSafeRedirect = false;
+      try {
+        const parsedUrl = new URL(paymentUrlStr);
+        const isLocal = parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1';
+        isSafeRedirect = parsedUrl.protocol === 'https:' || (isLocal && parsedUrl.protocol === 'http:');
+      } catch (_) {
+        isSafeRedirect = false;
+      }
+      if (!isSafeRedirect) {
+        throw new Error('Invalid payment gateway redirect address.');
+      }
+
+      this.showDonationProcessing('Redirecting to secure gateway checkout…');
+      window.location.assign(result.paymentUrl);
     } catch (err) {
-      console.warn('[REA Donate] Direct window.location navigation error:', err);
+      console.error('[REA Donate] Secure checkout error:', err);
+      this.isCreatingDonationOrder = false;
+      this.hideDonationProcessing();
+      if (this.donationAmountError) {
+        this.donationAmountError.textContent = err.message || 'Payment service is temporarily unavailable.';
+        this.donationAmountError.classList.remove('hidden');
+      }
+      if (this.donationPayUpiBtn) {
+        this.donationPayUpiBtn.disabled = false;
+        const label = this.donationPayUpiBtn.querySelector('span');
+        if (label) label.textContent = 'Pay with UPI';
+      }
     }
+  }
+
+  async verifyDonationPayment(orderId, isPolling = false) {
+    if (!orderId) return;
+    this.activeDonationOrderId = orderId;
+
+    if (!isPolling) {
+      this.showDonationProcessing('Verifying payment with UPI Gateway…');
+      if (this.donationAcknowledgeBtn) {
+        this.donationAcknowledgeBtn.disabled = true;
+        this.donationAcknowledgeBtn.textContent = 'Checking payment…';
+      }
+      if (this.donationCheckStatusBtn) {
+        this.donationCheckStatusBtn.disabled = true;
+        this.donationCheckStatusBtn.textContent = 'Checking…';
+      }
+    }
+
+    try {
+      const response = await fetch(`/api/donation/status/${encodeURIComponent(orderId)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Payment status could not be verified. Please try again.');
+      }
+
+      const status = String(result.status || '').toLowerCase();
+      this.hideDonationProcessing();
+
+      if (status === 'paid') {
+        this.stopDonationPolling();
+        try {
+          sessionStorage.removeItem('reaDonationOrderId');
+          sessionStorage.removeItem('reaDonationAmount');
+        } catch (_) {}
+
+        if (this.donationThankYouBox) {
+          const title = this.donationThankYouTitle || this.donationThankYouBox.querySelector('h4');
+          if (title) title.textContent = 'Payment Successfully Verified';
+
+          const message = this.donationThankYouMsg || this.donationThankYouBox.querySelector('.thankyou-primary-text');
+          if (message) {
+            message.textContent = 'Thank you for supporting REA Music! Your contribution has been successfully verified. Your support helps us keep the music experience alive.';
+          }
+
+          const disclaimer = this.donationThankYouMeta || this.donationThankYouBox.querySelector('.thankyou-disclaimer');
+          if (disclaimer) {
+            disclaimer.textContent = `Amount: ₹${Number(result.amount || 0).toLocaleString('en-IN')} • Order reference: ${result.orderId} • Verified by UPI Gateway on ${result.paidAt ? new Date(result.paidAt).toLocaleString('en-IN') : 'confirmation'}.`;
+          }
+
+          this.donationThankYouBox.classList.remove('hidden');
+        }
+
+        if (this.donationStatusCard) this.donationStatusCard.classList.add('hidden');
+        if (this.donationAmountError) this.donationAmountError.classList.add('hidden');
+        if (this.donationAcknowledgeBtn) this.donationAcknowledgeBtn.classList.add('hidden');
+      } else if (status === 'pending') {
+        this.showDonationStatus(
+          'pending',
+          'Payment Pending',
+          'Your payment is pending confirmation from your UPI app. Please approve the payment request in your UPI application.',
+          `Order reference: ${orderId}${result.amount ? ` • Amount: ₹${result.amount}` : ''}`,
+          false,
+          true
+        );
+        if (!isPolling && !this.donationPollTimer) {
+          this.startDonationPolling(orderId);
+        }
+      } else if (status === 'review' || status === 'under_review') {
+        this.stopDonationPolling();
+        this.showDonationStatus(
+          'review',
+          'Payment Under Review',
+          'Your payment reference is under review by the payment provider. We will update the status once verification is completed.',
+          `Order reference: ${orderId}${result.amount ? ` • Amount: ₹${result.amount}` : ''}`,
+          false,
+          true
+        );
+      } else if (status === 'expired') {
+        this.stopDonationPolling();
+        try { sessionStorage.removeItem('reaDonationOrderId'); } catch (_) {}
+        this.showDonationStatus(
+          'expired',
+          'Payment Link Expired',
+          'This payment link has expired. No funds were debited. Please create a new contribution.',
+          `Order reference: ${orderId}`,
+          true,
+          false
+        );
+      } else if (status === 'failed') {
+        this.stopDonationPolling();
+        try { sessionStorage.removeItem('reaDonationOrderId'); } catch (_) {}
+        this.showDonationStatus(
+          'failed',
+          'Payment Unsuccessful',
+          'The payment could not be completed or was cancelled. You can try again.',
+          `Order reference: ${orderId}`,
+          true,
+          false
+        );
+      } else {
+        this.stopDonationPolling();
+        this.showDonationStatus(
+          'unknown',
+          'Payment Status',
+          `Payment status: ${status}. Please check your UPI application.`,
+          `Order reference: ${orderId}`,
+          true,
+          true
+        );
+      }
+    } catch (err) {
+      if (!isPolling) {
+        this.hideDonationProcessing();
+        this.showDonationStatus(
+          'timeout',
+          'Verification Unavailable',
+          err.message || 'Payment verification is temporarily unavailable. If you already completed payment, please check back shortly.',
+          `Order reference: ${orderId}`,
+          true,
+          true
+        );
+      }
+    } finally {
+      this.isCreatingDonationOrder = false;
+      if (this.donationAcknowledgeBtn) {
+        this.donationAcknowledgeBtn.disabled = false;
+        this.donationAcknowledgeBtn.textContent = 'Check payment status';
+      }
+      if (this.donationCheckStatusBtn) {
+        this.donationCheckStatusBtn.disabled = false;
+        this.donationCheckStatusBtn.textContent = 'Check Status Now';
+      }
+    }
+  }
+
+  handleDonationReturn() {
+    let orderId = '';
+    try {
+      const params = new URLSearchParams(window.location.search);
+      orderId = params.get('order_id') || params.get('orderId') || sessionStorage.getItem('reaDonationOrderId') || '';
+      if (params.get('order_id') || params.get('orderId')) {
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    } catch (_) {}
+    if (!orderId) return;
+
+    this.switchView('donate');
+    this.verifyDonationPayment(orderId);
   }
 
   async copyUpiId() {
@@ -23916,11 +24502,46 @@ class REAMusicApp {
     }
 
     if (this.donationAcknowledgeBtn) {
+      this.donationAcknowledgeBtn.textContent = 'Check payment status';
       this.donationAcknowledgeBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (this.donationThankYouBox) {
-          this.donationThankYouBox.classList.toggle('hidden');
+        let orderId = this.activeDonationOrderId;
+        if (!orderId) {
+          try {
+            orderId = new URLSearchParams(window.location.search).get('order_id')
+              || sessionStorage.getItem('reaDonationOrderId') || '';
+          } catch (_) {}
         }
+        if (orderId) {
+          this.verifyDonationPayment(orderId);
+        } else if (this.donationAmountError) {
+          this.donationAmountError.textContent = 'No active gateway checkout found. Click "Pay with UPI" to start a verified contribution, or check your UPI application for manual transfers.';
+          this.donationAmountError.classList.remove('hidden');
+        }
+      });
+    }
+
+    if (this.donationRetryBtn) {
+      this.donationRetryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.resetDonationState();
+        this.executeUpiPayment();
+      });
+    }
+
+    if (this.donationCheckStatusBtn) {
+      this.donationCheckStatusBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (this.activeDonationOrderId) {
+          this.verifyDonationPayment(this.activeDonationOrderId);
+        }
+      });
+    }
+
+    if (this.donationResetBtn) {
+      this.donationResetBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.resetDonationState();
       });
     }
 
@@ -23932,6 +24553,8 @@ class REAMusicApp {
         }
       });
     }
+
+    this.handleDonationReturn();
   }
 }
 

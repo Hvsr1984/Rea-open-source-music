@@ -1,5 +1,6 @@
 import { decryptSaavnUrl } from './des.js';
 import { Readable } from 'node:stream';
+import crypto from 'node:crypto';
 
 /**
  * High-performance Bounded Cache with LRU eviction and TTL expiration.
@@ -45,6 +46,172 @@ class BoundedCache {
 }
 
 // Bounded in-memory caches with individual capacity limits and TTLs
+const DONATION_RATE_LIMITS = new Map();
+const RECENT_DONATION_ORDERS = new Map();
+
+function getClientIp(req) {
+  const vercelIp = req.headers['x-vercel-ip'];
+  const realIp = req.headers['x-real-ip'];
+  const cfIp = req.headers['cf-connecting-ip'];
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return vercelIp || realIp || cfIp || forwarded || req.socket?.remoteAddress || 'unknown';
+}
+
+function donationRequestAllowed(req, res, action, limit, windowMs) {
+  const ip = getClientIp(req);
+  const key = `${action}:${ip}`;
+  const now = Date.now();
+  const current = DONATION_RATE_LIMITS.get(key);
+  let count = 1;
+  let startedAt = now;
+
+  if (!current || now - current.startedAt >= windowMs) {
+    DONATION_RATE_LIMITS.set(key, { startedAt: now, count: 1 });
+  } else {
+    current.count += 1;
+    count = current.count;
+    startedAt = current.startedAt;
+  }
+
+  const remaining = Math.max(0, limit - count);
+  const resetSec = Math.ceil((startedAt + windowMs - now) / 1000);
+  if (res && typeof res.setHeader === 'function') {
+    res.setHeader('X-RateLimit-Limit', String(limit));
+    res.setHeader('X-RateLimit-Remaining', String(remaining));
+    res.setHeader('X-RateLimit-Reset', String(resetSec));
+  }
+
+  if (count > limit) {
+    if (res && typeof res.setHeader === 'function') {
+      res.setHeader('Retry-After', String(resetSec));
+    }
+    return false;
+  }
+
+  if (DONATION_RATE_LIMITS.size > 1000) {
+    for (const [entryKey, entry] of DONATION_RATE_LIMITS) {
+      if (now - entry.startedAt >= windowMs) DONATION_RATE_LIMITS.delete(entryKey);
+    }
+  }
+  return true;
+}
+
+function checkDuplicateOrder(req, amountStr) {
+  const ip = getClientIp(req);
+  const key = `${ip}:${amountStr}`;
+  const now = Date.now();
+  const lastTime = RECENT_DONATION_ORDERS.get(key);
+  if (lastTime && (now - lastTime) < 5000) {
+    return false; // Duplicate attempt within 5s
+  }
+  RECENT_DONATION_ORDERS.set(key, now);
+  if (RECENT_DONATION_ORDERS.size > 500) {
+    for (const [k, t] of RECENT_DONATION_ORDERS) {
+      if (now - t > 30000) RECENT_DONATION_ORDERS.delete(k);
+    }
+  }
+  return true;
+}
+
+function isSameOriginDonationRequest(req) {
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+  const candidate = origin || referer;
+  if (!candidate) return true;
+  try {
+    const candidateUrl = new URL(candidate);
+    const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    if (!forwardedHost) return true;
+    const originHost = candidateUrl.host.toLowerCase();
+    const targetHost = forwardedHost.toLowerCase();
+    if (originHost === targetHost) return true;
+    if ((candidateUrl.hostname === 'localhost' || candidateUrl.hostname === '127.0.0.1') &&
+        (targetHost.startsWith('localhost') || targetHost.startsWith('127.0.0.1'))) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function isValidGatewayPaymentUrl(paymentUrl, gatewayApiBase) {
+  if (!paymentUrl || typeof paymentUrl !== 'string') return false;
+  try {
+    const parsed = new URL(paymentUrl);
+    const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+    if (parsed.protocol !== 'https:' && (!isLocal || parsed.protocol !== 'http:')) {
+      return false;
+    }
+    if (gatewayApiBase) {
+      const baseParsed = new URL(gatewayApiBase);
+      if (parsed.hostname.toLowerCase() !== baseParsed.hostname.toLowerCase()) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validateDonationAmount(raw) {
+  if (raw === undefined || raw === null || raw === '') {
+    return { valid: false, error: 'Enter an amount between ₹1 and ₹1,00,000 with up to 2 decimal places.' };
+  }
+  let str = typeof raw === 'number' ? (Number.isFinite(raw) ? raw.toString() : '') : String(raw).trim();
+  if (!str || !/^\d+(\.\d+)?$/.test(str)) {
+    return { valid: false, error: 'Enter an amount between ₹1 and ₹1,00,000 with up to 2 decimal places.' };
+  }
+  const parts = str.split('.');
+  if (parts.length > 1 && parts[1].length > 2) {
+    return { valid: false, error: 'Enter an amount between ₹1 and ₹1,00,000 with up to 2 decimal places.' };
+  }
+  const whole = parseInt(parts[0], 10);
+  const frac = parts[1] ? parts[1].padEnd(2, '0') : '00';
+  if (isNaN(whole) || whole < 1 || whole > 100000 || (whole === 100000 && parseInt(frac, 10) > 0)) {
+    return { valid: false, error: 'Enter an amount between ₹1 and ₹1,00,000 with up to 2 decimal places.' };
+  }
+  const formatted = `${whole}.${frac}`;
+  return { valid: true, amountStr: formatted, numericAmount: parseFloat(formatted) };
+}
+
+async function parseJsonBody(req) {
+  if (req.body) {
+    if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+      return req.body;
+    }
+    if (typeof req.body === 'string') {
+      try { return JSON.parse(req.body); } catch { return null; }
+    }
+    if (Buffer.isBuffer(req.body)) {
+      try { return JSON.parse(req.body.toString('utf8')); } catch { return null; }
+    }
+  }
+  if (req.readableEnded) {
+    return {};
+  }
+  return new Promise((resolve) => {
+    let raw = '';
+    req.setEncoding?.('utf8');
+    req.on('data', chunk => {
+      raw += chunk;
+      if (raw.length > 16384) {
+        req.destroy();
+        resolve(null);
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on('error', () => resolve(null));
+  });
+}
+
 const CACHE = {
   trending: new BoundedCache(50, 600000),      // 10 minutes
   search: new BoundedCache(500, 900000),       // 15 minutes, high capacity
@@ -446,21 +613,41 @@ async function fetchGenreSongs(genreKey, page = 1) {
  * Universal API Handler: compatible with Vercel Serverless Functions and Node.js http.Server
  */
 export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    if (res.status) return res.status(200).end();
-    res.writeHead(200);
-    return res.end();
-  }
-
   const originalUrl = req.headers['x-forwarded-url'] || req.headers['x-matched-path'] || req.headers['x-invoke-path'] || req.url;
   const parsedUrl = new URL(originalUrl, `http://${req.headers.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;
   const pathParam = parsedUrl.searchParams.get('path') || '';
+
+  const isDonationRoute = pathname.startsWith('/api/donation') || pathParam.startsWith('donation');
+
+  // CORS and Cache headers: strict isolation for sensitive payment endpoints
+  if (isDonationRoute) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, X-Idempotency-Key');
+    if (req.headers.origin && isSameOriginDonationRequest(req)) {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+    }
+  } else {
+    // Open CORS headers for public music catalog and metadata APIs
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  if (req.method === 'OPTIONS') {
+    if (isDonationRoute && !isSameOriginDonationRequest(req)) {
+      res.removeHeader('Access-Control-Allow-Origin');
+      if (res.status) return res.status(403).end();
+      res.writeHead(403);
+      return res.end();
+    }
+    if (res.status) return res.status(200).end();
+    res.writeHead(200);
+    return res.end();
+  }
 
   const isSearch = pathname.endsWith('/search') || pathParam.startsWith('search');
   const isTrending = pathname.endsWith('/trending') || pathParam.startsWith('trending');
@@ -473,7 +660,7 @@ export default async function handler(req, res) {
   const isSong = pathname.endsWith('/song') || pathParam.startsWith('song');
 
   const sendJson = (statusCode, data, maxAge = 120) => {
-    if (statusCode === 200) {
+    if (statusCode === 200 && !String(res.getHeader?.('Cache-Control') || '').includes('no-store')) {
       res.setHeader('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge * 2}, stale-while-revalidate=86400`);
     }
     if (res.status && res.json) {
@@ -484,6 +671,177 @@ export default async function handler(req, res) {
   };
 
   try {
+    // Donation checkout: create an order server-side. Keep gateway credentials
+    // in Vercel environment variables; never expose them to the browser.
+    if (pathname === '/api/donation/create' || pathParam === 'donation/create') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      if (!isSameOriginDonationRequest(req)) {
+        res.removeHeader('Access-Control-Allow-Origin');
+        return sendJson(403, { error: 'Cross-origin donation requests are not allowed.' });
+      }
+      if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST');
+        return sendJson(405, { error: 'Method not allowed' });
+      }
+
+      const apiBase = (process.env.UPI_GATEWAY_URL || '').replace(/\/+$/, '');
+      const apiKey = process.env.UPI_GATEWAY_API_KEY || '';
+      const apiSecret = process.env.UPI_GATEWAY_API_SECRET || '';
+      if (!apiBase || !apiKey || !apiSecret) {
+        return sendJson(503, { error: 'Donation checkout is not configured yet.' });
+      }
+
+      const createLimit = parseInt(process.env.DONATION_RATE_LIMIT_CREATE || '30', 10);
+      if (!donationRequestAllowed(req, res, 'create', createLimit, 60000)) {
+        return sendJson(429, { error: 'Too many payment attempts. Please wait a minute and try again.' });
+      }
+
+      const body = await parseJsonBody(req);
+      if (!body || typeof body !== 'object') {
+        return sendJson(400, { error: 'Invalid request body.' });
+      }
+
+      const valResult = validateDonationAmount(body.amount);
+      if (!valResult.valid) {
+        return sendJson(422, { error: valResult.error });
+      }
+
+      if (!checkDuplicateOrder(req, valResult.amountStr)) {
+        return sendJson(429, { error: 'A payment order for this amount was recently initiated. Please wait a moment before trying again.' });
+      }
+
+      const clientOrderId = `REA-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`;
+      const gatewayTimeoutMs = parseInt(process.env.UPI_GATEWAY_TIMEOUT_MS || '10000', 10);
+      try {
+        const gatewayRes = await fetch(`${apiBase}/api/v1/orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Api-Key': apiKey,
+            'X-Api-Secret': apiSecret
+          },
+          body: JSON.stringify({
+            amount: valResult.amountStr,
+            client_order_id: clientOrderId,
+            note: 'REA Music voluntary support',
+            ...(process.env.UPI_GATEWAY_RETURN_URL ? { redirect_url: process.env.UPI_GATEWAY_RETURN_URL } : {})
+          }),
+          signal: AbortSignal.timeout(gatewayTimeoutMs)
+        });
+
+        if (gatewayRes.status === 401 || gatewayRes.status === 403) {
+          console.error('[REA Donation] Gateway authentication failed:', gatewayRes.status);
+          return sendJson(502, { error: 'Payment gateway authentication failed.' });
+        }
+
+        const payload = await gatewayRes.json().catch(() => ({}));
+        const order = payload?.data;
+        if (!gatewayRes.ok || !payload.success || !order?.payment_url || !order?.order_id || !isValidGatewayPaymentUrl(order.payment_url, apiBase)) {
+          console.error('[REA Donation] Gateway order creation failed or returned invalid payment URL:', gatewayRes.status);
+          return sendJson(502, { error: 'Unable to start payment right now. Please try again.' });
+        }
+
+        return sendJson(201, {
+          success: true,
+          orderId: order.order_id,
+          clientOrderId,
+          amount: order.amount,
+          paymentUrl: order.payment_url,
+          expiresAt: order.expires_at || null
+        });
+      } catch (error) {
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+          console.error('[REA Donation] Gateway request timed out');
+          return sendJson(504, { error: 'Payment gateway timed out. Please try again.' });
+        }
+        console.error('[REA Donation] Gateway request error:', error.message);
+        return sendJson(502, { error: 'Payment service is temporarily unavailable.' });
+      }
+    }
+
+    // Verify status server-to-server; a client redirect or acknowledgement is not proof.
+    if (pathname.startsWith('/api/donation/status/') || pathParam.startsWith('donation/status/')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      if (!isSameOriginDonationRequest(req)) {
+        res.removeHeader('Access-Control-Allow-Origin');
+        return sendJson(403, { error: 'Cross-origin donation requests are not allowed.' });
+      }
+      if (req.method !== 'GET') {
+        res.setHeader('Allow', 'GET');
+        return sendJson(405, { error: 'Method not allowed' });
+      }
+
+      const apiBase = (process.env.UPI_GATEWAY_URL || '').replace(/\/+$/, '');
+      const apiKey = process.env.UPI_GATEWAY_API_KEY || '';
+      const apiSecret = process.env.UPI_GATEWAY_API_SECRET || '';
+      if (!apiBase || !apiKey || !apiSecret) {
+        return sendJson(503, { error: 'Donation checkout is not configured yet.' });
+      }
+
+      const statusLimit = parseInt(process.env.DONATION_RATE_LIMIT_STATUS || '60', 10);
+      if (!donationRequestAllowed(req, res, 'status', statusLimit, 60000)) {
+        return sendJson(429, { error: 'Too many status checks. Please try again shortly.' });
+      }
+
+      const rawOrderId = pathname.startsWith('/api/donation/status/')
+        ? pathname.slice('/api/donation/status/'.length)
+        : pathParam.slice('donation/status/'.length);
+      const orderId = decodeURIComponent((rawOrderId || '').split('?')[0].replace(/\/+$/, ''));
+
+      if (!orderId || !/^[A-Za-z0-9_-]{4,100}$/.test(orderId)) {
+        return sendJson(400, { error: 'Invalid order reference.' });
+      }
+
+      const gatewayTimeoutMs = parseInt(process.env.UPI_GATEWAY_TIMEOUT_MS || '10000', 10);
+      try {
+        const gatewayRes = await fetch(`${apiBase}/api/v1/orders/${encodeURIComponent(orderId)}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-Api-Key': apiKey,
+            'X-Api-Secret': apiSecret
+          },
+          signal: AbortSignal.timeout(gatewayTimeoutMs)
+        });
+
+        if (gatewayRes.status === 401 || gatewayRes.status === 403) {
+          console.error('[REA Donation] Gateway authentication failed:', gatewayRes.status);
+          return sendJson(502, { error: 'Payment gateway authentication failed.' });
+        }
+        if (gatewayRes.status === 404) {
+          return sendJson(404, { error: 'Order not found.' });
+        }
+
+        const payload = await gatewayRes.json().catch(() => ({}));
+        if (!gatewayRes.ok || !payload.success || !payload.data) {
+          return sendJson(502, { error: 'Unable to verify this payment yet.' });
+        }
+
+        return sendJson(200, {
+          success: true,
+          orderId: payload.data.order_id,
+          clientOrderId: payload.data.client_order_id || null,
+          amount: payload.data.amount,
+          status: payload.data.status,
+          paidAt: payload.data.paid_at || null,
+          expiresAt: payload.data.expires_at || null
+        });
+      } catch (error) {
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+          console.error('[REA Donation] Gateway status request timed out');
+          return sendJson(504, { error: 'Payment verification timed out. Please try again.' });
+        }
+        console.error('[REA Donation] Gateway status error:', error.message);
+        return sendJson(502, { error: 'Payment verification is temporarily unavailable.' });
+      }
+    }
     // 0. Audio Download Proxy (attachment with memory-efficient stream piping)
     if (isDownload) {
       const audioUrl = parsedUrl.searchParams.get('url');

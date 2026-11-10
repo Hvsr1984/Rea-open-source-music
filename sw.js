@@ -69,7 +69,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // 2. CRITICAL: Never intercept or cache audio media streams, Range requests, or Saavn CDN media
+  // 2. CRITICAL: Never intercept or cache audio media streams, Range requests, Saavn CDN media, or sensitive Payment Gateway APIs
   if (
     url.hostname.includes('saavncdn') ||
     url.pathname.endsWith('.mp4') ||
@@ -77,9 +77,10 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.mp3') ||
     url.pathname.endsWith('.aac') ||
     url.pathname.startsWith('/api/download') ||
+    url.pathname.startsWith('/api/donation') ||
     request.headers.get('range')
   ) {
-    return; // Pass through directly to browser native streaming engine
+    return; // Pass through directly to browser native network engine
   }
 
   // 3. Stale-While-Revalidate for Catalog & Recommendations API endpoints (Instant 0ms UI load)
