@@ -225,18 +225,16 @@ body.theme-white {
   --max-bg: linear-gradient(160deg, #FFFFFF 0%, #F5F5F7 50%, #E8EAEF 100%);
 }
 
-body.theme-white .spatial-bg-wrapper {
+body.theme-white .spatial-bg-wrapper,
+body.theme-white .app-background-container {
   display: none;
 }
 
 body.theme-dark {
-  --bg-main: #000000;
-  --bg-gradient:
-    radial-gradient(circle at 15% 15%, rgba(28, 28, 34, 0.5) 0%, transparent 45%),
-    radial-gradient(circle at 85% 20%, rgba(20, 20, 26, 0.45) 0%, transparent 45%),
-    radial-gradient(circle at 80% 85%, rgba(24, 24, 30, 0.45) 0%, transparent 50%),
-    radial-gradient(circle at 20% 80%, rgba(18, 18, 24, 0.5) 0%, transparent 50%),
-    #000000;
+  --bg-main: transparent;
+  --bg-gradient: transparent;
+  background-color: transparent !important;
+  background-image: none !important;
 
   /* Apple Glassmorphism Tokens (Simple Black) */
   --glass-bg-nav: rgba(14, 14, 16, 0.78);
@@ -288,6 +286,10 @@ body.theme-dark {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+html {
+  background-color: #0c0a10;
 }
 
 html,
@@ -7114,55 +7116,87 @@ body.theme-dark .dl-track-quality {
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 1. Atmospheric Cinematic Background System */
-.spatial-bg-wrapper {
+/* 1. Atmospheric Cinematic Background System & Luxury Wallpaper Blur */
+.spatial-bg-wrapper,
+.app-background-container {
   position: fixed;
   inset: 0;
-  z-index: -10;
+  z-index: -2;
   overflow: hidden;
   pointer-events: none;
 }
 
-.spatial-bg-image {
-  position: absolute;
-  top: -24px;
-  left: -24px;
-  width: calc(100% + 48px);
-  height: calc(100% + 48px);
-  background-image: url("../assets/spatial_dusk_bg.jpg"), url("assets/spatial_dusk_bg.jpg");
+.spatial-bg-image,
+.app-background {
+  position: fixed;
+  inset: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  z-index: -2;
+  background-image: url("assets/spatial_dusk_bg.jpg");
+  background-image: url("/assets/spatial_dusk_bg.jpg");
   background-size: cover;
-  background-position: center 30%;
-  transform: translate3d(0, 0, 0);
-  will-change: transform;
+  background-position: center center;
+  background-repeat: no-repeat;
+  filter: blur(22px) brightness(0.65) saturate(0.85);
+  -webkit-filter: blur(22px) brightness(0.65) saturate(0.85);
+  transform: scale(1.05) translate3d(0, 0, 0);
+  -webkit-transform: scale(1.05) translate3d(0, 0, 0);
+  will-change: transform, filter;
+  pointer-events: none;
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.spatial-bg-gradient-overlay {
-  position: absolute;
+.spatial-bg-gradient-overlay,
+.app-background-overlay {
+  position: fixed;
   inset: 0;
-  background: linear-gradient(180deg, rgba(16, 12, 18, 0.18) 0%, rgba(14, 10, 16, 0.10) 45%, rgba(12, 8, 14, 0.32) 100%);
+  z-index: -1;
+  background: linear-gradient(
+    135deg,
+    rgba(12, 9, 15, 0.48),
+    rgba(25, 17, 24, 0.38),
+    rgba(10, 12, 22, 0.52)
+  );
+  pointer-events: none;
 }
 
 .spatial-bg-ambient-light {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: -1;
   background: 
     radial-gradient(circle at 75% 20%, rgba(255, 60, 90, 0.12) 0%, transparent 55%),
     radial-gradient(circle at 25% 75%, rgba(255, 130, 70, 0.08) 0%, transparent 50%);
   mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .spatial-bg-vignette {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: -1;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.40) 100%);
+  pointer-events: none;
+}
+
+/* Glass Panel Definition */
+.glass-panel {
+  background: rgba(29, 27, 39, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* 2. Desktop Spatial Layout (min-width: 769px) */
 @media (min-width: 769px) {
   body.theme-spatial,
   body.theme-dark {
-    background-color: #0c0a10 !important;
+    background-color: transparent !important;
+    background-image: none !important;
     color: #ffffff;
     overflow: hidden;
   }
@@ -8222,11 +8256,20 @@ body.theme-dark .dl-track-quality {
   }
 
   /* Safe viewport & layout bounds */
+  html {
+    background-color: #0c0a10;
+  }
   html,
   body {
     height: 100% !important;
     height: 100dvh !important;
     overflow: hidden !important;
+  }
+
+  body.theme-dark,
+  body.theme-spatial {
+    background-color: transparent !important;
+    background-image: none !important;
   }
 
   .sidebar-brand-header,
@@ -8237,14 +8280,15 @@ body.theme-dark .dl-track-quality {
     display: none !important;
   }
 
-  /* Disable expensive mix-blend-mode and parallax transforms on mobile */
+  /* Disable expensive mix-blend-mode and parallax transforms on mobile while preserving edge coverage */
   .spatial-bg-ambient-light {
     display: none !important;
   }
-  .spatial-bg-image {
+  .spatial-bg-image,
+  .app-background {
     transition: none !important;
     will-change: auto !important;
-    transform: none !important;
+    transform: scale(1.05) translate3d(0, 0, 0) !important;
   }
 
   /* 60/120fps Mobile Scroll Fluidity:
@@ -9112,6 +9156,7 @@ body.theme-white {
 }
 
 body.theme-white .spatial-bg-wrapper,
+body.theme-white .app-background-container,
 body.theme-white .spatial-aurora-orb {
   display: none !important;
 }
@@ -11894,9 +11939,9 @@ body.theme-white .btn-donate-again {
 </head>
 <body class="theme-dark">
   <!-- Spatial Atmospheric Cinematic Background Layer -->
-  <div class="spatial-bg-wrapper" id="spatialBgWrapper" aria-hidden="true">
-    <div class="spatial-bg-image" id="spatialBgImage"></div>
-    <div class="spatial-bg-gradient-overlay"></div>
+  <div class="spatial-bg-wrapper app-background-container" id="spatialBgWrapper" aria-hidden="true">
+    <div class="spatial-bg-image app-background" id="spatialBgImage"></div>
+    <div class="spatial-bg-gradient-overlay app-background-overlay"></div>
     <div class="spatial-bg-ambient-light"></div>
     <div class="spatial-bg-vignette"></div>
   </div>
@@ -15974,7 +16019,7 @@ class REAMusicApp {
           const yNorm = (e.clientY / window.innerHeight) - 0.5;
           const moveX = xNorm * -10;
           const moveY = yNorm * -8;
-          bgImage.style.transform = `translate3d(${moveX}px, ${moveY}px, 0)`;
+          bgImage.style.transform = `scale(1.05) translate3d(${moveX}px, ${moveY}px, 0)`;
         });
       }, { passive: true });
     }

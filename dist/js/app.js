@@ -1870,7 +1870,7 @@ class REAMusicApp {
           const yNorm = (e.clientY / window.innerHeight) - 0.5;
           const moveX = xNorm * -10;
           const moveY = yNorm * -8;
-          bgImage.style.transform = `translate3d(${moveX}px, ${moveY}px, 0)`;
+          bgImage.style.transform = `scale(1.05) translate3d(${moveX}px, ${moveY}px, 0)`;
         });
       }, { passive: true });
     }
