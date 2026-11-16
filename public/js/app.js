@@ -1621,6 +1621,88 @@ class HomeFeedService {
 // 3. Main REA Music UI & Application Controller
 // =============================================================================
 class REAMusicApp {
+
+  initMonolithGlass() {
+    // Dynamic greeting calculation
+    const hour = new Date().getHours();
+    let greeting = 'Good Evening,';
+    if (hour < 12) greeting = 'Good Morning,';
+    else if (hour < 17) greeting = 'Good Afternoon,';
+
+    const greetingTimeEl = document.getElementById('monolithGreetingTime');
+    if (greetingTimeEl) greetingTimeEl.textContent = greeting;
+
+    const greetingUserEl = document.getElementById('monolithGreetingUser');
+    if (greetingUserEl) {
+      const savedProfile = localStorage.getItem('rea_user_profile');
+      let userName = 'Harsh';
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          if (parsed && parsed.name) userName = parsed.name;
+        } catch (_) {}
+      }
+      greetingUserEl.textContent = userName;
+    }
+
+    // Hero Play Now action
+    const playNowBtn = document.getElementById('monolithPlayNowBtn');
+    if (playNowBtn) {
+      playNowBtn.addEventListener('click', () => {
+        this.playSearchTrack({
+          id: 'KGfDrbWe',
+          title: 'Tum Hi Ho',
+          artist: 'Arijit Singh',
+          album: 'Aashiqui 2',
+          cover: '/assets/images/card_tum_hi_ho.jpg',
+          duration: 262,
+          url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+        });
+      });
+    }
+
+    // Recently played card clicks
+    const recentCards = document.querySelectorAll('.monolith-album-card');
+    recentCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const title = card.getAttribute('data-title');
+        const artist = card.getAttribute('data-artist');
+        const id = card.getAttribute('data-id') || 'track_' + Math.random().toString(36).substring(2, 8);
+        const img = card.querySelector('img');
+        const cover = img ? img.src : '/assets/images/card_tum_hi_ho.jpg';
+        this.playSearchTrack({
+          id,
+          title,
+          artist,
+          album: title + ' - Single',
+          cover,
+          duration: 240,
+          url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+        });
+      });
+    });
+
+    // Made For You tile clicks
+    const mixTiles = document.querySelectorAll('.monolith-mix-card');
+    mixTiles.forEach(tile => {
+      tile.addEventListener('click', () => {
+        const mixName = tile.getAttribute('data-mix');
+        const titleEl = tile.querySelector('.monolith-mix-title');
+        const mixTitle = titleEl ? titleEl.textContent : 'Daily Mix';
+        this.playSearchTrack({
+          id: 'mix_' + mixName,
+          title: mixTitle,
+          artist: 'REA Music Curated',
+          album: 'Made For You',
+          cover: '/assets/images/tile_' + mixName.replace(/-/g, '_') + '.jpg',
+          duration: 300,
+          url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+        });
+      });
+    });
+  }
+
+
   constructor() {
     this.engine = new HybridAudioEngine();
 
@@ -1827,6 +1909,7 @@ class REAMusicApp {
     this.searchAbortController = null;
 
     this.initDOMElements();
+    this.initMonolithGlass();
     this.initTheme();
     this.initOfflineStorage();
     this.initCapacitorListeners();
