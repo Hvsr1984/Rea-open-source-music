@@ -7162,6 +7162,8 @@ body.theme-dark .dl-track-quality {
   z-index: -2;
   overflow: hidden;
   pointer-events: none;
+  filter: grayscale(1) brightness(0.88) contrast(1.1);
+  -webkit-filter: grayscale(1) brightness(0.88) contrast(1.1);
 }
 
 .spatial-bg-image,
@@ -7204,8 +7206,8 @@ body.theme-dark .dl-track-quality {
   inset: 0;
   z-index: -1;
   background: 
-    radial-gradient(circle at 75% 20%, rgba(255, 60, 90, 0.12) 0%, transparent 55%),
-    radial-gradient(circle at 25% 75%, rgba(255, 130, 70, 0.08) 0%, transparent 50%);
+    radial-gradient(circle at 75% 20%, rgba(255, 255, 255, 0.06) 0%, transparent 55%),
+    radial-gradient(circle at 25% 75%, rgba(200, 200, 220, 0.04) 0%, transparent 50%);
   mix-blend-mode: screen;
   pointer-events: none;
 }
@@ -13006,6 +13008,397 @@ body.theme-white .btn-donate-again {
   transform: scale(1.08);
 }
 
+/* ==========================================================================
+   REA MUSIC 2.0 — OBSIDIAN GLASS EXTENSIONS & POPUPS
+   ========================================================================== */
+
+/* Film Grain Overlay */
+.film-grain-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Notification Badge Dot */
+.notif-badge-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #FF5C5C;
+  box-shadow: 0 0 8px rgba(255, 92, 92, 0.8);
+  pointer-events: none;
+}
+
+/* Header Dropdowns */
+.header-dropdown {
+  position: fixed;
+  top: 68px;
+  right: 54px;
+  z-index: 1100;
+  background: rgba(18, 19, 22, 0.94);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.7);
+  animation: dropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.notif-dropdown {
+  width: 340px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.avatar-dropdown {
+  width: 220px;
+  padding: 12px;
+}
+
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dropdown-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFF;
+}
+
+.dropdown-action-btn {
+  font-size: 11px;
+  color: #B9F45B;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dropdown-action-btn:hover {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+.dropdown-list {
+  overflow-y: auto;
+  max-height: 340px;
+}
+
+.notif-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.notif-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.notif-item.unread {
+  background: rgba(185, 244, 91, 0.04);
+}
+
+.notif-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #FFF;
+  flex-shrink: 0;
+}
+
+.notif-avatar-lime {
+  background: rgba(185, 244, 91, 0.2);
+  color: #B9F45B;
+}
+
+.notif-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-text {
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0 0 4px 0;
+}
+
+.notif-time {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.avatar-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 10px 4px;
+}
+
+.avatar-badge-lime {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #B9F45B;
+  color: #080909;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.avatar-user-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFF;
+}
+
+.avatar-user-tier {
+  display: block;
+  font-size: 10px;
+  color: #B9F45B;
+}
+
+.avatar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.avatar-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFF;
+}
+
+.avatar-menu-item.item-danger:hover {
+  background: rgba(255, 70, 70, 0.15);
+  color: #FF6666;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 6px 0;
+}
+
+/* Search Filter Popover */
+.search-filter-popover {
+  position: fixed;
+  left: 230px;
+  top: 130px;
+  width: 260px;
+  background: rgba(18, 19, 22, 0.94);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  z-index: 1100;
+  padding: 14px;
+  animation: dropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.filter-popover-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #FFF;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.filter-group {
+  margin-bottom: 12px;
+}
+
+.filter-group-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 6px;
+}
+
+.filter-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-chip-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-chip-btn:hover {
+  border-color: rgba(185, 244, 91, 0.4);
+  color: #FFF;
+}
+
+.filter-chip-btn.active {
+  background: rgba(185, 244, 91, 0.16);
+  border-color: #B9F45B;
+  color: #B9F45B;
+  font-weight: 600;
+}
+
+/* Custom Context Menu */
+.custom-context-menu {
+  position: fixed;
+  z-index: 9999;
+  width: 220px;
+  background: rgba(18, 19, 22, 0.95);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.8);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  animation: dropdownIn 0.15s ease;
+}
+
+.context-track-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+}
+
+.context-track-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #222;
+}
+
+.context-track-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.context-track-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #FFF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.context-track-artist {
+  display: block;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.context-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFF;
+}
+
+/* Micro-animations */
+.monolith-brand:hover .monolith-logo-bars span:nth-child(1) { animation: eqDance 0.8s ease-in-out infinite alternate; }
+.monolith-brand:hover .monolith-logo-bars span:nth-child(2) { animation: eqDance 0.6s ease-in-out 0.2s infinite alternate; }
+.monolith-brand:hover .monolith-logo-bars span:nth-child(3) { animation: eqDance 0.9s ease-in-out 0.1s infinite alternate; }
+.monolith-brand:hover .monolith-logo-bars span:nth-child(4) { animation: eqDance 0.7s ease-in-out 0.3s infinite alternate; }
+
+@keyframes eqDance {
+  0% { height: 6px; }
+  100% { height: 18px; }
+}
+
+.radio-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #B9F45B;
+  margin-left: auto;
+  box-shadow: 0 0 6px rgba(185, 244, 91, 0.6);
+  animation: liveDotPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes liveDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 6px rgba(185, 244, 91, 0.8); }
+  50% { opacity: 0.5; transform: scale(0.85); box-shadow: 0 0 2px rgba(185, 244, 91, 0.3); }
+}
+
+.carousel-anim-in {
+  animation: heroSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes heroSlideIn {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
   </style>
 </head>
 <body class="theme-dark">
@@ -13013,6 +13406,7 @@ body.theme-white .btn-donate-again {
   <div class="spatial-bg-wrapper app-background-container" id="spatialBgWrapper" aria-hidden="true">
     <div class="spatial-bg-image app-background" id="spatialBgImage"></div>
     <div class="spatial-bg-gradient-overlay app-background-overlay"></div>
+    <div class="film-grain-overlay" aria-hidden="true"></div>
     <div class="spatial-bg-ambient-light"></div>
     <div class="spatial-bg-vignette"></div>
   </div>
@@ -13034,6 +13428,7 @@ body.theme-white .btn-donate-again {
 
     <div class="nav-right">
       <button class="monolith-header-btn notif-btn" id="notifBtn" aria-label="Notifications" title="Notifications">
+        <span class="notif-badge-dot" id="notifBadgeDot"></span>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       </button>
       <button class="monolith-header-btn settings-btn" id="settingsBtn" aria-label="Settings" title="Settings" onclick="if(window.reamusic&&window.reamusic.openSettingsModal){window.reamusic.openSettingsModal();}else{const m=document.getElementById('settingsModal');if(m){m.classList.remove('hidden');m.style.display='flex';}}">
@@ -13041,6 +13436,62 @@ body.theme-white .btn-donate-again {
       </button>
       <div class="user-avatar monolith-user-avatar" id="userAvatar" title="Active Profile">
         <span>R</span>
+      </div>
+    
+      <!-- Notifications Dropdown -->
+      <div class="header-dropdown notif-dropdown hidden" id="notifDropdown">
+        <div class="dropdown-header">
+          <span class="dropdown-title">Notifications</span>
+          <button class="dropdown-action-btn" id="markAllReadBtn">Mark all read</button>
+        </div>
+        <div class="dropdown-list" id="notifList">
+          <div class="notif-item unread">
+            <div class="notif-avatar notif-avatar-lime">♪</div>
+            <div class="notif-content">
+              <p class="notif-text"><strong>Arijit Singh</strong> released a new single: <em>Ruaan (Acoustic)</em></p>
+              <span class="notif-time">2 hours ago</span>
+            </div>
+          </div>
+          <div class="notif-item unread">
+            <div class="notif-avatar notif-avatar-lime">✦</div>
+            <div class="notif-content">
+              <p class="notif-text">Your <strong>Daily Mix 1</strong> has been updated with fresh tracks</p>
+              <span class="notif-time">Today</span>
+            </div>
+          </div>
+          <div class="notif-item">
+            <div class="notif-avatar">★</div>
+            <div class="notif-content">
+              <p class="notif-text">Welcome to <strong>REA Music 2.0</strong> — Monolith Glass edition</p>
+              <span class="notif-time">Yesterday</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Avatar Dropdown -->
+      <div class="header-dropdown avatar-dropdown hidden" id="avatarDropdown">
+        <div class="avatar-profile-header">
+          <div class="avatar-badge-lime" id="avatarDropdownBadge">R</div>
+          <div class="avatar-user-info">
+            <span class="avatar-user-name" id="avatarDropdownName">Harsh</span>
+            <span class="avatar-user-tier">Premium Listener</span>
+          </div>
+        </div>
+        <div class="dropdown-divider"></div>
+        <button class="avatar-menu-item" id="menuItemProfile">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>Profile</span>
+        </button>
+        <button class="avatar-menu-item" id="menuItemSettings">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </button>
+        <div class="dropdown-divider"></div>
+        <button class="avatar-menu-item item-danger" id="menuItemLogout">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Reset Session</span>
+        </button>
       </div>
     </div>
   </header>
@@ -15356,6 +15807,98 @@ body.theme-white .btn-donate-again {
     </footer>
   </div>
 
+  <!-- Search Filter Popover -->
+  <div class="search-filter-popover hidden" id="searchFilterPopover">
+    <div class="filter-popover-title">Filter Search</div>
+    <div class="filter-group">
+      <span class="filter-group-label">TYPE</span>
+      <div class="filter-chips-row">
+        <button class="filter-chip-btn active" data-filter-type="all">All</button>
+        <button class="filter-chip-btn" data-filter-type="song">Songs</button>
+        <button class="filter-chip-btn" data-filter-type="artist">Artists</button>
+        <button class="filter-chip-btn" data-filter-type="album">Albums</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-group-label">LANGUAGE</span>
+      <div class="filter-chips-row">
+        <button class="filter-chip-btn active" data-filter-lang="all">Any</button>
+        <button class="filter-chip-btn" data-filter-lang="hindi">Hindi</button>
+        <button class="filter-chip-btn" data-filter-lang="punjabi">Punjabi</button>
+        <button class="filter-chip-btn" data-filter-lang="english">English</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-group-label">SORT BY</span>
+      <div class="filter-chips-row">
+        <button class="filter-chip-btn active" data-filter-sort="relevance">Relevance</button>
+        <button class="filter-chip-btn" data-filter-sort="popularity">Popularity</button>
+        <button class="filter-chip-btn" data-filter-sort="latest">Latest</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Track Context Menu -->
+  <div class="custom-context-menu hidden" id="trackContextMenu">
+    <div class="context-track-header">
+      <img src="" alt="" class="context-track-thumb" id="contextThumb">
+      <div class="context-track-info">
+        <span class="context-track-title" id="contextTitle">Song Title</span>
+        <span class="context-track-artist" id="contextArtist">Artist</span>
+      </div>
+    </div>
+    <div class="dropdown-divider"></div>
+    <button class="context-item" data-action="play-next">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+      <span>Play Next</span>
+    </button>
+    <button class="context-item" data-action="add-queue">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>Add to Queue</span>
+    </button>
+    <button class="context-item" data-action="add-playlist">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/></svg>
+      <span>Add to Playlist</span>
+    </button>
+    <button class="context-item" data-action="toggle-like">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      <span>Save to Liked Songs</span>
+    </button>
+    <div class="dropdown-divider"></div>
+    <button class="context-item" data-action="go-artist">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Go to Artist</span>
+    </button>
+    <button class="context-item" data-action="go-album">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Go to Album</span>
+    </button>
+    <button class="context-item" data-action="share">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      <span>Share Track</span>
+    </button>
+    <button class="context-item" data-action="download">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>Download Offline</span>
+    </button>
+  </div>
+
+  <!-- Hero More Options Menu -->
+  <div class="custom-context-menu hidden" id="heroMoreMenu">
+    <button class="context-item" data-action="hero-go-artist">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Go to Artist Profile</span>
+    </button>
+    <button class="context-item" data-action="hero-queue-all">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>Add All Top Tracks to Queue</span>
+    </button>
+    <button class="context-item" data-action="hero-share">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      <span>Share Artist</span>
+    </button>
+  </div>
+  
   <script id="rea-embedded-script">
 // REA Music Engine v2.4.1
 if (window.__REA_INITIALIZED__) {
@@ -17184,12 +17727,20 @@ class REAMusicApp {
 
     updateHeroArtist(0);
 
-    // Carousel Navigation Controls
+    // Carousel Navigation Controls & Auto-Rotation (8s interval, pauses on hover/focus)
+    const resetHeroTimer = () => {
+      if (this.heroCarouselTimer) clearInterval(this.heroCarouselTimer);
+      this.heroCarouselTimer = setInterval(() => {
+        updateHeroArtist(this.currentHeroIndex + 1);
+      }, 8000);
+    };
+
     const prevBtn = document.getElementById('monolithHeroPrev');
     if (prevBtn) {
       prevBtn.onclick = (e) => {
         e.preventDefault();
         updateHeroArtist(this.currentHeroIndex - 1);
+        resetHeroTimer();
       };
     }
     const nextBtn = document.getElementById('monolithHeroNext');
@@ -17197,8 +17748,218 @@ class REAMusicApp {
       nextBtn.onclick = (e) => {
         e.preventDefault();
         updateHeroArtist(this.currentHeroIndex + 1);
+        resetHeroTimer();
       };
     }
+
+    const heroBanner = document.querySelector('.monolith-hero-banner');
+    if (heroBanner) {
+      heroBanner.addEventListener('mouseenter', () => {
+        if (this.heroCarouselTimer) clearInterval(this.heroCarouselTimer);
+      });
+      heroBanner.addEventListener('mouseleave', () => resetHeroTimer());
+      heroBanner.addEventListener('focusin', () => {
+        if (this.heroCarouselTimer) clearInterval(this.heroCarouselTimer);
+      });
+      heroBanner.addEventListener('focusout', () => resetHeroTimer());
+    }
+    resetHeroTimer();
+
+    // Hero More Options Menu
+    const heroMoreBtn = document.getElementById('monolithMoreBtn');
+    const heroMoreMenu = document.getElementById('heroMoreMenu');
+    if (heroMoreBtn && heroMoreMenu) {
+      heroMoreBtn.onclick = (e) => {
+        e.stopPropagation();
+        const rect = heroMoreBtn.getBoundingClientRect();
+        heroMoreMenu.style.top = (rect.bottom + 8) + 'px';
+        heroMoreMenu.style.left = rect.left + 'px';
+        heroMoreMenu.classList.toggle('hidden');
+      };
+
+      heroMoreMenu.querySelectorAll('.context-item').forEach(item => {
+        item.onclick = (e) => {
+          e.stopPropagation();
+          heroMoreMenu.classList.add('hidden');
+          const action = item.getAttribute('data-action');
+          const artist = this.heroArtists[this.currentHeroIndex];
+          if (!artist) return;
+
+          if (action === 'hero-go-artist') {
+            this.openArtistView(artist.id, artist.name);
+          } else if (action === 'hero-queue-all') {
+            const playNowBtn = document.getElementById('monolithPlayNowBtn');
+            if (playNowBtn) playNowBtn.click();
+            if (typeof this.showToast === 'function') this.showToast(`Queued all top tracks for ${artist.name}`);
+          } else if (action === 'hero-share') {
+            const shareUrl = window.location.origin + '/#artist/' + artist.id;
+            navigator.clipboard?.writeText(shareUrl);
+            if (typeof this.showToast === 'function') this.showToast(`Copied share link for ${artist.name}`);
+          }
+        };
+      });
+    }
+
+    // Top Bar Notification Dropdown
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    const notifBadgeDot = document.getElementById('notifBadgeDot');
+    const markAllReadBtn = document.getElementById('markAllReadBtn');
+    if (notifBtn && notifDropdown) {
+      notifBtn.onclick = (e) => {
+        e.stopPropagation();
+        const avatarDropdown = document.getElementById('avatarDropdown');
+        if (avatarDropdown) avatarDropdown.classList.add('hidden');
+        notifDropdown.classList.toggle('hidden');
+      };
+      if (markAllReadBtn) {
+        markAllReadBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (notifBadgeDot) notifBadgeDot.style.display = 'none';
+          notifDropdown.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+          if (typeof this.showToast === 'function') this.showToast('All notifications marked as read');
+        };
+      }
+    }
+
+    // Top Bar Avatar Dropdown
+    const userAvatar = document.getElementById('userAvatar');
+    const avatarDropdown = document.getElementById('avatarDropdown');
+    if (userAvatar && avatarDropdown) {
+      userAvatar.onclick = (e) => {
+        e.stopPropagation();
+        if (notifDropdown) notifDropdown.classList.add('hidden');
+        avatarDropdown.classList.toggle('hidden');
+      };
+      const profileItem = document.getElementById('menuItemProfile');
+      if (profileItem) {
+        profileItem.onclick = () => {
+          avatarDropdown.classList.add('hidden');
+          this.switchView('library');
+          if (typeof this.showToast === 'function') this.showToast('Opened Profile & Library');
+        };
+      }
+      const settingsItem = document.getElementById('menuItemSettings');
+      if (settingsItem) {
+        settingsItem.onclick = () => {
+          avatarDropdown.classList.add('hidden');
+          const settingsModal = document.getElementById('settingsModal');
+          if (settingsModal) settingsModal.classList.remove('hidden');
+        };
+      }
+      const logoutItem = document.getElementById('menuItemLogout');
+      if (logoutItem) {
+        logoutItem.onclick = () => {
+          avatarDropdown.classList.add('hidden');
+          if (confirm('Reset session preferences and reload?')) {
+            localStorage.removeItem('rea_user_profile');
+            localStorage.removeItem('rea_history');
+            window.location.reload();
+          }
+        };
+      }
+    }
+
+    // Search Filter Popover
+    const filterBtn = document.getElementById('sidebarSearchFilterBtn');
+    const filterPopover = document.getElementById('searchFilterPopover');
+    if (filterBtn && filterPopover) {
+      filterBtn.onclick = (e) => {
+        e.stopPropagation();
+        const rect = filterBtn.getBoundingClientRect();
+        filterPopover.style.top = (rect.bottom + 8) + 'px';
+        filterPopover.style.left = Math.max(10, rect.left - 180) + 'px';
+        filterPopover.classList.toggle('hidden');
+      };
+      filterPopover.querySelectorAll('.filter-chip-btn').forEach(chip => {
+        chip.onclick = (e) => {
+          e.stopPropagation();
+          const parentRow = chip.parentElement;
+          parentRow.querySelectorAll('.filter-chip-btn').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          const searchInput = document.getElementById('sidebarSearchInput') || document.getElementById('searchInput');
+          if (searchInput && searchInput.value.trim()) {
+            this.handleSearch(searchInput.value.trim());
+          }
+        };
+      });
+    }
+
+    // Global Track Context Menu
+    const trackContextMenu = document.getElementById('trackContextMenu');
+    this.openMonolithTrackContextMenu = (e, track) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!trackContextMenu || !track) return;
+      this.selectedContextMenuTrack = track;
+
+      const thumb = document.getElementById('contextThumb');
+      const title = document.getElementById('contextTitle');
+      const artist = document.getElementById('contextArtist');
+      if (thumb) thumb.src = track.cover || '/assets/images/card_tum_hi_ho.jpg';
+      if (title) title.textContent = track.title || 'Unknown Title';
+      if (artist) artist.textContent = track.artist || 'Unknown Artist';
+
+      let x = e.clientX || 100;
+      let y = e.clientY || 100;
+      if (x + 230 > window.innerWidth) x = window.innerWidth - 240;
+      if (y + 320 > window.innerHeight) y = window.innerHeight - 330;
+
+      trackContextMenu.style.left = x + 'px';
+      trackContextMenu.style.top = y + 'px';
+      trackContextMenu.classList.remove('hidden');
+    };
+
+    if (trackContextMenu) {
+      trackContextMenu.querySelectorAll('.context-item').forEach(item => {
+        item.onclick = (e) => {
+          e.stopPropagation();
+          const action = item.getAttribute('data-action');
+          const track = this.selectedContextMenuTrack;
+          trackContextMenu.classList.add('hidden');
+          if (!track) return;
+
+          if (action === 'play-next') {
+            this.addToPlayNext(track);
+          } else if (action === 'add-queue') {
+            this.addToManualQueue(track);
+          } else if (action === 'add-playlist') {
+            this.openAddToPlaylistModal(track);
+          } else if (action === 'toggle-like') {
+            this.toggleLikeTrack(track);
+          } else if (action === 'go-artist') {
+            this.openArtistView(track.artistId || '', track.artist);
+          } else if (action === 'go-album') {
+            this.openAlbumView(track.albumId || '', track.album || track.title);
+          } else if (action === 'share') {
+            const url = window.location.origin + '/#track/' + (track.id || '');
+            navigator.clipboard?.writeText(url);
+            if (typeof this.showToast === 'function') this.showToast('Copied track link to clipboard');
+          } else if (action === 'download') {
+            this.downloadTrack(track, true);
+          }
+        };
+      });
+    }
+
+    // Global Click-Outside dismisser for all dropdowns & popovers
+    document.addEventListener('click', (e) => {
+      if (notifDropdown && !notifDropdown.contains(e.target) && e.target !== notifBtn && !notifBtn?.contains(e.target)) {
+        notifDropdown.classList.add('hidden');
+      }
+      if (avatarDropdown && !avatarDropdown.contains(e.target) && e.target !== userAvatar && !userAvatar?.contains(e.target)) {
+        avatarDropdown.classList.add('hidden');
+      }
+      if (filterPopover && !filterPopover.contains(e.target) && e.target !== filterBtn && !filterBtn?.contains(e.target)) {
+        filterPopover.classList.add('hidden');
+      }
+      if (heroMoreMenu && !heroMoreMenu.contains(e.target) && e.target !== heroMoreBtn && !heroMoreBtn?.contains(e.target)) {
+        heroMoreMenu.classList.add('hidden');
+      }
+      if (trackContextMenu && !trackContextMenu.contains(e.target)) {
+        trackContextMenu.classList.add('hidden');
+      }
+    });
 
     // Play Now Button — Plays current artist's top hit & queues discography
     const playNowBtn = document.getElementById('monolithPlayNowBtn');
@@ -17297,6 +18058,18 @@ class REAMusicApp {
           </div>
           <span class="monolith-album-title" title="${track.title}">${track.title}</span>
         `;
+
+        card.addEventListener('contextmenu', (e) => {
+          this.openMonolithTrackContextMenu(e, {
+            id: track.id || 'track_' + Math.random().toString(36).substring(2, 8),
+            title: track.title,
+            artist: track.artist,
+            album: track.album || track.title + ' - Single',
+            cover: track.cover || '/assets/images/card_tum_hi_ho.jpg',
+            duration: track.duration || 240,
+            url: track.url || 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+          });
+        });
 
         card.addEventListener('click', () => {
           this.playSearchTrack({
@@ -19823,18 +20596,71 @@ class REAMusicApp {
     document.addEventListener('keydown', (e) => {
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
       const isInput = activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.isContentEditable;
-      if (e.code === 'Space' && !isInput) {
+      
+      if (e.key === 'Escape') {
+        if (this.isPlayerMaximized) this.minimizePlayer();
+        const nd = document.getElementById('notifDropdown'); if (nd) nd.classList.add('hidden');
+        const ad = document.getElementById('avatarDropdown'); if (ad) ad.classList.add('hidden');
+        const fp = document.getElementById('searchFilterPopover'); if (fp) fp.classList.add('hidden');
+        const hm = document.getElementById('heroMoreMenu'); if (hm) hm.classList.add('hidden');
+        const tc = document.getElementById('trackContextMenu'); if (tc) tc.classList.add('hidden');
+        return;
+      }
+
+      if (isInput) return;
+
+      if (e.code === 'Space') {
         e.preventDefault();
         this.togglePlayPause();
-      } else if (e.key === 'Escape' && this.isPlayerMaximized) {
-        this.minimizePlayer();
-      } else if ((e.key === 'f' || e.key === 'F') && !isInput) {
+      } else if (e.key === 'ArrowRight' && !e.shiftKey) {
         e.preventDefault();
-        this.toggleMaximizePlayer();
-      } else if ((e.key === 'j' || e.key === 'J') && !isInput) {
+        if (this.engine) this.engine.seek((this.engine.currentTime || 0) + 5);
+      } else if (e.key === 'ArrowLeft' && !e.shiftKey) {
+        e.preventDefault();
+        if (this.engine) this.engine.seek(Math.max(0, (this.engine.currentTime || 0) - 5));
+      } else if (e.key === 'ArrowRight' && e.shiftKey) {
+        e.preventDefault();
+        this.advanceTrack('manual');
+      } else if (e.key === 'ArrowLeft' && e.shiftKey) {
         e.preventDefault();
         this.prevTrack();
-      } else if ((e.key === 'k' || e.key === 'K') && !isInput) {
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (this.engine) {
+          const newVol = Math.min(1, (this.engine.volume || 1) + 0.1);
+          this.engine.setVolume(newVol);
+          if (this.volumeSlider) this.volumeSlider.value = Math.round(newVol * 100);
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (this.engine) {
+          const newVol = Math.max(0, (this.engine.volume || 1) - 0.1);
+          this.engine.setVolume(newVol);
+          if (this.volumeSlider) this.volumeSlider.value = Math.round(newVol * 100);
+        }
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        this.toggleMute();
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        if (this.currentTrack) this.toggleLikeTrack(this.currentTrack);
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        this.toggleShuffle();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        this.cycleRepeatMode();
+      } else if (e.key === '/') {
+        e.preventDefault();
+        const searchInput = document.getElementById('sidebarSearchInput') || document.getElementById('searchInput');
+        if (searchInput) searchInput.focus();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        this.toggleMaximizePlayer();
+      } else if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        this.prevTrack();
+      } else if (e.key === 'k' || e.key === 'K') {
         e.preventDefault();
         this.advanceTrack('manual');
       }

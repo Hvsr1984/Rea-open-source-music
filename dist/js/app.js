@@ -1825,12 +1825,20 @@ class REAMusicApp {
 
     updateHeroArtist(0);
 
-    // Carousel Navigation Controls
+    // Carousel Navigation Controls & Auto-Rotation (8s interval, pauses on hover/focus)
+    const resetHeroTimer = () => {
+      if (this.heroCarouselTimer) clearInterval(this.heroCarouselTimer);
+      this.heroCarouselTimer = setInterval(() => {
+        updateHeroArtist(this.currentHeroIndex + 1);
+      }, 8000);
+    };
+
     const prevBtn = document.getElementById('monolithHeroPrev');
     if (prevBtn) {
       prevBtn.onclick = (e) => {
         e.preventDefault();
         updateHeroArtist(this.currentHeroIndex - 1);
+        resetHeroTimer();
       };
     }
     const nextBtn = document.getElementById('monolithHeroNext');
@@ -1838,8 +1846,218 @@ class REAMusicApp {
       nextBtn.onclick = (e) => {
         e.preventDefault();
         updateHeroArtist(this.currentHeroIndex + 1);
+        resetHeroTimer();
       };
     }
+
+    const heroBanner = document.querySelector('.monolith-hero-banner');
+    if (heroBanner) {
+      heroBanner.addEventListener('mouseenter', () => {
+        if (this.heroCarouselTimer) clearInterval(this.heroCarouselTimer);
+      });
+      heroBanner.addEventListener('mouseleave', () => resetHeroTimer());
+      heroBanner.addEventListener('focusin', () => {
+        if (this.heroCarouselTimer) clearInterval(this.heroCarouselTimer);
+      });
+      heroBanner.addEventListener('focusout', () => resetHeroTimer());
+    }
+    resetHeroTimer();
+
+    // Hero More Options Menu
+    const heroMoreBtn = document.getElementById('monolithMoreBtn');
+    const heroMoreMenu = document.getElementById('heroMoreMenu');
+    if (heroMoreBtn && heroMoreMenu) {
+      heroMoreBtn.onclick = (e) => {
+        e.stopPropagation();
+        const rect = heroMoreBtn.getBoundingClientRect();
+        heroMoreMenu.style.top = (rect.bottom + 8) + 'px';
+        heroMoreMenu.style.left = rect.left + 'px';
+        heroMoreMenu.classList.toggle('hidden');
+      };
+
+      heroMoreMenu.querySelectorAll('.context-item').forEach(item => {
+        item.onclick = (e) => {
+          e.stopPropagation();
+          heroMoreMenu.classList.add('hidden');
+          const action = item.getAttribute('data-action');
+          const artist = this.heroArtists[this.currentHeroIndex];
+          if (!artist) return;
+
+          if (action === 'hero-go-artist') {
+            this.openArtistView(artist.id, artist.name);
+          } else if (action === 'hero-queue-all') {
+            const playNowBtn = document.getElementById('monolithPlayNowBtn');
+            if (playNowBtn) playNowBtn.click();
+            if (typeof this.showToast === 'function') this.showToast(`Queued all top tracks for ${artist.name}`);
+          } else if (action === 'hero-share') {
+            const shareUrl = window.location.origin + '/#artist/' + artist.id;
+            navigator.clipboard?.writeText(shareUrl);
+            if (typeof this.showToast === 'function') this.showToast(`Copied share link for ${artist.name}`);
+          }
+        };
+      });
+    }
+
+    // Top Bar Notification Dropdown
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    const notifBadgeDot = document.getElementById('notifBadgeDot');
+    const markAllReadBtn = document.getElementById('markAllReadBtn');
+    if (notifBtn && notifDropdown) {
+      notifBtn.onclick = (e) => {
+        e.stopPropagation();
+        const avatarDropdown = document.getElementById('avatarDropdown');
+        if (avatarDropdown) avatarDropdown.classList.add('hidden');
+        notifDropdown.classList.toggle('hidden');
+      };
+      if (markAllReadBtn) {
+        markAllReadBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (notifBadgeDot) notifBadgeDot.style.display = 'none';
+          notifDropdown.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+          if (typeof this.showToast === 'function') this.showToast('All notifications marked as read');
+        };
+      }
+    }
+
+    // Top Bar Avatar Dropdown
+    const userAvatar = document.getElementById('userAvatar');
+    const avatarDropdown = document.getElementById('avatarDropdown');
+    if (userAvatar && avatarDropdown) {
+      userAvatar.onclick = (e) => {
+        e.stopPropagation();
+        if (notifDropdown) notifDropdown.classList.add('hidden');
+        avatarDropdown.classList.toggle('hidden');
+      };
+      const profileItem = document.getElementById('menuItemProfile');
+      if (profileItem) {
+        profileItem.onclick = () => {
+          avatarDropdown.classList.add('hidden');
+          this.switchView('library');
+          if (typeof this.showToast === 'function') this.showToast('Opened Profile & Library');
+        };
+      }
+      const settingsItem = document.getElementById('menuItemSettings');
+      if (settingsItem) {
+        settingsItem.onclick = () => {
+          avatarDropdown.classList.add('hidden');
+          const settingsModal = document.getElementById('settingsModal');
+          if (settingsModal) settingsModal.classList.remove('hidden');
+        };
+      }
+      const logoutItem = document.getElementById('menuItemLogout');
+      if (logoutItem) {
+        logoutItem.onclick = () => {
+          avatarDropdown.classList.add('hidden');
+          if (confirm('Reset session preferences and reload?')) {
+            localStorage.removeItem('rea_user_profile');
+            localStorage.removeItem('rea_history');
+            window.location.reload();
+          }
+        };
+      }
+    }
+
+    // Search Filter Popover
+    const filterBtn = document.getElementById('sidebarSearchFilterBtn');
+    const filterPopover = document.getElementById('searchFilterPopover');
+    if (filterBtn && filterPopover) {
+      filterBtn.onclick = (e) => {
+        e.stopPropagation();
+        const rect = filterBtn.getBoundingClientRect();
+        filterPopover.style.top = (rect.bottom + 8) + 'px';
+        filterPopover.style.left = Math.max(10, rect.left - 180) + 'px';
+        filterPopover.classList.toggle('hidden');
+      };
+      filterPopover.querySelectorAll('.filter-chip-btn').forEach(chip => {
+        chip.onclick = (e) => {
+          e.stopPropagation();
+          const parentRow = chip.parentElement;
+          parentRow.querySelectorAll('.filter-chip-btn').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          const searchInput = document.getElementById('sidebarSearchInput') || document.getElementById('searchInput');
+          if (searchInput && searchInput.value.trim()) {
+            this.handleSearch(searchInput.value.trim());
+          }
+        };
+      });
+    }
+
+    // Global Track Context Menu
+    const trackContextMenu = document.getElementById('trackContextMenu');
+    this.openMonolithTrackContextMenu = (e, track) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!trackContextMenu || !track) return;
+      this.selectedContextMenuTrack = track;
+
+      const thumb = document.getElementById('contextThumb');
+      const title = document.getElementById('contextTitle');
+      const artist = document.getElementById('contextArtist');
+      if (thumb) thumb.src = track.cover || '/assets/images/card_tum_hi_ho.jpg';
+      if (title) title.textContent = track.title || 'Unknown Title';
+      if (artist) artist.textContent = track.artist || 'Unknown Artist';
+
+      let x = e.clientX || 100;
+      let y = e.clientY || 100;
+      if (x + 230 > window.innerWidth) x = window.innerWidth - 240;
+      if (y + 320 > window.innerHeight) y = window.innerHeight - 330;
+
+      trackContextMenu.style.left = x + 'px';
+      trackContextMenu.style.top = y + 'px';
+      trackContextMenu.classList.remove('hidden');
+    };
+
+    if (trackContextMenu) {
+      trackContextMenu.querySelectorAll('.context-item').forEach(item => {
+        item.onclick = (e) => {
+          e.stopPropagation();
+          const action = item.getAttribute('data-action');
+          const track = this.selectedContextMenuTrack;
+          trackContextMenu.classList.add('hidden');
+          if (!track) return;
+
+          if (action === 'play-next') {
+            this.addToPlayNext(track);
+          } else if (action === 'add-queue') {
+            this.addToManualQueue(track);
+          } else if (action === 'add-playlist') {
+            this.openAddToPlaylistModal(track);
+          } else if (action === 'toggle-like') {
+            this.toggleLikeTrack(track);
+          } else if (action === 'go-artist') {
+            this.openArtistView(track.artistId || '', track.artist);
+          } else if (action === 'go-album') {
+            this.openAlbumView(track.albumId || '', track.album || track.title);
+          } else if (action === 'share') {
+            const url = window.location.origin + '/#track/' + (track.id || '');
+            navigator.clipboard?.writeText(url);
+            if (typeof this.showToast === 'function') this.showToast('Copied track link to clipboard');
+          } else if (action === 'download') {
+            this.downloadTrack(track, true);
+          }
+        };
+      });
+    }
+
+    // Global Click-Outside dismisser for all dropdowns & popovers
+    document.addEventListener('click', (e) => {
+      if (notifDropdown && !notifDropdown.contains(e.target) && e.target !== notifBtn && !notifBtn?.contains(e.target)) {
+        notifDropdown.classList.add('hidden');
+      }
+      if (avatarDropdown && !avatarDropdown.contains(e.target) && e.target !== userAvatar && !userAvatar?.contains(e.target)) {
+        avatarDropdown.classList.add('hidden');
+      }
+      if (filterPopover && !filterPopover.contains(e.target) && e.target !== filterBtn && !filterBtn?.contains(e.target)) {
+        filterPopover.classList.add('hidden');
+      }
+      if (heroMoreMenu && !heroMoreMenu.contains(e.target) && e.target !== heroMoreBtn && !heroMoreBtn?.contains(e.target)) {
+        heroMoreMenu.classList.add('hidden');
+      }
+      if (trackContextMenu && !trackContextMenu.contains(e.target)) {
+        trackContextMenu.classList.add('hidden');
+      }
+    });
 
     // Play Now Button — Plays current artist's top hit & queues discography
     const playNowBtn = document.getElementById('monolithPlayNowBtn');
@@ -1938,6 +2156,18 @@ class REAMusicApp {
           </div>
           <span class="monolith-album-title" title="${track.title}">${track.title}</span>
         `;
+
+        card.addEventListener('contextmenu', (e) => {
+          this.openMonolithTrackContextMenu(e, {
+            id: track.id || 'track_' + Math.random().toString(36).substring(2, 8),
+            title: track.title,
+            artist: track.artist,
+            album: track.album || track.title + ' - Single',
+            cover: track.cover || '/assets/images/card_tum_hi_ho.jpg',
+            duration: track.duration || 240,
+            url: track.url || 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+          });
+        });
 
         card.addEventListener('click', () => {
           this.playSearchTrack({
@@ -4466,18 +4696,71 @@ class REAMusicApp {
     document.addEventListener('keydown', (e) => {
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
       const isInput = activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.isContentEditable;
-      if (e.code === 'Space' && !isInput) {
+      
+      if (e.key === 'Escape') {
+        if (this.isPlayerMaximized) this.minimizePlayer();
+        const nd = document.getElementById('notifDropdown'); if (nd) nd.classList.add('hidden');
+        const ad = document.getElementById('avatarDropdown'); if (ad) ad.classList.add('hidden');
+        const fp = document.getElementById('searchFilterPopover'); if (fp) fp.classList.add('hidden');
+        const hm = document.getElementById('heroMoreMenu'); if (hm) hm.classList.add('hidden');
+        const tc = document.getElementById('trackContextMenu'); if (tc) tc.classList.add('hidden');
+        return;
+      }
+
+      if (isInput) return;
+
+      if (e.code === 'Space') {
         e.preventDefault();
         this.togglePlayPause();
-      } else if (e.key === 'Escape' && this.isPlayerMaximized) {
-        this.minimizePlayer();
-      } else if ((e.key === 'f' || e.key === 'F') && !isInput) {
+      } else if (e.key === 'ArrowRight' && !e.shiftKey) {
         e.preventDefault();
-        this.toggleMaximizePlayer();
-      } else if ((e.key === 'j' || e.key === 'J') && !isInput) {
+        if (this.engine) this.engine.seek((this.engine.currentTime || 0) + 5);
+      } else if (e.key === 'ArrowLeft' && !e.shiftKey) {
+        e.preventDefault();
+        if (this.engine) this.engine.seek(Math.max(0, (this.engine.currentTime || 0) - 5));
+      } else if (e.key === 'ArrowRight' && e.shiftKey) {
+        e.preventDefault();
+        this.advanceTrack('manual');
+      } else if (e.key === 'ArrowLeft' && e.shiftKey) {
         e.preventDefault();
         this.prevTrack();
-      } else if ((e.key === 'k' || e.key === 'K') && !isInput) {
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (this.engine) {
+          const newVol = Math.min(1, (this.engine.volume || 1) + 0.1);
+          this.engine.setVolume(newVol);
+          if (this.volumeSlider) this.volumeSlider.value = Math.round(newVol * 100);
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (this.engine) {
+          const newVol = Math.max(0, (this.engine.volume || 1) - 0.1);
+          this.engine.setVolume(newVol);
+          if (this.volumeSlider) this.volumeSlider.value = Math.round(newVol * 100);
+        }
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        this.toggleMute();
+      } else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        if (this.currentTrack) this.toggleLikeTrack(this.currentTrack);
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        this.toggleShuffle();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        this.cycleRepeatMode();
+      } else if (e.key === '/') {
+        e.preventDefault();
+        const searchInput = document.getElementById('sidebarSearchInput') || document.getElementById('searchInput');
+        if (searchInput) searchInput.focus();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        this.toggleMaximizePlayer();
+      } else if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        this.prevTrack();
+      } else if (e.key === 'k' || e.key === 'K') {
         e.preventDefault();
         this.advanceTrack('manual');
       }
