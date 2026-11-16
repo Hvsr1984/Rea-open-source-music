@@ -10117,13 +10117,7 @@ class REAMusicApp {
     }
 
     window.__REA_DONATION_POPUP_SESSION_SHOWN__ = true;
-
-    // Small delay after app initialization so that initial shell renders smoothly
-    setTimeout(() => {
-      if (!this.donationPopupDismissed && this.currentView !== 'donate') {
-        this.openDonationPopup();
-      }
-    }, 700);
+    this.donationPopupDismissed = true;
   }
 
   openDonationPopup() {
