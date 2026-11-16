@@ -1620,86 +1620,433 @@ class HomeFeedService {
 // =============================================================================
 // 3. Main REA Music UI & Application Controller
 // =============================================================================
+
+const TRENDING_HERO_ARTISTS = [
+  {
+    name: 'Arijit Singh',
+    id: '459320',
+    bio: "Experience the soul of modern Indian music with Arijit Singh's biggest hits.",
+    image: '/assets/images/featured_arijit_sculpture.jpg',
+    fallbackTrack: {
+      id: 'KGfDrbWe',
+      title: 'Tum Hi Ho',
+      artist: 'Arijit Singh',
+      album: 'Aashiqui 2',
+      cover: '/assets/images/card_tum_hi_ho.jpg',
+      duration: 262,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  },
+  {
+    name: 'Shreya Ghoshal',
+    id: '455125',
+    bio: "The timeless Nightingale of contemporary cinema, weaving pure emotion through ethereal melodies and classic hits.",
+    image: 'https://c.saavncdn.com/artists/Shreya_Ghoshal_500x500.jpg',
+    fallbackTrack: {
+      id: 'shreya_track_1',
+      title: 'Sunn Raha Hai',
+      artist: 'Shreya Ghoshal',
+      album: 'Aashiqui 2',
+      cover: 'https://c.saavncdn.com/500/Aashiqui-2-Hindi-2013-20220909181510-500x500.jpg',
+      duration: 315,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  },
+  {
+    name: 'Diljit Dosanjh',
+    id: '468245',
+    bio: "Global Punjabi icon and powerhouse performer blending infectious Bhangra beats with international trap rhythms.",
+    image: 'https://c.saavncdn.com/artists/Diljit_Dosanjh_500x500.jpg',
+    fallbackTrack: {
+      id: 'diljit_track_1',
+      title: 'Lover',
+      artist: 'Diljit Dosanjh',
+      album: 'MoonChild Era',
+      cover: 'https://c.saavncdn.com/500/MoonChild-Era-Punjabi-2021-20210821033423-500x500.jpg',
+      duration: 198,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  },
+  {
+    name: 'Karan Aujla',
+    id: '468255',
+    bio: "Chart-topping Punjabi superstar dominating global charts with unforgettable flows, trap beats and street swagger.",
+    image: 'https://c.saavncdn.com/artists/Karan_Aujla_500x500.jpg',
+    fallbackTrack: {
+      id: 'aujla_track_1',
+      title: 'Softly',
+      artist: 'Karan Aujla',
+      album: 'Making Memories',
+      cover: 'https://c.saavncdn.com/500/Making-Memories-Punjabi-2023-20230818053245-500x500.jpg',
+      duration: 156,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  },
+  {
+    name: 'A.R. Rahman',
+    id: '456269',
+    bio: "Oscar & Grammy-winning maestro redefining global cinematic music with sublime spiritual orchestrations.",
+    image: 'https://c.saavncdn.com/artists/A_R_Rahman_500x500.jpg',
+    fallbackTrack: {
+      id: 'rahman_track_1',
+      title: 'Kun Faya Kun',
+      artist: 'A.R. Rahman, Javed Ali, Mohit Chauhan',
+      album: 'Rockstar',
+      cover: 'https://c.saavncdn.com/500/Rockstar-Hindi-2011-20221212023005-500x500.jpg',
+      duration: 472,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  },
+  {
+    name: 'Anuv Jain',
+    id: '489230',
+    bio: "Indie sensation telling raw, poetic stories of modern romance and heartfelt nostalgia through acoustic ballads.",
+    image: 'https://c.saavncdn.com/artists/Anuv_Jain_500x500.jpg',
+    fallbackTrack: {
+      id: 'anuv_track_1',
+      title: 'Husn',
+      artist: 'Anuv Jain',
+      album: 'Husn',
+      cover: 'https://c.saavncdn.com/500/Husn-Hindi-2023-20231201043224-500x500.jpg',
+      duration: 217,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  },
+  {
+    name: 'The Weeknd',
+    id: 'weeknd_global',
+    bio: "Global streaming giant crafting hypnotic, synth-drenched dark R&B and cinematic retro-futuristic anthems.",
+    image: 'https://c.saavncdn.com/artists/The_Weeknd_500x500.jpg',
+    fallbackTrack: {
+      id: 'weeknd_track_1',
+      title: 'Blinding Lights',
+      artist: 'The Weeknd',
+      album: 'After Hours',
+      cover: 'https://c.saavncdn.com/500/After-Hours-English-2020-20200320001046-500x500.jpg',
+      duration: 200,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  },
+  {
+    name: 'Pritam',
+    id: '455778',
+    bio: "The powerhouse architect of Bollywood hits, delivering two decades of anthemic romantic blockbusters.",
+    image: 'https://c.saavncdn.com/artists/Pritam_500x500.jpg',
+    fallbackTrack: {
+      id: 'pritam_track_1',
+      title: 'Kesariya',
+      artist: 'Pritam, Arijit Singh',
+      album: 'Brahmastra',
+      cover: '/assets/images/card_kesariya.jpg',
+      duration: 268,
+      url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    }
+  }
+];
+
 class REAMusicApp {
 
   initMonolithGlass() {
-    // Dynamic greeting calculation
-    const hour = new Date().getHours();
-    let greeting = 'Good Evening,';
-    if (hour < 12) greeting = 'Good Morning,';
-    else if (hour < 17) greeting = 'Good Afternoon,';
+    this.heroArtists = typeof TRENDING_HERO_ARTISTS !== 'undefined' ? TRENDING_HERO_ARTISTS : [];
+    this.currentHeroIndex = 0;
 
-    const greetingTimeEl = document.getElementById('monolithGreetingTime');
-    if (greetingTimeEl) greetingTimeEl.textContent = greeting;
+    // 1. Dynamic greeting based on current local time
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      let greeting = 'Good Evening,';
+      if (hour >= 5 && hour < 12) greeting = 'Good Morning,';
+      else if (hour >= 12 && hour < 17) greeting = 'Good Afternoon,';
 
-    const greetingUserEl = document.getElementById('monolithGreetingUser');
-    if (greetingUserEl) {
-      const savedProfile = localStorage.getItem('rea_user_profile');
-      let userName = 'Harsh';
-      if (savedProfile) {
+      const greetingTimeEl = document.getElementById('monolithGreetingTime');
+      if (greetingTimeEl) greetingTimeEl.textContent = greeting;
+
+      const greetingUserEl = document.getElementById('monolithGreetingUser');
+      if (greetingUserEl) {
+        let userName = 'Harsh';
         try {
-          const parsed = JSON.parse(savedProfile);
-          if (parsed && parsed.name) userName = parsed.name;
+          const savedProfile = localStorage.getItem('rea_user_profile');
+          if (savedProfile) {
+            const parsed = JSON.parse(savedProfile);
+            if (parsed && parsed.name) userName = parsed.name;
+          }
         } catch (_) {}
+        greetingUserEl.textContent = userName;
       }
-      greetingUserEl.textContent = userName;
+    };
+    updateGreeting();
+
+    // 2. Dynamic Hero Artist Renderer
+    const updateHeroArtist = (index) => {
+      if (!this.heroArtists || this.heroArtists.length === 0) return;
+      this.currentHeroIndex = (index + this.heroArtists.length) % this.heroArtists.length;
+      const artist = this.heroArtists[this.currentHeroIndex];
+
+      const titleEl = document.getElementById('monolithFeaturedTitle');
+      const descEl = document.getElementById('monolithFeaturedDesc');
+      const imgEl = document.getElementById('monolithFeaturedArtwork');
+
+      if (titleEl) {
+        titleEl.textContent = artist.name;
+        titleEl.style.cursor = 'pointer';
+        titleEl.onclick = () => this.openArtistView(artist.id, artist.name);
+      }
+      if (descEl) {
+        descEl.textContent = artist.bio;
+      }
+      if (imgEl) {
+        imgEl.style.opacity = '0.4';
+        imgEl.src = artist.image;
+        imgEl.alt = artist.name;
+        imgEl.onload = () => { imgEl.style.opacity = '1'; };
+        imgEl.onerror = () => {
+          imgEl.src = '/assets/images/featured_arijit_sculpture.jpg';
+          imgEl.style.opacity = '1';
+        };
+        imgEl.style.cursor = 'pointer';
+        imgEl.onclick = () => this.openArtistView(artist.id, artist.name);
+      }
+
+      // Check liked status
+      const likeBtn = document.getElementById('monolithLikeBtn');
+      if (likeBtn) {
+        let likedArtists = [];
+        try {
+          likedArtists = JSON.parse(localStorage.getItem('rea_liked_artists') || '[]');
+        } catch (_) {}
+        if (likedArtists.includes(artist.name)) {
+          likeBtn.classList.add('is-active');
+          likeBtn.style.color = 'var(--accent-lime)';
+        } else {
+          likeBtn.classList.remove('is-active');
+          likeBtn.style.color = '#F5F5F5';
+        }
+      }
+    };
+
+    updateHeroArtist(0);
+
+    // Carousel Navigation Controls
+    const prevBtn = document.getElementById('monolithHeroPrev');
+    if (prevBtn) {
+      prevBtn.onclick = (e) => {
+        e.preventDefault();
+        updateHeroArtist(this.currentHeroIndex - 1);
+      };
+    }
+    const nextBtn = document.getElementById('monolithHeroNext');
+    if (nextBtn) {
+      nextBtn.onclick = (e) => {
+        e.preventDefault();
+        updateHeroArtist(this.currentHeroIndex + 1);
+      };
     }
 
-    // Hero Play Now action
+    // Play Now Button — Plays current artist's top hit & queues discography
     const playNowBtn = document.getElementById('monolithPlayNowBtn');
     if (playNowBtn) {
-      playNowBtn.addEventListener('click', () => {
-        this.playSearchTrack({
-          id: 'KGfDrbWe',
-          title: 'Tum Hi Ho',
-          artist: 'Arijit Singh',
-          album: 'Aashiqui 2',
-          cover: '/assets/images/card_tum_hi_ho.jpg',
-          duration: 262,
-          url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
-        });
-      });
+      playNowBtn.onclick = async () => {
+        const artist = this.heroArtists[this.currentHeroIndex];
+        if (!artist) return;
+
+        this.playSearchTrack(artist.fallbackTrack);
+
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/artist?name=${encodeURIComponent(artist.name)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.songs) && data.songs.length > 0) {
+              this.sequenceQueue = data.songs;
+              this.sequenceIndex = 0;
+              this.playbackContext = {
+                type: 'artist',
+                id: artist.id,
+                title: `${artist.name} Essentials`
+              };
+              this.renderQueueDrawer();
+            }
+          }
+        } catch (_) {}
+      };
     }
 
-    // Recently played card clicks
-    const recentCards = document.querySelectorAll('.monolith-album-card');
-    recentCards.forEach(card => {
-      card.addEventListener('click', () => {
-        const title = card.getAttribute('data-title');
-        const artist = card.getAttribute('data-artist');
-        const id = card.getAttribute('data-id') || 'track_' + Math.random().toString(36).substring(2, 8);
-        const img = card.querySelector('img');
-        const cover = img ? img.src : '/assets/images/card_tum_hi_ho.jpg';
-        this.playSearchTrack({
-          id,
-          title,
-          artist,
-          album: title + ' - Single',
-          cover,
-          duration: 240,
-          url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+    // Like Artist Button
+    const likeBtn = document.getElementById('monolithLikeBtn');
+    if (likeBtn) {
+      likeBtn.onclick = (e) => {
+        e.preventDefault();
+        const artist = this.heroArtists[this.currentHeroIndex];
+        if (!artist) return;
+        let likedArtists = [];
+        try {
+          likedArtists = JSON.parse(localStorage.getItem('rea_liked_artists') || '[]');
+        } catch (_) {}
+        const idx = likedArtists.indexOf(artist.name);
+        if (idx > -1) {
+          likedArtists.splice(idx, 1);
+          likeBtn.classList.remove('is-active');
+          likeBtn.style.color = '#F5F5F5';
+          if (typeof this.showToast === 'function') this.showToast(`Removed ${artist.name} from favorites`);
+        } else {
+          likedArtists.push(artist.name);
+          likeBtn.classList.add('is-active');
+          likeBtn.style.color = 'var(--accent-lime)';
+          if (typeof this.showToast === 'function') this.showToast(`Added ${artist.name} to favorites`);
+        }
+        try {
+          localStorage.setItem('rea_liked_artists', JSON.stringify(likedArtists));
+        } catch (_) {}
+      };
+    }
+
+    // 3. Recently Played Live Synchronization
+    this.renderMonolithRecentGrid = () => {
+      const container = document.getElementById('monolithRecentGrid');
+      if (!container) return;
+
+      const history = this.history || [];
+      const curatedFallbacks = [
+        { id: 'KGfDrbWe', title: 'Tum Hi Ho', artist: 'Arijit Singh', cover: '/assets/images/card_tum_hi_ho.jpg', duration: 262, url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4' },
+        { id: 'track_channa_ve', title: 'Channa Ve', artist: 'Akhil Sachdeva', cover: '/assets/images/card_channa_ve.jpg', duration: 245, url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4' },
+        { id: 'track_kesariya', title: 'Kesariya', artist: 'Arijit Singh', cover: '/assets/images/card_kesariya.jpg', duration: 268, url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4' },
+        { id: 'track_apna_bana_le', title: 'Apna Bana Le', artist: 'Arijit Singh', cover: '/assets/images/card_apna_bana_le.jpg', duration: 261, url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4' },
+        { id: 'track_heeriye', title: 'Heeriye', artist: 'Arijit Singh, Jasleen Royal', cover: '/assets/images/card_heeriye.jpg', duration: 194, url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4' },
+        { id: 'track_sajni', title: 'Sajni', artist: 'Arijit Singh', cover: '/assets/images/card_sajni.jpg', duration: 170, url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4' }
+      ];
+
+      let displayTracks = [...history.slice(0, 6)];
+      if (displayTracks.length < 6) {
+        curatedFallbacks.forEach(item => {
+          if (displayTracks.length < 6 && !displayTracks.some(t => t.title && t.title.toLowerCase() === item.title.toLowerCase())) {
+            displayTracks.push(item);
+          }
         });
+      }
+
+      container.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+
+      displayTracks.forEach(track => {
+        const card = document.createElement('div');
+        card.className = 'monolith-album-card';
+        card.setAttribute('tabindex', '0');
+        card.innerHTML = `
+          <div class="monolith-album-cover">
+            <img src="${track.cover || '/assets/images/card_tum_hi_ho.jpg'}" alt="${track.title}" loading="lazy" decoding="async" onerror="this.src='/assets/images/card_tum_hi_ho.jpg'">
+            <div class="monolith-card-play-overlay">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="#B9F45B"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+          <span class="monolith-album-title" title="${track.title}">${track.title}</span>
+        `;
+
+        card.addEventListener('click', () => {
+          this.playSearchTrack({
+            id: track.id || 'track_' + Math.random().toString(36).substring(2, 8),
+            title: track.title,
+            artist: track.artist,
+            album: track.album || track.title + ' - Single',
+            cover: track.cover || '/assets/images/card_tum_hi_ho.jpg',
+            duration: track.duration || 240,
+            url: track.url || 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+          });
+        });
+
+        fragment.appendChild(card);
+      });
+
+      container.appendChild(fragment);
+    };
+
+    this.renderMonolithRecentGrid();
+
+    // 4. Made For You Mix Tiles Handler
+    const mixTiles = document.querySelectorAll('.monolith-mix-card');
+    mixTiles.forEach(tile => {
+      const mixKey = tile.getAttribute('data-mix');
+      const titleEl = tile.querySelector('.monolith-mix-title');
+      const mixTitle = titleEl ? titleEl.textContent : 'Made For You';
+
+      tile.addEventListener('click', (e) => {
+        e.preventDefault();
+        let seedGenre = 'superhits';
+        if (mixKey === 'chill-vibes') seedGenre = 'indie';
+        else if (mixKey === 'romantic-hits') seedGenre = 'romantic';
+        else if (mixKey === 'focus-flow') seedGenre = 'bollywood';
+
+        fetch(`${API_BASE_URL}/api/trending?category=${seedGenre}`)
+          .then(r => r.json())
+          .then(data => {
+            const songs = data.songs || data.quickPicks || [];
+            if (songs.length > 0) {
+              this.sequenceQueue = songs;
+              this.sequenceIndex = 0;
+              this.playbackContext = {
+                type: 'playlist',
+                id: mixKey,
+                title: mixTitle
+              };
+              this.playSearchTrack(songs[0]);
+              this.renderQueueDrawer();
+            }
+          })
+          .catch(() => {
+            this.playSearchTrack({
+              id: 'mix_' + mixKey,
+              title: mixTitle,
+              artist: 'REA Music Curated',
+              album: 'Made For You',
+              cover: '/assets/images/tile_' + mixKey.replace(/-/g, '_') + '.jpg',
+              duration: 260,
+              url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
+            });
+          });
       });
     });
 
-    // Made For You tile clicks
-    const mixTiles = document.querySelectorAll('.monolith-mix-card');
-    mixTiles.forEach(tile => {
-      tile.addEventListener('click', () => {
-        const mixName = tile.getAttribute('data-mix');
-        const titleEl = tile.querySelector('.monolith-mix-title');
-        const mixTitle = titleEl ? titleEl.textContent : 'Daily Mix';
-        this.playSearchTrack({
-          id: 'mix_' + mixName,
-          title: mixTitle,
-          artist: 'REA Music Curated',
-          album: 'Made For You',
-          cover: '/assets/images/tile_' + mixName.replace(/-/g, '_') + '.jpg',
-          duration: 300,
-          url: 'https://aac.saavncdn.com/264/b27f7a8ca184f4f7831d87e0fae1ec26_320.mp4'
-        });
-      });
-    });
+    // 5. Additional Sidebar Navigation Hooks
+    const navRadio = document.getElementById('navRadio');
+    if (navRadio) {
+      navRadio.onclick = (e) => {
+        e.preventDefault();
+        this.switchView('explore');
+        if (typeof this.showToast === 'function') this.showToast('Tuned in to Live REA Radio');
+      };
+    }
+
+    const navArtists = document.getElementById('navArtists');
+    if (navArtists) {
+      navArtists.onclick = (e) => {
+        e.preventDefault();
+        const artist = this.heroArtists[this.currentHeroIndex];
+        if (artist) this.openArtistView(artist.id, artist.name);
+      };
+    }
+
+    const navAlbums = document.getElementById('navAlbums');
+    if (navAlbums) {
+      navAlbums.onclick = (e) => {
+        e.preventDefault();
+        this.switchView('explore');
+        const shelf = document.getElementById('exploreReleasesShelf');
+        if (shelf) shelf.scrollIntoView({ behavior: 'smooth' });
+      };
+    }
+
+    const navLiked = document.getElementById('navLiked');
+    if (navLiked) {
+      navLiked.onclick = (e) => {
+        e.preventDefault();
+        this.switchView('library');
+      };
+    }
+
+    const navRecent = document.getElementById('navRecent');
+    if (navRecent) {
+      navRecent.onclick = (e) => {
+        e.preventDefault();
+        this.switchView('library');
+      };
+    }
   }
 
 
