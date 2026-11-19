@@ -1688,8 +1688,10 @@ class REAMusicApp {
     this.currentTrack = null;
     this.currentTrackIndex = -1;
     this.isPlaying = false;
-    this.isMuted = false;
-    this.previousVolume = 0.75;
+    const savedVol = this.loadLocalStorage('rea_volume', 0.75);
+    const parsedVol = (typeof savedVol === 'number' && !isNaN(savedVol)) ? Math.max(0, Math.min(1, savedVol)) : 0.75;
+    this.isMuted = (parsedVol === 0);
+    this.previousVolume = parsedVol > 0 ? parsedVol : 0.75;
 
     // 3-Tier Queue & Autoplay Engine Architecture
     this.manualQueue = [];
@@ -2641,11 +2643,17 @@ class REAMusicApp {
     this.progressBarFill = document.getElementById('progressFill');
     this.scrubHandle = document.getElementById('progressThumb');
     this.scrubTooltip = document.getElementById('progressTooltip');
+    this.volumeContainer = document.getElementById('volumeContainer');
     this.volumeBtn = document.getElementById('volumeBtn');
     this.volHighSvg = document.getElementById('volHighSvg');
+    this.volLowSvg = document.getElementById('volLowSvg');
     this.volMuteSvg = document.getElementById('volMuteSvg');
     this.volumeTrack = document.getElementById('volumeTrack');
     this.volumeFill = document.getElementById('volumeFill');
+    this.volumeThumb = document.getElementById('volumeThumb');
+    this.volumePercent = document.getElementById('volumePercent');
+    const initialVol = this.isMuted ? 0 : this.previousVolume;
+    this.setVolume(initialVol);
     this.audioVisualizer = document.getElementById('audioVisualizer');
     this.toggleQueueBtn = document.getElementById('toggleQueueBtn');
     this.toggleLyricsBtn = document.getElementById('toggleLyricsBtn');
@@ -3191,24 +3199,106 @@ class REAMusicApp {
       });
     }
 
-    // 5. Volume controls
+    // 5. Volume controls (mouse drag, touch drag, click & keyboard controls)
     if (this.volumeTrack) {
-      this.volumeTrack.addEventListener('click', (e) => {
+      const getVolumeFromPointer = (e) => {
+        if (!this.volumeTrack) return 0.75;
         const rect = this.volumeTrack.getBoundingClientRect();
-        const val = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        this.setVolume(val);
+        if (rect.width <= 0) return 0.75;
+        let clientX = e.clientX;
+        if (e.touches && e.touches.length > 0) {
+          clientX = e.touches[0].clientX;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+          clientX = e.changedTouches[0].clientX;
+        }
+        if (clientX === undefined) clientX = rect.left + rect.width * 0.75;
+        const pct = (clientX - rect.left) / rect.width;
+        return Math.max(0, Math.min(1, pct));
+      };
+
+      let isDraggingVolume = false;
+
+      this.volumeTrack.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        isDraggingVolume = true;
+        this.volumeTrack.classList.add('is-dragging');
+        this.setVolume(getVolumeFromPointer(e));
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDraggingVolume) return;
+        this.setVolume(getVolumeFromPointer(e));
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDraggingVolume) {
+          isDraggingVolume = false;
+          this.volumeTrack?.classList.remove('is-dragging');
+        }
+      });
+
+      this.volumeTrack.addEventListener('touchstart', (e) => {
+        isDraggingVolume = true;
+        this.volumeTrack.classList.add('is-dragging');
+        this.setVolume(getVolumeFromPointer(e));
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (!isDraggingVolume) return;
+        this.setVolume(getVolumeFromPointer(e));
+      }, { passive: true });
+
+      window.addEventListener('touchend', () => {
+        if (isDraggingVolume) {
+          isDraggingVolume = false;
+          this.volumeTrack?.classList.remove('is-dragging');
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchcancel', () => {
+        if (isDraggingVolume) {
+          isDraggingVolume = false;
+          this.volumeTrack?.classList.remove('is-dragging');
+        }
+      }, { passive: true });
+
+      // Keyboard Accessibility (Arrow keys, Home, End, PageUp, PageDown)
+      this.volumeTrack.addEventListener('keydown', (e) => {
+        const cur = typeof this.engine.volume === 'number' ? this.engine.volume : 0.75;
+        let nextVol = null;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+          nextVol = Math.min(1, cur + 0.05);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+          nextVol = Math.max(0, cur - 0.05);
+        } else if (e.key === 'Home') {
+          nextVol = 0;
+        } else if (e.key === 'End') {
+          nextVol = 1;
+        } else if (e.key === 'PageUp') {
+          nextVol = Math.min(1, cur + 0.1);
+        } else if (e.key === 'PageDown') {
+          nextVol = Math.max(0, cur - 0.1);
+        }
+        if (nextVol !== null) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.setVolume(nextVol);
+        }
       });
     }
 
     if (this.volumeBtn) {
-      this.volumeBtn.addEventListener('click', () => {
-        if (this.isMuted) {
-          this.setVolume(this.previousVolume || 0.75);
+      this.volumeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (this.isMuted || this.engine.volume === 0) {
+          const restoreVol = (this.previousVolume && this.previousVolume > 0) ? this.previousVolume : 0.75;
           this.isMuted = false;
+          this.setVolume(restoreVol);
         } else {
-          this.previousVolume = this.engine.volume || 0.75;
-          this.setVolume(0);
+          this.previousVolume = (this.engine.volume && this.engine.volume > 0) ? this.engine.volume : 0.75;
           this.isMuted = true;
+          this.setVolume(0);
         }
       });
     }
@@ -4050,6 +4140,9 @@ class REAMusicApp {
       } else if ((e.key === 'k' || e.key === 'K') && !isInput) {
         e.preventDefault();
         this.advanceTrack('manual');
+      } else if ((e.key === 'm' || e.key === 'M') && !isInput) {
+        e.preventDefault();
+        if (this.volumeBtn) this.volumeBtn.click();
       }
     });
 
@@ -6261,21 +6354,72 @@ class REAMusicApp {
   }
 
   setVolume(val) {
-    this.engine.setVolume(val);
+    const clamped = Math.max(0, Math.min(1, typeof val === 'number' && !isNaN(val) ? val : 0.75));
+    this.engine.setVolume(clamped);
+
+    if (clamped > 0) {
+      this.isMuted = false;
+      this.previousVolume = clamped;
+    } else {
+      this.isMuted = true;
+    }
+
+    try {
+      localStorage.setItem('rea_volume', clamped.toString());
+    } catch (_) {}
+
+    const pct = Math.round(clamped * 100);
+
+    // Mini Player Slider Elements
     if (this.volumeFill) {
-      this.volumeFill.style.width = `${val * 100}%`;
+      this.volumeFill.style.width = `${pct}%`;
     }
-    if (this.maxVolumeFill) {
-      this.maxVolumeFill.style.width = `${val * 100}%`;
+    if (this.volumeThumb) {
+      this.volumeThumb.style.left = `${pct}%`;
     }
-    if (val === 0) {
+    if (this.volumePercent) {
+      this.volumePercent.textContent = `${pct}%`;
+    }
+    if (this.volumeTrack) {
+      this.volumeTrack.setAttribute('aria-valuenow', pct.toString());
+      this.volumeTrack.setAttribute('aria-valuetext', `${pct}%`);
+    }
+
+    // 3-State Mini Speaker Icons (>50% high, 1%-50% low, 0% mute)
+    if (clamped === 0 || this.isMuted) {
       if (this.volHighSvg) this.volHighSvg.classList.add('hidden');
+      if (this.volLowSvg) this.volLowSvg.classList.add('hidden');
       if (this.volMuteSvg) this.volMuteSvg.classList.remove('hidden');
+      if (this.volumeBtn) {
+        this.volumeBtn.setAttribute('title', 'Unmute (M)');
+        this.volumeBtn.setAttribute('aria-label', 'Unmute');
+      }
+    } else if (clamped <= 0.5) {
+      if (this.volHighSvg) this.volHighSvg.classList.add('hidden');
+      if (this.volLowSvg) this.volLowSvg.classList.remove('hidden');
+      if (this.volMuteSvg) this.volMuteSvg.classList.add('hidden');
+      if (this.volumeBtn) {
+        this.volumeBtn.setAttribute('title', 'Mute (M)');
+        this.volumeBtn.setAttribute('aria-label', 'Mute');
+      }
+    } else {
+      if (this.volHighSvg) this.volHighSvg.classList.remove('hidden');
+      if (this.volLowSvg) this.volLowSvg.classList.add('hidden');
+      if (this.volMuteSvg) this.volMuteSvg.classList.add('hidden');
+      if (this.volumeBtn) {
+        this.volumeBtn.setAttribute('title', 'Mute (M)');
+        this.volumeBtn.setAttribute('aria-label', 'Mute');
+      }
+    }
+
+    // Maximized Theater Player Scrubber & Icons Synchronization
+    if (this.maxVolumeFill) {
+      this.maxVolumeFill.style.width = `${pct}%`;
+    }
+    if (clamped === 0 || this.isMuted) {
       if (this.maxVolHighSvg) this.maxVolHighSvg.classList.add('hidden');
       if (this.maxVolMuteSvg) this.maxVolMuteSvg.classList.remove('hidden');
     } else {
-      if (this.volHighSvg) this.volHighSvg.classList.remove('hidden');
-      if (this.volMuteSvg) this.volMuteSvg.classList.add('hidden');
       if (this.maxVolHighSvg) this.maxVolHighSvg.classList.remove('hidden');
       if (this.maxVolMuteSvg) this.maxVolMuteSvg.classList.add('hidden');
     }
