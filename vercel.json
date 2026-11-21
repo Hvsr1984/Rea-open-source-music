@@ -1,6 +1,8 @@
 {
   "version": 2,
-  "regions": ["bom1"],
+  "regions": [
+    "bom1"
+  ],
   "headers": [
     {
       "source": "/manifest.webmanifest",
@@ -127,6 +129,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/analytics/collect",
+      "destination": "/api/analytics/collect.js"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/index.js?path=$1"
