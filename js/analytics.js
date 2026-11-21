@@ -7,7 +7,7 @@
     consent.type = 'button';
     consent.style.cssText = 'margin:10px;padding:8px 12px;border-radius:5px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer';
     const mount = () => {
-      const host = document.querySelector('.sidebar-footer') || document.querySelector('aside') || document.body;
+      const host = document.querySelector('.sidebar-nav') || document.querySelector('aside') || document.body;
       host.append(consent);
       consent.textContent = 'Usage analytics · ' + (allowed() ? 'On' : 'Off');
     };
