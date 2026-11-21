@@ -76,7 +76,7 @@ const styleBlock = `  <style id="rea-embedded-styles">\n${cssContent}\n  </style
 bundledHtml = bundledHtml.replace('</head>', `${styleBlock}</head>`);
 
 // Inject embedded JS before </body>
-const scriptBlock = `  <script id="rea-embedded-script">\n${jsContent}\n  </script>\n`;
+const scriptBlock = `  <script id="rea-embedded-script">\n${fs.readFileSync(path.join(__dirname, 'js', 'analytics.js'), 'utf8')}\n${jsContent}\n  </script>\n`;
 bundledHtml = bundledHtml.replace('</body>', `${scriptBlock}</body>`);
 
 // Normalize excessive blank lines

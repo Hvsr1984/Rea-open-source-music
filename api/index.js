@@ -1,3 +1,4 @@
+import collectAnalytics from './analytics/collect.js';
 import { decryptSaavnUrl } from './des.js';
 import { Readable } from 'node:stream';
 import crypto from 'node:crypto';
@@ -613,6 +614,10 @@ async function fetchGenreSongs(genreKey, page = 1) {
  * Universal API Handler: compatible with Vercel Serverless Functions and Node.js http.Server
  */
 export default async function handler(req, res) {
+  const requestPath = new URL(req.url, 'http://localhost').pathname;
+  if (requestPath === '/api/analytics/collect' || req.query?.path === 'analytics/collect') {
+    return collectAnalytics(req, res);
+  }
   const originalUrl = req.headers['x-forwarded-url'] || req.headers['x-matched-path'] || req.headers['x-invoke-path'] || req.url;
   const parsedUrl = new URL(originalUrl, `http://${req.headers.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;

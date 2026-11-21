@@ -237,6 +237,7 @@ class OfflineStorage {
 class HybridAudioEngine {
   constructor() {
     this.audio = new Audio();
+    window.reaAnalytics?.attach(this.audio);
     this.audio.preload = 'auto';
     this.volume = 0.75;
     this.audio.volume = this.volume;
@@ -280,6 +281,7 @@ class HybridAudioEngine {
       this.ctx.resume().catch(() => {});
     }
 
+    window.reaAnalytics?.select(track);
     this.currentTrack = track;
     const audioSource = track.localBlobUrl || track.audioUrl;
     if (audioSource) {
